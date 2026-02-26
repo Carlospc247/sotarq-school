@@ -1,0 +1,11 @@
+{% if 'documents' in active_modules %}
+<a href="{% url 'documents:verify_document' %}" class="flex items-center p-3 hover:text-white hover:bg-slate-800 rounded-lg transition-colors group">
+    <i data-feather="folder" class="mr-3 text-yellow-500"></i><span>Documentos</span>
+</a>
+{% endif %}
+
+{% if 'management' in active_modules %}
+<a href="{% url 'management:settings' %}" class="flex items-center p-3 hover:text-white hover:bg-slate-800 rounded-lg transition-colors group">
+    <i data-feather="settings" class="mr-3 text-slate-300"></i><span>Gestão Interna</span>
+</a>
+{% endif %}

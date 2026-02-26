@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f7fa; font-family: 'Inter', Helvetica, Arial, sans-serif;">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+            <td align="center" style="padding: 40px 0;">
+                <table border="0" cellpadding="0" cellspacing="0" width="600" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                    
+                    <tr>
+                        <td align="center" style="background-color: #1e293b; padding: 40px 40px 30px 40px;">
+                            <div style="background-color: #4f46e5; width: 48px; height: 48px; border-radius: 12px; display: inline-block; line-height: 48px; color: #ffffff; font-weight: 800; font-size: 20px;">S</div>
+                            <h1 style="color: #ffffff; font-size: 24px; font-weight: 800; margin: 20px 0 0 0; letter-spacing: -0.025em; text-transform: uppercase;">Pagamento Confirmado</h1>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="padding: 40px;">
+                            <p style="font-size: 16px; line-height: 24px; color: #334155; margin-bottom: 24px;">
+                                Prezado(a) Encarregado(a),<br><br>
+                                Confirmamos a receção e validação do pagamento efetuado para a conta do aluno <strong>{{ student_name }}</strong>. Os dados foram devidamente processados pelo nosso departamento financeiro.
+                            </p>
+
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px;">
+                                <tr>
+                                    <td style="padding: 24px;">
+                                        <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                            <tr>
+                                                <td style="font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; padding-bottom: 8px;">Documento de Referência</td>
+                                                <td align="right" style="font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; padding-bottom: 8px;">Montante Validado</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="font-size: 16px; font-weight: 700; color: #1e293b;">{{ invoice_number }}</td>
+                                                <td align="right" style="font-size: 20px; font-weight: 800; color: #10b981;">{{ amount|floatformat:2 }} Kz</td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="font-size: 14px; line-height: 21px; color: #64748b; margin-top: 24px;">
+                                O seu <strong>Recibo Oficial (Documento Fiscal)</strong> foi gerado e encontra-se em anexo a este e-mail. Poderá utilizá-lo para efeitos de justificação de despesas.
+                            </p>
+
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-top: 32px;">
+                                <tr>
+                                    <td align="center">
+                                        <a href="{{ dashboard_url }}" style="background-color: #1e293b; color: #ffffff; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 14px; display: inline-block;">Aceder ao Portal do Aluno</a>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="padding: 0 40px 40px 40px;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border-top: 1px solid #e2e8f0; pt-32px">
+                                <tr>
+                                    <td style="padding-top: 24px; font-size: 12px; color: #94a3b8; text-align: center;">
+                                        &copy; 2026 <strong>{{ school_name }}</strong>. Todos os direitos reservados.<br>
+                                        Sistema de Gestão Escolar gerido por <strong>SOTARQ Enterprise</strong>.
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

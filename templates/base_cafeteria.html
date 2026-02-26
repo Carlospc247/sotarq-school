@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block side_menu %}
+<div class="flex flex-col h-full bg-slate-900 text-slate-400 p-6 min-w-[280px]">
+    <div class="mb-12 px-2">
+        <h2 class="text-white font-black italic text-2xl tracking-tighter uppercase">
+            Sotarq<span class="text-indigo-500">Food</span>
+        </h2>
+        <p class="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1">Módulo de Aprovisionamento</p>
+    </div>
+    
+    <nav class="flex-1 space-y-3">
+        <a href="{% url 'cafeteria:pos_checkout' %}" 
+           class="flex items-center gap-4 p-4 rounded-2xl hover:bg-slate-800 hover:text-white transition-all group {% if request.resolver_match.url_name == 'pos_checkout' %}bg-indigo-600 text-white shadow-lg shadow-indigo-500/20{% endif %}">
+            <i data-feather="monitor" class="w-5 h-5 group-hover:scale-110 transition-transform"></i> 
+            <span class="text-[11px] font-black uppercase tracking-wider">Ponto de Venda</span>
+        </a>
+
+        <a href="{% url 'cafeteria:inventory_list' %}" 
+           class="flex items-center gap-4 p-4 rounded-2xl hover:bg-slate-800 hover:text-white transition-all group {% if request.resolver_match.url_name == 'inventory_list' %}bg-indigo-600 text-white shadow-lg shadow-indigo-500/20{% endif %}">
+            <i data-feather="package" class="w-5 h-5 group-hover:scale-110 transition-transform"></i> 
+            <span class="text-[11px] font-black uppercase tracking-wider">Stock & Produtos</span>
+        </a>
+
+        <a href="{% url 'cafeteria:client_manager' %}" 
+           class="flex items-center gap-4 p-4 rounded-2xl hover:bg-slate-800 hover:text-white transition-all group {% if request.resolver_match.url_name == 'client_manager' %}bg-indigo-600 text-white shadow-lg shadow-indigo-500/20{% endif %}">
+            <i data-feather="users" class="w-5 h-5 group-hover:scale-110 transition-transform"></i> 
+            <span class="text-[11px] font-black uppercase tracking-wider">Gestão de Clientes</span>
+        </a>
+
+        <a href="{% url 'cafeteria:sessions_history' %}" 
+           class="flex items-center gap-4 p-4 rounded-2xl hover:bg-slate-800 hover:text-white transition-all group {% if request.resolver_match.url_name == 'sessions_history' %}bg-indigo-600 text-white shadow-lg shadow-indigo-500/20{% endif %}">
+            <i data-feather="archive" class="w-5 h-5 group-hover:scale-110 transition-transform"></i> 
+            <span class="text-[11px] font-black uppercase tracking-wider">Histórico de Caixas</span>
+        </a>
+    </nav>
+
+    <div class="mt-auto border-t border-slate-800 pt-8">
+        <a href="{% url 'core:dashboard' %}" 
+           class="flex items-center justify-center gap-3 p-4 rounded-2xl bg-slate-800 text-slate-300 font-black text-[10px] uppercase tracking-[0.2em] hover:bg-red-600 hover:text-white transition-all group">
+            <i data-feather="corner-up-left" class="w-4 h-4 group-hover:-translate-x-1 transition-transform"></i> 
+            Sair do Módulo
+        </a>
+    </div>
+</div>
+{% endblock %}

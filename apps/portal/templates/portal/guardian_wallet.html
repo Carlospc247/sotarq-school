@@ -1,0 +1,45 @@
+{% extends 'portal_base.html' %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-8 animate-fade-in">
+    
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+        <div class="flex items-center space-x-4">
+            <div class="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white text-2xl font-black">
+                {{ student.full_name|slice:":1" }}
+            </div>
+            <div>
+                <h1 class="text-2xl font-black text-slate-800 tracking-tight">Portal do Aluno</h1>
+                <p class="text-slate-500 font-medium">{{ student.full_name }} | Matrícula: <span class="text-indigo-600 font-bold">{{ student.registration_number }}</span></p>
+            </div>
+        </div>
+        <div class="flex space-x-2">
+             <span class="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold uppercase tracking-wider">Status: Activo</span>
+        </div>
+    </div>
+<div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+    <div class="flex items-center justify-between mb-6">
+        <h3 class="text-sm font-black text-slate-400 uppercase tracking-widest">Controlo de Gastos (Cantina)</h3>
+        <span class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold">Saldo: {{ student.wallet.balance }} Kz</span>
+    </div>
+
+    <form method="POST" action="{% url 'cafeteria:update_limit' %}">
+        {% csrf_token %}
+        <label class="text-[10px] font-black text-slate-400 uppercase">Limite Diário de Consumo (Kz)</label>
+        <div class="mt-2 flex gap-4">
+            <input type="number" name="daily_limit" value="{{ student.wallet.daily_limit }}" 
+                   class="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700">
+            <button type="submit" class="px-6 py-3 bg-slate-900 text-white rounded-xl text-xs font-bold uppercase hover:bg-indigo-600 transition-all">
+                Definir
+            </button>
+        </div>
+    </form>
+    
+    <div class="mt-6 pt-6 border-t border-slate-50">
+        <a href="{% url 'finance:reload_wallet' %}" class="block w-full text-center py-3 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700">
+            Carregar Saldo via Multicaixa
+        </a>
+    </div>
+</div>
+</div>
+{% endblock %}

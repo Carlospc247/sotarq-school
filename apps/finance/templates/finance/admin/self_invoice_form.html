@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="max-w-2xl mx-auto py-10 px-4">
+    <div class="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden">
+        <div class="bg-slate-900 p-8 text-white">
+            <h2 class="text-xl font-black uppercase italic tracking-tighter">Emitir Autofacturação (AF)</h2>
+            <p class="text-xs opacity-70 font-bold uppercase">Justificação legal de saída de caixa</p>
+        </div>
+        
+        <form method="POST" class="p-8 space-y-6">
+            {% csrf_token %}
+            
+            <div>
+                <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Seleccionar Prestador</label>
+                <select name="provider_id" required class="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-indigo-500">
+                    <option value="">-- Escolha o prestador --</option>
+                    {% for p in providers %}
+                    <option value="{{ p.id }}">{{ p.full_name }} (BI: {{ p.bi_number }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Descrição do Serviço</label>
+                <textarea name="description" required rows="3" placeholder="Ex: Reparação do sistema elétrico do bloco B..." 
+                          class="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold"></textarea>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Valor Total (Kz)</label>
+                    <input type="number" name="amount" step="0.01" required 
+                           class="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold text-emerald-600">
+                </div>
+                <div class="flex items-end">
+                    <button type="submit" class="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all">
+                        Gerar Autofacturação (AF)
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

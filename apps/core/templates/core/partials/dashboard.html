@@ -1,0 +1,22 @@
+{% if student.is_suspended %}
+<div class="bg-red-50 border-l-4 border-red-500 p-6 rounded-2xl shadow-lg mb-8">
+    <div class="flex items-center justify-between">
+        <div class="flex items-center">
+            <div class="p-3 bg-red-100 rounded-full text-red-600 mr-4">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            </div>
+            <div>
+                <h3 class="text-xl font-black text-red-900 leading-none uppercase">Acesso Suspenso</h3>
+                <p class="text-red-700 mt-1 font-medium">Regularize as suas propinas para aceder aos conteúdos académicos.</p>
+            </div>
+        </div>
+        
+        <form action="{% url 'finance:request_agreement' %}" method="POST">
+            {% csrf_token %}
+            <button type="submit" class="bg-red-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-red-700 transition-all shadow-md shadow-red-200">
+                Regularizar com Acordo (Dividir em 3x)
+            </button>
+        </form>
+    </div>
+</div>
+{% endif %}

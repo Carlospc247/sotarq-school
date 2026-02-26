@@ -1,0 +1,188 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mx-auto max-w-7xl">
+    
+    <div class="flex flex-col md:flex-row md:items-center justify-between mb-8 space-y-4 md:space-y-0">
+        <div>
+            <h1 class="text-2xl font-black text-slate-800 tracking-tight">Gestão de Usuários</h1>
+            <p class="text-sm text-slate-500 mt-1">Administração de acessos, perfis e staff escolar.</p>
+        </div>
+        <div class="flex items-center space-x-3">
+            {% if request.user.current_role in 'ADMIN,DIRECTOR,RH' %}
+                <a href="{% url 'core:recruitment_dashboard' %}" class="flex items-center px-4 py-2 bg-green-100 border border-slate-300 rounded-lg text-slate-600 text-sm font-bold hover:border-indigo-600">
+                    <i data-feather="users" class="w-5 h-5 mr-3"></i>
+                        <span class="font-medium text-sm">Recrutamento</span>    
+                </a>
+
+            {% endif %}
+            <a href="{% url 'core:user_import' %}" class="flex items-center px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-600 text-sm font-bold hover:bg-slate-50 transition-colors shadow-sm">
+                <i data-feather="upload" class="w-4 h-4 mr-2"></i> Importar CSV
+            </a>
+
+            <a href="{% url 'core:user_export' %}?q={{ request.GET.q }}&role={{ request.GET.role }}" class="flex items-center px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-600 text-sm font-bold hover:bg-slate-50 transition-colors shadow-sm">
+                <i data-feather="download" class="w-4 h-4 mr-2"></i> Exportar
+            </a>
+            
+            <a href="{% url 'core:user_add' %}" class="flex items-center px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-bold hover:bg-brand-700 transition-colors shadow-md hover:shadow-lg">
+                <i data-feather="plus" class="w-4 h-4 mr-2"></i> Novo Funcionário
+            </a>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6">
+        <form method="GET" class="flex flex-col md:flex-row md:items-center gap-4">
+            <div class="relative flex-1">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i data-feather="search" class="text-slate-400 w-4 h-4"></i>
+                </div>
+                <input type="text" name="q" value="{{ request.GET.q }}" 
+                       class="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg leading-5 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 sm:text-sm transition-shadow" 
+                       placeholder="Buscar por nome, username ou e-mail...">
+            </div>
+            
+            <div class="w-full md:w-48">
+                <select name="role" class="block w-full pl-3 pr-10 py-2 text-base border-slate-300 focus:outline-none focus:ring-brand-500 focus:border-brand-500 sm:text-sm rounded-lg">
+                    <option value="">Todos os Perfis</option>
+                    <option value="ADMIN" {% if request.GET.role == 'ADMIN' %}selected{% endif %}>Administradores</option>
+                    <option value="DIRECTOR" {% if request.GET.role == 'DIRECTOR' %}selected{% endif %}>Diretores</option>
+                    <option value="TEACHER" {% if request.GET.role == 'TEACHER' %}selected{% endif %}>Professores</option>
+                    <option value="SECRETARY" {% if request.GET.role == 'SECRETARY' %}selected{% endif %}>Secretaria</option>
+                </select>
+            </div>
+
+            <button type="submit" class="px-5 py-2 bg-slate-800 text-white rounded-lg text-sm font-bold hover:bg-slate-900 transition-colors">
+                Filtrar
+            </button>
+        </form>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200">
+                <thead class="bg-slate-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
+                            Usuário
+                        </th>
+                        <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
+                            Perfil (Role)
+                        </th>
+                        <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
+                            Status
+                        </th>
+                        <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
+                            Data Criação
+                        </th>
+                        <th scope="col" class="relative px-6 py-4">
+                            <span class="sr-only">Ações</span>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-slate-200">
+                    {% for user_obj in users %}
+                    <tr class="hover:bg-slate-50 transition-colors group">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0 h-10 w-10">
+                                    <div class="h-10 w-10 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-bold border border-brand-200">
+                                        {{ user_obj.username|first|upper }}{{ user_obj.last_name|first|upper }}
+                                    </div>
+                                </div>
+                                <div class="ml-4">
+                                    <div class="text-sm font-bold text-slate-900">
+                                        {{ user_obj.get_full_name|default:user_obj.username }}
+                                    </div>
+                                    <div class="text-xs text-slate-500">
+                                        {{ user_obj.email|default:"Sem e-mail" }}
+                                    </div>
+                                    <div class="text-[10px] text-slate-400 font-mono mt-0.5">
+                                        @{{ user_obj.username }}
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if user_obj.current_role == 'ADMIN' or user_obj.is_superuser %}
+                                <span class="px-3 py-1 inline-flex text-xs leading-5 font-bold rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+                                    Admin/Superuser
+                                </span>
+                            {% elif user_obj.current_role == 'DIRECTOR' %}
+                                <span class="px-3 py-1 inline-flex text-xs leading-5 font-bold rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                    Diretor
+                                </span>
+                            {% elif user_obj.current_role == 'TEACHER' %}
+                                <span class="px-3 py-1 inline-flex text-xs leading-5 font-bold rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+                                    Professor
+                                </span>
+                            {% elif user_obj.current_role == 'SECRETARY' %}
+                                <span class="px-3 py-1 inline-flex text-xs leading-5 font-bold rounded-full bg-pink-100 text-pink-800 border border-pink-200">
+                                    Secretaria
+                                </span>
+                            {% else %}
+                                <span class="px-3 py-1 inline-flex text-xs leading-5 font-bold rounded-full bg-slate-100 text-slate-800 border border-slate-200">
+                                    {{ user_obj.get_current_role_display }}
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if user_obj.is_active %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+                                <span class="w-2 h-2 mr-1.5 bg-emerald-500 rounded-full"></span>
+                                Ativo
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                <span class="w-2 h-2 mr-1.5 bg-red-500 rounded-full"></span>
+                                Inativo
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                            {{ user_obj.date_joined|date:"d M, Y" }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <div class="flex justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <a href="{% url 'core:user_edit' user_obj.id %}" class="text-brand-600 hover:text-brand-900 p-2 hover:bg-brand-50 rounded-lg" title="Editar">
+                                    <i data-feather="edit-2" class="w-4 h-4"></i>
+                                </a>
+                                {% if not user_obj.is_superuser %}
+                                <a href="#" class="text-red-600 hover:text-red-900 p-2 hover:bg-red-50 rounded-lg" title="Suspender/Apagar" onclick="return confirm('Tem a certeza que deseja desativar este utilizador?');">
+                                    <i data-feather="trash-2" class="w-4 h-4"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="px-6 py-12 text-center">
+                            <div class="flex flex-col items-center justify-center">
+                                <div class="bg-slate-50 p-4 rounded-full mb-3">
+                                    <i data-feather="users" class="w-8 h-8 text-slate-400"></i>
+                                </div>
+                                <h3 class="text-sm font-bold text-slate-900">Nenhum utilizador encontrado</h3>
+                                <p class="text-sm text-slate-500 mt-1">Ajuste os filtros ou adicione um novo funcionário.</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="bg-slate-50 px-4 py-3 border-t border-slate-200 sm:px-6">
+            <div class="text-xs text-slate-500 text-center">
+                A exibir {{ users.count }} registo(s).
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        feather.replace();
+    });
+</script>
+{% endblock %}

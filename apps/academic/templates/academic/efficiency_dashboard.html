@@ -1,0 +1,254 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div x-data="{ 
+    openModal: false, 
+    processing: false, 
+    lock_event_is_break: {{ lock_event.is_pedagogical_break|yesno:'true,false' }} 
+}" class="container mx-auto max-w-7xl px-4 py-8">
+    
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+        <div>
+            <h1 class="text-2xl font-black text-slate-800 flex items-center gap-2">
+                <i data-feather="bar-chart-2" class="w-6 h-6 text-indigo-600"></i>
+                Eficiência & Recursos
+            </h1>
+            <p class="text-sm text-slate-500">
+                Análise de desperdício de tempos e ocupação de espaços.
+                <span class="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-xs ml-2">
+                    Ano Ativo: {{ active_year.name }}
+                </span>
+            </p>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="window.print()" class="flex items-center px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-50 shadow-sm transition">
+                <i data-feather="printer" class="w-4 h-4 mr-2"></i> Imprimir
+            </button>
+            <a href="{% url 'academic:export_efficiency_pdf' %}" target="_blank" class="flex items-center px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-50 shadow-sm transition">
+                <i data-feather="file-text" class="w-4 h-4 mr-2"></i> Exportar PDF (Server-side)
+            </a>
+            <a href="{% url 'core:dashboard' %}" class="flex items-center px-4 py-2 bg-slate-800 text-white rounded-lg text-sm font-bold hover:bg-slate-900 shadow-lg transition">
+                <i data-feather="arrow-left" class="w-4 h-4 mr-2"></i> Voltar
+            </a>
+        </div>
+    </div>
+
+    <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm mb-8 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-4">
+            <div class="p-4 rounded-2xl" :class="lock_event_is_break ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'">
+                <template x-if="lock_event_is_break">
+                    <i data-feather="lock" class="w-6 h-6"></i>
+                </template>
+                <template x-if="!lock_event_is_break">
+                    <i data-feather="unlock" class="w-6 h-6"></i>
+                </template>
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h3 class="font-black text-slate-800 italic uppercase text-sm">Controlo de Lançamentos</h3>
+                    <span :class="lock_event_is_break ? 'animate-pulse bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase' : 'bg-emerald-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase'">
+                        <span x-text="lock_event_is_break ? 'Bloqueado' : 'Liberado'"></span>
+                    </span>
+                </div>
+                <p class="text-xs text-slate-500">Estado atual das pautas no {{ active_year.name }}.</p>
+            </div>
+        </div>
+
+        <button type="button" @click="openModal = true" :disabled="processing"
+            class="group flex items-center gap-2 px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-md hover:shadow-xl"
+            :class="lock_event_is_break ? 'bg-white border-2 border-red-600 text-red-600 hover:bg-red-600 hover:text-white' : 'bg-slate-900 text-white hover:bg-indigo-600'">
+            <i data-feather="power" class="w-4 h-4"></i>
+            <span x-text="lock_event_is_break ? 'Encerrar Pausa' : 'Ativar Pausa'"></span>
+        </button>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+            <h3 class="text-sm font-black text-slate-800 uppercase mb-4 italic">🏆 Top Performance: Aprovação</h3>
+            <div class="relative" style="height: 300px;">
+                <canvas id="performanceChart"></canvas>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+            <h3 class="text-sm font-black text-red-600 uppercase mb-4 italic">⚠️ Alertas de Rendimento</h3>
+            <div class="space-y-4 max-h-[300px] overflow-y-auto pr-2">
+                {% for item in alerts %}
+                <div class="flex justify-between items-center p-3 bg-red-50 rounded-xl border border-red-100">
+                    <div>
+                        <p class="text-sm font-bold text-slate-800">{{ item.teacher }}</p>
+                        <p class="text-[10px] text-slate-500">{{ item.subject }} - {{ item.class }}</p>
+                    </div>
+                    <span class="text-red-600 font-black">{{ item.pass_rate }}%</span>
+                </div>
+                {% empty %}
+                <p class="text-xs text-slate-400 italic text-center py-10">Sem alertas de baixo rendimento.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden flex flex-col h-full">
+            <div class="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+                <h3 class="font-bold text-slate-800 text-sm uppercase italic">Janelas de Horários (Top 10)</h3>
+                <div class="p-2 bg-amber-50 rounded-lg text-amber-600"><i data-feather="clock" class="w-4 h-4"></i></div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-50">
+                    <tbody class="divide-y divide-slate-50">
+                        {% for t in teacher_stats %}
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="px-6 py-4 text-sm font-bold text-slate-700">{{ t.name }}</td>
+                            <td class="px-6 py-4 text-center text-xs font-bold text-slate-500">{{ t.windows }} janelas</td>
+                            <td class="px-6 py-4 text-right text-amber-600 font-mono font-bold">{{ t.gap_minutes }} min</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden flex flex-col h-full">
+            <div class="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+                <h3 class="font-bold text-slate-800 text-sm uppercase italic">Ocupação de Salas</h3>
+                <div class="p-2 bg-emerald-50 rounded-lg text-emerald-600"><i data-feather="layout" class="w-4 h-4"></i></div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-50">
+                    <tbody class="divide-y divide-slate-50">
+                        {% for r in room_stats %}
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="px-6 py-4 text-sm font-bold text-slate-700">{{ r.name }}</td>
+                            <td class="px-6 py-4">
+                                <div class="w-full bg-slate-100 rounded-full h-2">
+                                    <div class="h-2 rounded-full {% if r.occupancy > 85 %}bg-red-500{% elif r.occupancy > 50 %}bg-emerald-500{% else %}bg-indigo-400{% endif %}" 
+                                         style="width: {{ r.occupancy }}%"></div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 text-right text-sm font-black text-slate-700">{{ r.occupancy }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-8 bg-slate-900 rounded-3xl p-6 text-white shadow-xl flex items-start gap-4">
+        <div class="p-3 bg-indigo-500/20 rounded-2xl border border-indigo-500/30">
+            <i data-feather="cpu" class="w-6 h-6 text-indigo-300"></i>
+        </div>
+        <div>
+            <h4 class="font-bold text-lg mb-1">Diagnóstico SOTARQ-AI</h4>
+            <p class="text-slate-400 text-sm leading-relaxed">
+                Detectamos que janelas superiores a 90 minutos aumentam o turnover de professores. 
+                Salas com ocupação abaixo de 40% indicam margem para expansão de matrículas no próximo semestre sem CAPEX adicional.
+            </p>
+        </div>
+    </div>
+
+    <div x-show="openModal" x-cloak class="fixed inset-0 z-[100] overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4">
+            <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm" @click="openModal = false"></div>
+            
+            <div class="relative bg-white rounded-[2rem] max-w-md w-full p-8 shadow-2xl border border-slate-100"
+                 x-transition:enter="transition ease-out duration-300"
+                 x-transition:enter-start="opacity-0 scale-90"
+                 x-transition:enter-end="opacity-100 scale-100">
+                
+                <div class="text-center">
+                    <div class="mx-auto flex items-center justify-center h-20 w-20 rounded-full mb-6" 
+                         :class="lock_event_is_break ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'">
+                        <i data-feather="alert-circle" class="w-10 h-10"></i>
+                    </div>
+                    <h3 class="text-2xl font-black text-slate-800 mb-2">Confirmar Alteração?</h3>
+                    <p class="text-sm text-slate-500 mb-8 leading-relaxed">
+                        Ao confirmar, o sistema irá <strong x-text="lock_event_is_break ? 'liberar' : 'bloquear'"></strong> 
+                        a edição de notas para todos os docentes do tenant **SOTARQ SCHOOL** imediatamente.
+                    </p>
+                </div>
+
+                <form action="{% url 'academic:toggle_pedagogical_break' %}" method="POST" @submit="processing = true">
+                    {% csrf_token %}
+                    <div class="flex flex-col gap-3">
+                        <button type="submit" class="w-full px-6 py-4 rounded-2xl font-black text-sm text-white shadow-lg transition-transform active:scale-95" 
+                                :class="lock_event_is_break ? 'bg-emerald-600' : 'bg-red-600'">
+                            <span x-show="!processing">Sim, Executar Agora</span>
+                            <span x-show="processing" class="flex items-center justify-center gap-2">
+                                <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                Processando...
+                            </span>
+                        </button>
+                        <button type="button" @click="openModal = false" class="w-full px-6 py-4 rounded-2xl font-bold text-sm bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
+                            Cancelar Operação
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Inicializar ícones Feather
+        feather.replace();
+
+        // Configuração do Gráfico de Performance
+        const perfCtx = document.getElementById('performanceChart').getContext('2d');
+        new Chart(perfCtx, {
+            type: 'bar',
+            data: {
+                labels: [{% for item in top_performers %}"{{ item.teacher|truncatechars:12 }}"{% if not forloop.last %},{% endif %}{% endfor %}],
+                datasets: [{
+                    label: 'Aprovação %',
+                    data: [{% for item in top_performers %}{{ item.pass_rate }}{% if not forloop.last %},{% endif %}{% endfor %}],
+                    backgroundColor: '#6366f1',
+                    borderRadius: 12,
+                    borderSkipped: false,
+                    barThickness: 15
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                maintainAspectRatio: false,
+                responsive: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#1e293b',
+                        titleFont: { size: 13, weight: 'bold' },
+                        padding: 12,
+                        cornerRadius: 10
+                    }
+                },
+                scales: {
+                    x: { 
+                        max: 100, 
+                        beginAtZero: true, 
+                        grid: { display: false },
+                        ticks: { font: { size: 10, weight: 'bold' } }
+                    },
+                    y: { 
+                        grid: { display: false },
+                        ticks: { font: { size: 10, weight: 'bold' } }
+                    }
+                }
+            }
+        });
+    });
+</script>
+
+<style>
+    [x-cloak] { display: none !important; }
+    @media print {
+        .no-print, button, a { display: none !important; }
+        .container { max-width: 100% !important; width: 100% !important; padding: 0 !important; }
+    }
+</style>
+{% endblock %}

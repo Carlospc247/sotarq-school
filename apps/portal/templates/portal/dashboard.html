@@ -1,0 +1,266 @@
+{% extends 'portal_base.html' %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-8 animate-fade-in">
+
+    {% if my_students and my_students.count > 1 %}
+    <div class="bg-indigo-50 p-4 rounded-3xl mb-8 flex items-center justify-between border border-indigo-100">
+        <div class="flex items-center space-x-3">
+            <span class="text-xs font-black text-indigo-400 uppercase tracking-widest">Alterar Educando:</span>
+            <div class="flex -space-x-2">
+                {% for s in my_students %}
+                <a href="{% url 'portal:switch_context' s.id %}"
+                    class="w-10 h-10 rounded-full border-2 {% if s.id == student.id %}border-indigo-600 z-10 scale-110 shadow-lg{% else %}border-white hover:z-20 transition-all{% endif %} bg-slate-200 flex items-center justify-center text-xs font-bold overflow-hidden"
+                    title="{{ s.full_name }}">
+                    {{ s.full_name|slice:":1" }}
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        <p class="text-sm font-bold text-indigo-900">
+            A visualizar: <span class="underline">{{ student.full_name }}</span>
+        </p>
+    </div>
+    {% endif %}
+    
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+        <div class="flex items-center space-x-4">
+            <div class="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white text-2xl font-black">
+                {{ student.full_name|slice:":1" }}
+            </div>
+            <div>
+                <h1 class="text-2xl font-black text-slate-800 tracking-tight">Portal do Aluno</h1>
+                <p class="text-slate-500 font-medium">{{ student.full_name }} | Matrícula: <span class="text-indigo-600 font-bold">{{ student.registration_number }}</span></p>
+            </div>
+        </div>
+        <div class="flex space-x-2">
+             <span class="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold uppercase tracking-wider">Status: Activo</span>
+        </div>
+    </div>
+
+    {% if notifications %}
+    <div class="space-y-3 mb-8">
+        {% for note in notifications %}
+        <div
+            class="flex items-center justify-between bg-indigo-600 text-white p-4 rounded-2xl shadow-lg animate-bounce-subtle">
+            <div class="flex items-center space-x-3">
+                <span class="text-xl">🔔</span>
+                <div>
+                    <p class="text-xs font-black uppercase tracking-widest opacity-80">{{ note.title }}</p>
+                    <p class="text-sm font-bold">{{ note.message }}</p>
+                </div>
+            </div>
+            <button class="text-white/50 hover:text-white transition-colors">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col md:flex-row items-center gap-6 mb-8">
+    <div class="relative flex-shrink-0">
+        <div class="w-24 h-24 rounded-full border-8 border-slate-100 flex items-center justify-center">
+            <span class="text-{{ health_color }}-600 font-black text-xl">{{ 100|add:failing_count|inverse_ratio }}%</span>
+        </div>
+        <div class="absolute top-1 right-1 w-5 h-5 bg-{{ health_color }}-500 border-4 border-white rounded-full"></div>
+    </div>
+    <!--Biblioteca-->
+    <div class="mt-8 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+        <h3 class="font-bold text-slate-800 flex items-center">
+            <i data-feather="book" class="w-4 h-4 mr-2 text-brand-600"></i>
+            Minha Biblioteca
+        </h3>
+        <span class="text-xs font-bold px-2 py-1 bg-brand-100 text-brand-700 rounded-full">
+            {{ library_loans.count }} Livro(s) Comigo
+        </span>
+    </div>
+    <div class="p-6">
+        {% if library_loans %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full">
+                <thead>
+                    <tr
+                        class="text-left text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100">
+                        <th class="pb-3">Livro</th>
+                        <th class="pb-3">Data Empréstimo</th>
+                        <th class="pb-3">Devolução Prevista</th>
+                        <th class="pb-3">Tempo Restante</th>
+                        <th class="pb-3">Estado</th>
+                    </tr>
+                </thead>
+                <tbody class="text-sm">
+                    {% for loan in library_loans %}
+                    <tr class="group hover:bg-slate-50 transition-colors">
+                        <td class="py-3 font-medium text-slate-800">{{ loan.book.title }}</td>
+                        <td class="py-3 text-slate-500">{{ loan.loan_date|date:"d/m/Y" }}</td>
+                        <td class="py-3 text-slate-500">{{ loan.expected_return_date|date:"d/m/Y" }}</td>
+                        <td class="py-3">
+                            {% if loan.status == 'overdue' %}
+                            <span class="text-red-600 font-bold">Atrasado há {{ loan.expected_return_date|timesince
+                                }}</span>
+                            {% else %}
+                            <span class="text-emerald-600 font-bold">{{ loan.expected_return_date|timeuntil }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-3">
+                            {% if loan.status == 'overdue' %}
+                            <span
+                                class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                                Em Atraso
+                            </span>
+                            {% else %}
+                            <span
+                                class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800">
+                                No Prazo
+                            </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-6">
+            <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-slate-100 mb-3">
+                <i data-feather="book-open" class="w-6 h-6 text-slate-400"></i>
+            </div>
+            <p class="text-sm text-slate-500">Nenhum livro emprestado no momento.</p>
+        </div>
+        {% endif %}
+    </div>
+    </div>
+
+    <!--Este botão só aparece se o aluno não tiver faturas vencidas, servindo como uma recompensa psicológica por ser um bom pagador.-->
+    {% if not has_overdue_invoices %}
+    <div class="mt-4 p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex items-center justify-between">
+        <div>
+            <p class="text-emerald-800 font-bold text-sm">Parabéns! Suas contas estão em dia.</p>
+            <p class="text-emerald-600 text-[10px] uppercase font-black">Certidão de Quitação {{ current_year }} disponível
+            </p>
+        </div>
+        <a href="{% url 'finance:download_clearance' %}"
+            class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all">
+            Baixar Certidão
+        </a>
+    </div>
+    {% endif %}
+
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-bold text-slate-800">Autenticidade</h3>
+            <i data-feather="shield" class="text-brand-500"></i>
+        </div>
+        <p class="text-xs text-slate-500 mb-4">Precisa provar que estuda aqui? Acesse seus códigos de validação.</p>
+        <a href="{% url 'portal:my_verification_codes' %}" class="block w-full py-2 bg-slate-50 text-brand-600 text-center rounded-lg text-xs font-bold hover:bg-brand-50 border border-brand-100 transition-colors">
+            Ver Meus Códigos
+        </a>
+    </div>
+
+    <div class="flex-1">
+        <div class="flex items-center gap-2 mb-1">
+            <span
+                class="px-2 py-0.5 bg-{{ health_color }}-50 text-{{ health_color }}-700 text-[10px] font-black uppercase rounded-md">Status:
+                {{ health_status }}</span>
+            <span class="text-slate-300">|</span>
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-widest italic">Inteligência Sotarq
+                School</span>
+        </div>
+        <h3 class="text-lg font-bold text-slate-800">Dica SOTARQ:</h3>
+        <p class="text-slate-600 font-medium text-sm leading-relaxed">
+            "{{ sotarq_tip }}"
+        </p>
+    </div>
+    
+    <div class="flex-shrink-0">
+        <a href="#"
+            class="px-6 py-3 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-indigo-600 transition-all uppercase tracking-widest">Ver
+            Plano de Estudo</a>
+    </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <div class="lg:col-span-2 space-y-8">
+            
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-sm font-black text-slate-400 uppercase tracking-widest">Estado das Propinas (Ano Actual)</h3>
+                    <span class="text-sm font-bold text-indigo-600">{{ paid_months }}/{{ total_months }} Meses Pagos</span>
+                </div>
+                
+                <div class="relative pt-1">
+                    <div class="overflow-hidden h-4 mb-4 text-xs flex rounded-full bg-slate-100">
+                        <div style="width:{{ tuition_progress }}%" class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-indigo-600 transition-all duration-1000"></div>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-400 font-medium italic">* O acesso a documentos e notas depende da regularização das propinas.</p>
+            </div>
+
+            <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+                <div class="p-6 border-b border-slate-50">
+                    <h3 class="text-sm font-black text-slate-400 uppercase tracking-widest">Mural Académico & Eventos</h3>
+                </div>
+                <div class="divide-y divide-slate-50">
+                    {% for event in events %}
+                    <div class="p-6 flex items-start hover:bg-slate-50 transition-colors">
+                        <div class="bg-indigo-50 text-indigo-600 p-3 rounded-xl mr-4 flex flex-col items-center min-w-[60px]">
+                            <span class="text-xs font-black uppercase">{{ event.start_date|date:"M" }}</span>
+                            <span class="text-xl font-bold">{{ event.start_date|date:"d" }}</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-500">{{ event.get_category_display }}</span>
+                            <h4 class="text-slate-800 font-bold mt-1">{{ event.title }}</h4>
+                            <p class="text-sm text-slate-500">{{ event.start_date|date:"H:i" }} - Sala {{ student.current_class.name }}</p>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="p-8 text-center text-slate-400 font-medium">Nenhum evento agendado para os próximos dias.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="space-y-8">
+            
+            <div class="bg-slate-900 rounded-3xl p-6 text-white shadow-xl">
+                <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Central de Documentos</h3>
+                
+                <div class="space-y-4">
+                    <a href="{% url 'academic:download_report_card' student.id %}" class="flex items-center justify-between p-4 bg-white/5 rounded-2xl hover:bg-white/10 transition-all border border-white/10 group">
+                        <div class="flex items-center">
+                            <svg class="w-6 h-6 text-indigo-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                            <span class="text-sm font-bold">Boletim de Notas</span>
+                        </div>
+                        <svg class="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    </a>
+
+                    <div class="pt-4 border-t border-white/5">
+                        <p class="text-[10px] font-bold text-slate-500 uppercase mb-3 px-2">Recibos Recentes</p>
+                        {% for invoice in receipts %}
+                            {% for payment in invoice.payments.all %}
+                                {% if payment.receipt_pdf %}
+                                <a href="{{ payment.receipt_pdf.url }}" class="flex items-center justify-between p-3 text-xs hover:text-indigo-400 transition-colors">
+                                    <span>Recibo #{{ invoice.number }}</span>
+                                    <span class="text-slate-500 font-mono">{{ payment.confirmed_at|date:"d/m/y" }}</span>
+                                </a>
+                                {% endif %}
+                            {% endfor %}
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            {% if pending_invoices %}
+            <div class="bg-amber-50 rounded-3xl p-6 border border-amber-100">
+                <h3 class="text-xs font-black text-amber-600 uppercase tracking-widest mb-4">Atenção Financeira</h3>
+                <p class="text-sm text-amber-800 font-medium mb-4">Tens {{ pending_invoices.count }} faturas pendentes que podem limitar o teu acesso.</p>
+                <a href="{% url 'finance:debt_list' %}" class="block text-center w-full py-3 bg-amber-600 text-white rounded-xl font-bold text-sm hover:bg-amber-700 transition-all">Pagar Agora</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

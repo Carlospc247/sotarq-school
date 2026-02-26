@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block content %}
+<div class="animate-fade-in space-y-8 p-6 max-w-7xl mx-auto">
+    
+    <div class="flex flex-col md:flex-row justify-between items-end bg-slate-900 p-8 rounded-[3rem] text-white shadow-2xl gap-6">
+        <div>
+            <h1 class="text-3xl font-black uppercase italic leading-none">Sotarq Library</h1>
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">Gestão Universal (Alunos, Professores & Staff)</p>
+        </div>
+        <div class="flex flex-wrap gap-3">
+            <button onclick="openModal('bookModal')" class="px-5 py-3 bg-white text-slate-900 rounded-2xl font-black text-[10px] uppercase hover:scale-105 transition-all">
+                <i data-feather="plus" class="inline w-3 h-3 mr-1"></i> Novo Livro
+            </button>
+            <button onclick="openModal('importModal')" class="px-5 py-3 bg-indigo-500 text-white rounded-2xl font-black text-[10px] uppercase hover:scale-105 transition-all">
+                <i data-feather="upload" class="inline w-3 h-3 mr-1"></i> Importar Excel
+            </button>
+            <button onclick="openModal('loanModal')" class="px-5 py-3 bg-emerald-500 text-white rounded-2xl font-black text-[10px] uppercase hover:scale-105 transition-all shadow-lg shadow-emerald-500/20">
+                <i data-feather="barcode" class="inline w-3 h-3 mr-1"></i> Novo Empréstimo
+            </button>
+            <a href="{% url 'library:export_overdue' %}" class="px-5 py-3 bg-red-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-red-500/20 hover:scale-105 transition-all">
+                <i data-feather="download" class="inline w-3 h-3 mr-1"></i> Relatório Atrasos
+            </a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div class="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+            <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Livros no Acervo</p>
+            <h3 class="text-2xl font-black text-slate-900">{{ total_books }}</h3>
+        </div>
+        <div class="bg-indigo-50 p-6 rounded-[2.5rem] border border-indigo-100">
+            <p class="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Empréstimos Ativos</p>
+            <h3 class="text-2xl font-black text-indigo-700">{{ active_loans }}</h3>
+        </div>
+        <div class="bg-red-50 p-6 rounded-[2.5rem] border border-red-100">
+            <p class="text-[9px] font-black text-red-400 uppercase tracking-widest">Livros em Atraso</p>
+            <h3 class="text-2xl font-black text-red-600">{{ overdue_loans }}</h3>
+        </div>
+        <div class="bg-slate-50 p-6 rounded-[2.5rem] border border-slate-200">
+            <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Multas (Mês)</p>
+            <h3 class="text-2xl font-black text-slate-800">{{ monthly_fine_revenue|default:"0.00"|intcomma }} <span class="text-xs text-slate-400">Kz</span></h3>
+        </div>
+    </div>
+
+    <div>
+        <label class="text-[10px] font-black text-slate-400 uppercase italic">Prazo de Empréstimo (Dias)</label>
+        <div class="flex items-center gap-4 mt-2">
+            <input type="number" name="loan_duration" value="7" min="1" 
+                class="w-24 p-4 bg-slate-50 border-none rounded-2xl font-black text-indigo-600">
+            <span class="text-[10px] font-bold text-slate-400 uppercase italic">O sistema calculará o vencimento automaticamente.</span>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-[3rem] border border-slate-200 overflow-hidden shadow-sm">
+        <table class="w-full text-left border-collapse">
+            <thead class="bg-slate-50 border-b border-slate-100">
+                <tr class="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    <th class="px-8 py-5 text-indigo-600">Detalhes do Livro</th>
+                    <th class="px-8 py-5">Requisitante (Aluno/Staff)</th>
+                    <th class="px-8 py-5">Cronograma de Entrega</th>
+                    <th class="px-8 py-5 text-center">Status</th>
+                    <th class="px-8 py-5 text-right">Acção</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-50">
+                {% for loan in active_loans_list %}
+                <tr class="hover:bg-slate-50/50 transition-colors group">
+                    <td class="px-8 py-5">
+                        <span class="text-sm font-black text-slate-800 group-hover:text-indigo-600 transition-colors">{{ loan.book.title }}</span>
+                        <div class="text-[9px] text-slate-400 font-bold uppercase mt-1">
+                            {{ loan.book.author }} | <span class="text-indigo-500">Barcode: {{ loan.book.barcode }}</span>
+                        </div>
+                    </td>
+                    <td class="px-8 py-5">
+                        <span class="text-xs font-bold text-slate-700 block">{{ loan.borrower.full_name }}</span>
+                        <div class="flex items-center gap-2 mt-1">
+                            <span class="text-[8px] bg-slate-100 px-2 py-0.5 rounded font-black text-slate-500 uppercase tracking-tighter">
+                                {{ loan.borrower.current_role|default:"UTENTE" }}
+                            </span>
+                        </div>
+                    </td>
+                    <td class="px-8 py-5">
+                        <div class="text-xs font-black {% if loan.status == 'overdue' %}text-red-600 animate-pulse{% else %}text-indigo-600{% endif %}">
+                            Vence em: {{ loan.expected_return_date|date:"d/m/Y" }}
+                        </div>
+                        <div class="text-[8px] text-slate-400 font-bold uppercase mt-1">Saída: {{ loan.loan_date|date:"d/m/Y" }}</div>
+                    </td>
+                    <td class="px-8 py-5 text-center">
+                        {% if loan.status == 'overdue' %}
+                            <span class="px-3 py-1 bg-red-100 text-red-700 rounded-lg text-[9px] font-black uppercase">Atrasado</span>
+                        {% else %}
+                            <span class="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-[9px] font-black uppercase">Em Dia</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-8 py-5 text-right">
+                        <button onclick="confirmReturn('{{ loan.id }}', '{{ loan.book.title }}')" class="px-4 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase hover:bg-emerald-600 transition-all">Devolver</button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="px-8 py-10 text-center text-slate-400 italic text-sm">Nenhum empréstimo ativo no momento.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div id="bookModal" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-[3rem] w-full max-w-xl overflow-hidden shadow-2xl animate-zoom-in">
+        <div class="bg-slate-900 p-8 text-white flex justify-between items-center">
+            <h3 class="text-xl font-black uppercase italic">Novo Item no Acervo</h3>
+            <button onclick="closeModal('bookModal')"><i data-feather="x" class="w-5 h-5"></i></button>
+        </div>
+        <form method="POST" action="{% url 'library:book_add' %}" class="p-8 space-y-4">
+            {% csrf_token %}
+            <div class="grid grid-cols-2 gap-4">
+                <div class="col-span-2"><input type="text" name="title" placeholder="Título do Livro" class="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold"></div>
+                <input type="text" name="author" placeholder="Autor" class="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold">
+                <input type="text" name="barcode" placeholder="Código de Barras (Scan)" class="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold">
+                <input type="text" name="category" placeholder="Categoria" class="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold">
+                <input type="number" name="total_copies" placeholder="Qtd. Cópias" class="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold">
+            </div>
+            <button type="submit" class="w-full py-5 bg-indigo-600 text-white rounded-3xl font-black uppercase tracking-widest shadow-xl shadow-indigo-100 transition-all hover:bg-indigo-700">Adicionar ao Sistema</button>
+        </form>
+    </div>
+</div>
+
+<div id="loanModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-[3rem] shadow-2xl w-full max-w-lg overflow-hidden animate-zoom-in">
+        <div class="bg-indigo-600 p-8 text-white flex justify-between items-center">
+            <h3 class="text-xl font-black uppercase italic">Scan de Saída</h3>
+            <button onclick="closeModal('loanModal')"><i data-feather="x" class="w-5 h-5"></i></button>
+        </div>
+        <form method="POST" action="{% url 'library:register_loan' %}" class="p-8 space-y-6">
+            {% csrf_token %}
+            <div>
+                <label class="text-[10px] font-black text-slate-400 uppercase italic tracking-widest">Requisitante (Aluno/Staff)</label>
+                <select name="user_id" class="w-full mt-2 p-4 bg-slate-50 border-none rounded-2xl font-bold text-slate-700">
+                    {% for user in utentes_list %}
+                    <option value="{{ user.id }}">{{ user.full_name }} ({{ user.current_role }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="text-[10px] font-black text-slate-400 uppercase italic tracking-widest">Código do Livro (Barcode)</label>
+                <input type="text" name="barcode" id="barcodeInput" class="w-full mt-2 p-4 bg-slate-50 border-none rounded-2xl font-bold text-indigo-600" placeholder="Passe o leitor de código de barras...">
+            </div>
+            <button type="submit" class="w-full py-5 bg-slate-900 text-white rounded-3xl font-black uppercase tracking-widest shadow-xl hover:bg-black transition-all">Confirmar Empréstimo</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    function confirmReturn(id, title) {
+        if(confirm(`🛡️ SOTARQ AUDIT: Confirmar a devolução física do livro: ${title}?`)) {
+            window.location.href = `/library/return/${id}/`;
+        }
+    }
+    
+    function openModal(id) {
+        document.getElementById(id).classList.remove('hidden');
+        if(id === 'loanModal') {
+            setTimeout(() => document.getElementById('barcodeInput').focus(), 150);
+        }
+    }
+
+    function closeModal(id) {
+        document.getElementById(id).classList.add('hidden');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => { feather.replace(); });
+</script>
+{% endblock %}

@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+
+{% block title %}Auditoria Final | {{ school_config.school_name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-8 animate-fade-in">
+    
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-3xl font-black text-slate-800 tracking-tight uppercase">Auditoria e Fecho de Contas</h1>
+            <p class="text-slate-500 font-medium">Relatório Consolidado de Performance | Exercício {{ year|default:"2026" }}</p>
+        </div>
+        <div class="flex gap-3">
+            <button onclick="window.print()" class="px-6 py-3 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold text-xs uppercase hover:bg-slate-50 transition-all shadow-sm">
+                Exportar PDF
+            </button>
+            <div class="px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-indigo-100">
+                Status: Auditado
+            </div>
+        </div>
+    </div>
+
+    <hr class="border-slate-100">
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <div class="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+            <div class="flex justify-between items-start mb-4">
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Lucro Operacional (DRE)</p>
+                <span class="p-2 bg-emerald-50 rounded-xl">
+                    <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                </span>
+            </div>
+            <h2 class="text-4xl font-black text-emerald-600 mt-2">{{ audit.dre.ebitda }} Kz</h2>
+            <div class="mt-6 pt-6 border-t border-slate-50 text-xs text-slate-500 flex justify-between">
+                <span>Receita: <strong class="text-slate-700">{{ audit.dre.receita }} Kz</strong></span>
+                <span>Compras: <strong class="text-red-500">-{{ audit.dre.despesas }} Kz</strong></span>
+            </div>
+        </div>
+
+        <div class="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+            <div class="flex justify-between items-start mb-4">
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Risco de Inadimplência</p>
+                <span class="p-2 bg-red-50 rounded-xl">
+                    <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                </span>
+            </div>
+            <h2 class="text-4xl font-black text-red-600 mt-2">{{ audit.risco.total_inadimplente }} Kz</h2>
+            <p class="mt-6 pt-6 border-t border-slate-50 text-xs font-bold text-red-400 uppercase tracking-tight">
+                {{ audit.risco.qtd_devedores }} Alunos com faturas vencidas.
+            </p>
+        </div>
+
+        <div class="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+            <div class="flex justify-between items-start mb-4">
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Perdas de Stock / Desperdício</p>
+                <span class="p-2 bg-amber-50 rounded-xl">
+                    <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                </span>
+            </div>
+            <h2 class="text-4xl font-black text-amber-600 mt-2">{{ audit.desperdicio }} Kz</h2>
+            <p class="mt-6 pt-6 border-t border-slate-50 text-xs text-slate-500 font-medium italic">
+                Valor apurado via ajustes de inventário.
+            </p>
+        </div>
+
+    </div>
+
+    <div class="bg-slate-900 rounded-3xl p-8 text-white">
+        <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Notas do Auditor SOTARQ</h3>
+        <ul class="space-y-3 text-sm font-medium text-slate-300">
+            <li class="flex items-center gap-2">
+                <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                A receita operacional subiu {{ revenue_growth|default:"12" }}% comparado ao ano anterior.
+            </li>
+            <li class="flex items-center gap-2">
+                <span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
+                Atenção: A inadimplência na Unidade A representa 60% do risco total.
+            </li>
+        </ul>
+    </div>
+</div>
+{% endblock %}

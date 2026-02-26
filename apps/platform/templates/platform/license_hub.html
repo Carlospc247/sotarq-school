@@ -1,0 +1,48 @@
+{% extends 'base_staff.html' %}
+{% block content %}
+<div class="p-8 animate-fade-in space-y-8">
+    <div class="bg-red-600 p-10 rounded-[3rem] text-white shadow-2xl flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-black uppercase italic">Licensing Control Tower</h1>
+            <p class="text-[10px] font-bold opacity-70 uppercase tracking-widest mt-2">Gestão de Suspensões e Ativações por Subagentes</p>
+        </div>
+        <i data-feather="lock" class="w-12 h-12 opacity-20"></i>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div class="bg-white p-8 rounded-[3rem] border border-red-100 shadow-sm">
+            <h3 class="text-xs font-black text-red-500 uppercase tracking-widest mb-6">Escolas em Risco de Bloqueio</h3>
+            <div class="space-y-4">
+                {% for school in at_risk %}
+                <div class="flex justify-between items-center p-5 bg-red-50 rounded-2xl border border-red-100">
+                    <div>
+                        <span class="text-sm font-black text-slate-800">{{ school.name }}</span>
+                        <p class="text-[9px] text-red-600 font-bold">Expira em: {{ school.license_set.first.expiry_date|date:"d/m/Y" }}</p>
+                    </div>
+                    <form method="POST">
+                        {% csrf_token %}
+                        <input type="hidden" name="tenant_id" value="{{ school.id }}">
+                        <button name="force_block" class="px-4 py-2 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase hover:bg-red-600 transition-all">Suspender</button>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm">
+            <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Rastro de Ativações de Subagentes</h3>
+            <div class="space-y-4">
+                {% for log in audit_logs %}
+                <div class="p-4 border-b border-slate-50 last:border-0 flex justify-between items-center">
+                    <div>
+                        <span class="text-xs font-bold text-slate-700">{{ log.user.get_full_name }} (Subagente)</span>
+                        <p class="text-[9px] text-indigo-500 font-black uppercase">{{ log.details }}</p>
+                    </div>
+                    <span class="text-[9px] text-slate-300 font-mono">{{ log.timestamp|date:"H:i" }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto py-8 px-4">
+    <div class="mb-8">
+        <a href="{% url 'students:student_list' %}" class="text-xs font-bold text-slate-500 hover:text-slate-800 flex items-center mb-2">
+            <i data-feather="arrow-left" class="w-3 h-3 mr-1"></i> Voltar à Lista
+        </a>
+        <h1 class="text-2xl font-black text-slate-800">Matrícula Presencial</h1>
+        <p class="text-sm text-slate-500">Registo interno de novo estudante (Balcão da Secretaria).</p>
+    </div>
+
+    <form method="POST" class="bg-white p-8 rounded-xl shadow-sm border border-slate-200 space-y-6">
+        {% csrf_token %}
+        
+        {% if form.errors %}
+            <div class="bg-red-50 p-4 rounded-lg mb-6">
+                <p class="text-sm text-red-600 font-bold">Por favor, corrija os erros abaixo:</p>
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
+        <div>
+            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b pb-2">Dados Pessoais</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-bold text-slate-700 mb-2">Nome Completo</label>
+                    {{ form.full_name }}
+                    {% if form.full_name.errors %}<p class="text-xs text-red-500 mt-1">{{ form.full_name.errors.0 }}</p>{% endif %}
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-2">Nº Processo / Matrícula</label>
+                    {{ form.registration_number }}
+                    {% if form.registration_number.errors %}<p class="text-xs text-red-500 mt-1">{{ form.registration_number.errors.0 }}</p>{% endif %}
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-2">Data de Nascimento</label>
+                    {{ form.birth_date }}
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-2">Género</label>
+                    {{ form.gender }}
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b pb-2 mt-6">Credenciais de Acesso</h4>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-2">Email (Login do Sistema)</label>
+                {{ form.email }}
+                <p class="text-xs text-slate-400 mt-1">A senha padrão será: <strong>Sotarq.Mudar123</strong></p>
+                {% if form.email.errors %}<p class="text-xs text-red-500 mt-1">{{ form.email.errors.0 }}</p>{% endif %}
+            </div>
+        </div>
+
+        <div>
+            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b pb-2 mt-6">Dados Académicos</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-2">Curso</label>
+                    {{ form.course }}
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-2">Classe</label>
+                    {{ form.grade_level }}
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-6 border-t border-slate-100 mt-8">
+            <a href="{% url 'students:student_list' %}" class="px-6 py-3 bg-white border border-slate-300 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-colors">
+                Cancelar
+            </a>
+            <button type="submit" class="px-8 py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-indigo-600 transition-colors shadow-lg">
+                Confirmar Matrícula
+            </button>
+        </div>
+    </form>
+</div>
+<script>feather.replace()</script>
+{% endblock %}

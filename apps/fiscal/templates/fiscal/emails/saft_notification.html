@@ -1,0 +1,25 @@
+<div style="font-family: sans-serif; color: #1e293b; max-width: 600px; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+    <div style="background-color: #4f46e5; padding: 24px; text-align: center; color: white;">
+        <h1 style="margin: 0; font-size: 18px; text-transform: uppercase; letter-spacing: 2px;">Gestão Fiscal SOTARQ</h1>
+    </div>
+    <div style="padding: 32px;">
+        <p>Caro(a) Contabilista,</p>
+        <p>Informamos que o ficheiro <strong>SAF-T (AO)</strong> referente ao período <strong>{{ periodo }}</strong> foi gerado e validado com sucesso pelo motor de conformidade técnica.</p>
+        
+        <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 24px 0;">
+            <h4 style="margin-top: 0; font-size: 12px; color: #64748b; text-transform: uppercase;">Resumo do Período</h4>
+            <table width="100%">
+                <tr><td>Documentos Emitidos:</td><td align="right"><strong>{{ qtd_docs }}</strong></td></tr>
+                <tr><td>Total Faturado:</td><td align="right"><strong>{{ total_faturado|floatformat:2 }} Kz</strong></td></tr>
+                <tr style="color: #4f46e5;"><td>IVA Liquidado:</td><td align="right"><strong>{{ total_iva|floatformat:2 }} Kz</strong></td></tr>
+            </table>
+        </div>
+
+        <p style="font-size: 12px; color: #64748b;">
+            O ficheiro XML encontra-se em anexo para submissão no portal da AGT. Este processo foi automatizado pelo sistema de gestão escolar.
+        </p>
+    </div>
+    <div style="background-color: #f1f5f9; padding: 16px; text-align: center; font-size: 10px; color: #94a3b8;">
+        &copy; 2026 SOTARQ SCHOOL - Sistema Certificado AGT
+    </div>
+</div>

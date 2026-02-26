@@ -1,0 +1,82 @@
+{% extends 'portal_base.html' %}
+{% load humanize %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-8 animate-fade-in py-6">
+    <div class="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100 flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-black text-slate-800 uppercase italic leading-none">Gestão de Propinas</h1>
+            <p class="text-xs text-slate-400 font-bold uppercase mt-2">Ano Lectivo {{ current_year }}</p>
+        </div>
+        <i data-feather="credit-card" class="text-brand w-10 h-10"></i>
+    </div>
+
+    <div class="bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden">
+        <table class="w-full text-left">
+            <thead class="bg-slate-50 border-b border-slate-100">
+                <tr class="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    <th class="px-8 py-5">Nº Fatura / Mês</th>
+                    <th class="px-8 py-5">Vencimento</th>
+                    <th class="px-8 py-5 text-right">Valor Original</th>
+                    <th class="px-8 py-5 text-right text-red-500">Multas/Juros</th>
+                    <th class="px-8 py-5 text-right">Total a Pagar</th>
+                    <th class="px-8 py-5 text-center">Estado</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-50">
+                {% for inv in invoices %}
+                <tr class="hover:bg-slate-50/50 transition-colors">
+                    <td class="px-8 py-5">
+                        <span class="text-sm font-black text-slate-800">#{{ inv.number }}</span>
+                        <p class="text-[9px] text-slate-400 font-bold uppercase">{{ inv.items.first.description }}</p>
+                    </td>
+                    <td class="px-8 py-5 text-xs font-bold text-slate-500">{{ inv.due_date|date:"d/m/Y" }}</td>
+                    <td class="px-8 py-5 text-right text-xs font-bold text-slate-400">{{ inv.total|intcomma }} Kz</td>
+                    <td class="px-8 py-5 text-right text-xs font-black text-red-500">
+                        + {{ inv.current_multa|add:inv.current_juros|intcomma }} Kz
+                    </td>
+                    <td class="px-8 py-5 text-right">
+                        <span class="text-sm font-black text-slate-900">{{ inv.current_total_with_mora|intcomma }} Kz</span>
+                    </td>
+                    <td class="px-8 py-5 text-center">
+                        {% if inv.status == 'paid' %}
+                            <span class="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-[9px] font-black uppercase">Liquidado</span>
+                        {% elif inv.status == 'overdue' %}
+                            <button onclick="openPaymentModal('{{ inv.id }}', '{{ inv.current_total_with_mora }}')" 
+                                    class="px-3 py-1 bg-red-600 text-white rounded-lg text-[9px] font-black uppercase animate-pulse">Pagar Agora</button>
+                        {% else %}
+                            <button onclick="openPaymentModal('{{ inv.id }}', '{{ inv.total }}')" 
+                                    class="px-3 py-1 bg-indigo-600 text-white rounded-lg text-[9px] font-black uppercase">Pagar</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div id="paymentModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-[3rem] shadow-2xl w-full max-w-md overflow-hidden animate-zoom-in">
+        <div class="bg-slate-900 p-8 text-white text-center">
+            <img src="{% static 'img/multicaixa_logo.png' %}" class="h-8 mx-auto mb-4" alt="Multicaixa">
+            <h3 class="text-xl font-black uppercase italic">Pagamento de Serviços</h3>
+        </div>
+        <div class="p-8 space-y-6 text-center">
+            <div class="space-y-1">
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Entidade</p>
+                <h2 class="text-2xl font-black text-slate-800">00654</h2>
+            </div>
+            <div class="space-y-1">
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Referência</p>
+                <h2 class="text-2xl font-black text-brand tracking-widest" id="ref-placeholder">954 123 789</h2>
+            </div>
+            <div class="space-y-1 pb-4">
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor Total</p>
+                <h2 class="text-2xl font-black text-slate-800" id="amount-placeholder">-- Kz</h2>
+            </div>
+            <button onclick="closeModal('paymentModal')" class="w-full py-4 bg-slate-100 text-slate-400 rounded-2xl font-black text-[10px] uppercase tracking-widest">Fechar</button>
+        </div>
+    </div>
+</div>
+{% endblock %}

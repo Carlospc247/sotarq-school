@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+
+{% block title %}Despacho de Vaga | SOTARQ{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto mt-10 animate-fade-in">
+    <div class="bg-white rounded-3xl border border-slate-100 shadow-2xl overflow-hidden">
+        <div class="bg-slate-900 p-8 text-white">
+            <div class="flex justify-between items-center">
+                <div>
+                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Solicitação #{{ vacancy.id }}</p>
+                    <h1 class="text-2xl font-black mt-1">Análise de Matrícula Especial</h1>
+                </div>
+                <div class="px-4 py-2 bg-amber-500/20 text-amber-400 rounded-xl text-xs font-bold uppercase border border-amber-500/30">
+                    Aguardando Despacho
+                </div>
+            </div>
+        </div>
+
+        <form method="POST" action="{% url 'core:director_respond_vacancy' vacancy.id %}" class="p-8 space-y-8">
+            {% csrf_token %}
+            
+            <div class="grid grid-cols-2 gap-6 bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase">Estudante</label>
+                    <p class="font-bold text-slate-800">{{ vacancy.student.full_name }}</p>
+                </div>
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase">Série Solicitada</label>
+                    <p class="font-bold text-slate-800">{{ vacancy.target_grade.name }}</p>
+                </div>
+                <div class="col-span-2 pt-4 border-t border-slate-200">
+                    <label class="text-[10px] font-black text-slate-400 uppercase">Status da Capacidade</label>
+                    <div class="flex items-center gap-3 mt-1">
+                        <div class="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
+                            <div class="h-full bg-indigo-600" style="width: 95%;"></div>
+                        </div>
+                        <span class="text-xs font-bold text-red-600">Limite Atingido</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-4" x-data="{ decision: 'YES' }">
+                <label class="text-sm font-black text-slate-700">Qual é o seu despacho?</label>
+                <div class="grid grid-cols-2 gap-4">
+                    <label :class="decision === 'YES' ? 'border-indigo-600 bg-indigo-50' : 'border-slate-200'" 
+                           class="relative flex flex-col p-4 border-2 rounded-2xl cursor-pointer transition-all">
+                        <input type="radio" name="action" value="YES" x-model="decision" class="sr-only">
+                        <span class="font-bold text-slate-900 text-sm">Aprovar Vaga</span>
+                        <span class="text-xs text-slate-500">Aumentar limite da sala automaticamente.</span>
+                    </label>
+                    <label :class="decision === 'NO' ? 'border-red-600 bg-red-50' : 'border-slate-200'" 
+                           class="relative flex flex-col p-4 border-2 rounded-2xl cursor-pointer transition-all">
+                        <input type="radio" name="action" value="NO" x-model="decision" class="sr-only">
+                        <span class="font-bold text-slate-900 text-sm">Negar Vaga</span>
+                        <span class="text-xs text-slate-500">Informar falta de espaço físico.</span>
+                    </label>
+                </div>
+
+                <div class="mt-6" x-show="decision === 'YES'">
+                    <label class="text-xs font-bold text-slate-500 uppercase tracking-widest">Mensagem ao Encarregado</label>
+                    <select name="message_option" class="mt-2 block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <option value="Vaga aprovada por despacho. O limite da sala foi ajustado para recebê-lo.">Aprovação Especial (Ajuste de Capacidade)</option>
+                        <option value="Inscrição autorizada. Por favor, prossiga com o pagamento da taxa nas próximas 24h.">Aprovação Padrão (Aguardando Pagamento)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-6 border-t border-slate-100">
+                <a href="{% url 'admin:core_vacancyrequest_changelist' %}" class="text-sm font-bold text-slate-400 hover:text-slate-600">Cancelar</a>
+                <button type="submit" class="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all">
+                    Confirmar Despacho
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

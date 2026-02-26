@@ -1,0 +1,608 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+<div class="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8" 
+     x-data="{ modalOpen: false, currentStudentUrl: '', lessonModalOpen: false, newPlanModalOpen: false, openMatricula: false, openReconfModal: false }">
+
+    <div class="flex flex-col xl:flex-row xl:items-center justify-between mb-8 gap-6">
+        <div>
+            <h1 class="text-2xl font-black text-slate-800">
+                {% if view_type == 'TEACHER' %}Sala dos Professores{% else %}Gestão Académica{% endif %}
+            </h1>
+            <p class="text-sm text-slate-500">
+                {% if view_type == 'TEACHER' %}Gerencie as suas turmas, alunos e planos de aula.{% else %}Painel de controlo de matrículas e estudantes.{% endif %}
+            </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3">
+
+            {% if view_type == 'TEACHER' %}
+                <button @click="lessonModalOpen = true" class="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-md transition-all">
+                    <i data-feather="book-open" class="w-4 h-4 mr-2"></i> Planos de Aulas
+                </button>
+            {% endif %}
+
+            {% if is_director or view_type == 'SECRETARY' %}
+                
+                <div class="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200 shadow-sm">
+                    {% if config.is_enrollment_open %}
+                        <button @click="openMatricula = true" class="flex items-center px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-white hover:text-slate-900 rounded-md transition-all">
+                            <i data-feather="monitor" class="w-3 h-3 mr-2"></i> Nova Matrícula (Presencial)
+                        </button>
+                    {% else %}
+                        <button disabled class="flex items-center px-3 py-1.5 text-xs font-bold text-slate-400 cursor-not-allowed opacity-70" title="Matrículas Fechadas">
+                            <i data-feather="lock" class="w-3 h-3 mr-2"></i> Nova Matrícula (Fechado)
+                        </button>
+                    {% endif %}
+                    
+                    <div class="w-px h-4 bg-slate-300 mx-1"></div>
+
+                    {% if config.is_enrollment_open %}
+                        <a href="{% url 'students:public_enrollment' %}" target="_blank" class="flex items-center px-3 py-1.5 text-xs font-bold text-brand-600 hover:bg-white rounded-md transition-all" title="Link público para candidatos">
+                            <i data-feather="globe" class="w-3 h-3 mr-2"></i> Online
+                        </a>
+                    {% else %}
+                        <span class="flex items-center px-3 py-1.5 text-xs font-bold text-red-400 cursor-not-allowed">
+                            <i data-feather="lock" class="w-3 h-3 mr-2"></i> Online Fechado
+                        </span>
+                    {% endif %}
+                </div>
+
+                <div class="flex items-center bg-emerald-50 p-1 rounded-lg border border-emerald-100 shadow-sm">
+                    {% if config.is_reconfirmation_open %}
+                        <button @click="openReconfModal = true" 
+                                class="flex items-center px-3 py-1.5 text-xs font-bold text-emerald-800 hover:bg-white rounded-md transition-all" 
+                                title="Reconfirmar aluno no balcão">
+                            <i data-feather="check-square" class="w-3 h-3 mr-2"></i> Reconfirmação (Presencial)
+                        </button>
+                    {% else %}
+                        <button disabled class="flex items-center px-3 py-1.5 text-xs font-bold text-emerald-400 cursor-not-allowed opacity-70" title="Reconfirmações Fechadas">
+                            <i data-feather="lock" class="w-3 h-3 mr-2"></i> Reconfirmação (Fechado)
+                        </button>
+                    {% endif %}
+
+                    <div class="w-px h-4 bg-emerald-200 mx-1"></div>
+
+                    {% if config.is_reconfirmation_open %}
+                        <a href="{% url 'students:public_reconfirmation' %}" target="_blank" class="flex items-center px-3 py-1.5 text-xs font-bold text-emerald-600 hover:bg-white rounded-md transition-all" title="Link público para alunos antigos">
+                            <i data-feather="globe" class="w-3 h-3 mr-2"></i> Online
+                        </a>
+                    {% else %}
+                        <span class="flex items-center px-3 py-1.5 text-xs font-bold text-emerald-400 cursor-not-allowed">
+                            <i data-feather="lock" class="w-3 h-3 mr-2"></i> Fechado
+                        </span>
+                    {% endif %}
+                </div>
+
+            {% endif %}
+
+            <div class="flex items-center gap-2 border-l border-slate-200 pl-3 ml-1">
+                {% if is_director or view_type == 'SECRETARY' and config.allow_secretary_export or view_type == 'TEACHER' and config.allow_teacher_export %}
+                <a href="{% url 'students:student_export_excel' %}?{{ request.GET.urlencode }}" class="p-2 text-slate-500 hover:text-brand-600 hover:bg-slate-50 rounded-lg transition-colors" title="Exportar Excel">
+                    <i data-feather="download" class="w-4 h-4"></i>
+                </a>
+                {% endif %}
+
+                {% if is_director or view_type == 'SECRETARY' and config.allow_secretary_import %}
+                <a href="{% url 'students:student_import' %}" class="p-2 text-slate-500 hover:text-brand-600 hover:bg-slate-50 rounded-lg transition-colors" title="Importar Excel em Massa">
+                    <i data-feather="upload" class="w-4 h-4"></i>
+                </a>
+                {% endif %}
+                
+                {% if is_director %}
+                <form action="{% url 'students:toggle_enrollment' %}" method="POST" title="Trancar/Destrancar Matrículas Online Agora">
+                    {% csrf_token %}
+                    <button type="submit" class="p-2 rounded-lg transition-colors {% if config.is_enrollment_open %}bg-green-100 text-green-700 hover:bg-green-200{% else %}bg-red-100 text-red-700 hover:bg-red-200{% endif %}">
+                        {% if config.is_enrollment_open %}
+                        <i data-feather="unlock" class="w-4 h-4"></i> {% else %}
+                        <i data-feather="lock" class="w-4 h-4"></i> {% endif %}
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 mb-6 p-4">
+        <form method="GET" class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+            <div class="md:col-span-5">
+                <label class="block text-xs font-bold text-slate-500 mb-1">Pesquisar Aluno</label>
+                <div class="relative">
+                    <i data-feather="search" class="absolute left-3 top-2.5 w-4 h-4 text-slate-400"></i>
+                    <input type="text" name="q" value="{{ current_filters.q }}" placeholder="Nome, Nº Processo ou BI..." 
+                           class="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500">
+                </div>
+            </div>
+             <div class="md:col-span-3">
+                <label class="block text-xs font-bold text-slate-500 mb-1">Turma</label>
+                <select name="class_id" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-brand-500">
+                    <option value="">Todas as Turmas</option>
+                    {% for klass in active_classes %}
+                    <option value="{{ klass.id }}" {% if current_filters.class_id|stringformat:"s" == klass.id|stringformat:"s" %}selected{% endif %}>
+                        {{ klass.name }} ({{ klass.grade_level.name }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="md:col-span-2">
+                <button type="submit" class="w-full py-2 bg-slate-800 text-white rounded-lg font-bold text-sm hover:bg-slate-900 transition-colors shadow-sm">
+                    Aplicar Filtros
+                </button>
+            </div>
+        </form>
+    </div>
+
+    {% if is_director and pending_validations > 0 %}
+    <div class="mb-6 bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-lg flex justify-between items-center">
+        <div class="flex items-center">
+            <i data-feather="alert-triangle" class="text-amber-500 mr-3"></i>
+            <div>
+                <p class="text-sm font-bold text-amber-800">Atenção Necessária</p>
+                <p class="text-xs text-amber-700">Existem {{ pending_validations }} turmas aguardando validação.</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200">
+                <thead class="bg-slate-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Estudante</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Turma / Curso</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Situação</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Contacto (Enc.)</th>
+                        <th class="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Ação</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 bg-white">
+                    {% for student in students %}
+                    <tr class="hover:bg-slate-50 cursor-pointer transition-colors group"
+                        @click="modalOpen = true; currentStudentUrl = '{% url 'students:student_detail_modal' student.id %}'">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0 h-10 w-10">
+                                    <div class="h-10 w-10 rounded-full bg-brand-100 flex items-center justify-center text-brand-600 font-bold text-sm">
+                                        {{ student.full_name|slice:":2"|upper }}
+                                    </div>
+                                </div>
+                                <div class="ml-4">
+                                    <div class="text-sm font-bold text-slate-900">{{ student.full_name }}</div>
+                                    <div class="text-xs text-slate-500">ID: {{ student.registration_number }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if student.current_class %}
+                                <div class="text-sm text-slate-900 font-medium">{{ student.current_class.name }}</div>
+                            {% else %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-slate-100 text-slate-800">Sem Turma</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                             {% if student.is_suspended %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Bloqueado</span>
+                            {% else %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Ativo</span>
+                            {% endif %}
+                        </td>
+                         <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                             {% with guardian=student.guardians.first.guardian %}
+                                {{ guardian.phone|default:"-" }}
+                            {% endwith %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <span class="text-brand-600 group-hover:text-brand-900 group-hover:underline">Ver Ficha</span>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="px-6 py-12 text-center">
+                            <div class="mx-auto h-12 w-12 text-slate-400">
+                                <i data-feather="users" class="w-12 h-12"></i>
+                            </div>
+                            <h3 class="mt-2 text-sm font-medium text-slate-900">Nenhum aluno encontrado</h3>
+                            <p class="mt-1 text-sm text-slate-500">Tente ajustar os filtros ou pesquisar por outro nome.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div x-show="modalOpen" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+         <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" aria-hidden="true" @click="modalOpen = false">
+                <div class="absolute inset-0 bg-gray-900 opacity-75"></div>
+            </div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full"
+                x-init="$watch('modalOpen', value => { if(value) fetch(currentStudentUrl).then(response => response.text()).then(html => { $refs.modalContent.innerHTML = html; feather.replace(); }) })">
+                <div class="bg-white" x-ref="modalContent">
+                    <div class="flex justify-center p-12"><i data-feather="loader" class="animate-spin h-8 w-8 text-brand-600"></i></div>
+                </div>
+                <div class="bg-slate-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse border-t border-slate-100">
+                    <button type="button" class="w-full inline-flex justify-center rounded-lg border border-slate-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-slate-700 hover:bg-slate-50 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm" @click="modalOpen = false">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if view_type == 'TEACHER' %}
+    <div x-show="lessonModalOpen" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" aria-hidden="true" @click="lessonModalOpen = false">
+                <div class="absolute inset-0 bg-gray-900 opacity-75"></div>
+            </div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+                <div class="bg-indigo-600 px-6 py-4 flex justify-between items-center">
+                    <h3 class="text-lg leading-6 font-bold text-white flex items-center">
+                        <i data-feather="book-open" class="w-5 h-5 mr-2"></i> Meus Planos de Aula
+                    </h3>
+                    <button @click="lessonModalOpen = false" class="text-white hover:text-gray-200">
+                        <i data-feather="x" class="w-6 h-6"></i>
+                    </button>
+                </div>
+                <div class="px-6 py-6 bg-slate-50">
+                    <div class="flex justify-between items-center mb-6">
+                        <p class="text-xs text-slate-500">Histórico automático dos últimos 3 meses.</p>
+                        <button @click="lessonModalOpen = false; newPlanModalOpen = true" 
+                                class="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-sm">
+                            <i data-feather="plus" class="w-4 h-4 mr-2"></i> Criar Plano
+                        </button>
+                    </div>
+                    <div class="bg-white rounded-lg border border-slate-200 overflow-hidden">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase">Data</th>
+                                    <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase">Turma / Disciplina</th>
+                                    <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase">Sumário</th>
+                                    <th class="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase">Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                {% for plan in lesson_plans %}
+                                <tr class="hover:bg-slate-50">
+                                    <td class="px-4 py-3 text-sm text-slate-900 font-medium">{{ plan.date|date:"d/m/Y" }}</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600">
+                                        <div class="font-bold">{{ plan.allocation.class_room.name }}</div>
+                                        <div class="text-xs">{{ plan.allocation.subject.name }}</div>
+                                    </td>
+                                    <td class="px-4 py-3 text-sm text-slate-600 truncate max-w-xs">{{ plan.topic }}</td>
+                                    <td class="px-4 py-3 text-right">
+                                        <button class="text-indigo-600 hover:text-indigo-800 font-bold text-xs">Baixar PDF</button>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="px-6 py-8 text-center text-slate-500 text-sm">
+                                        Nenhum plano de aula registado nos últimos 90 dias.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="newPlanModalOpen" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" aria-hidden="true" @click="newPlanModalOpen = false">
+                <div class="absolute inset-0 bg-gray-900 opacity-75"></div>
+            </div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-indigo-600 px-6 py-4">
+                    <h3 class="text-lg font-bold text-white">Novo Plano de Aula</h3>
+                </div>
+                <form action="{% url 'academic:create_lesson_plan' %}" method="POST" class="p-6 space-y-4">
+                    {% csrf_token %}
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Turma e Disciplina</label>
+                        <select name="allocation_id" required class="w-full border-slate-300 rounded-lg text-sm focus:ring-indigo-500 focus:border-indigo-500">
+                            {% for alloc in allocations %}
+                                <option value="{{ alloc.id }}">{{ alloc.class_room.name }} - {{ alloc.subject.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Data</label>
+                        <input type="date" name="date" required class="w-full border-slate-300 rounded-lg text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Sumário / Tópico</label>
+                        <input type="text" name="topic" required placeholder="Ex: Introdução à Álgebra" class="w-full border-slate-300 rounded-lg text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Conteúdo Programático e Objetivos</label>
+                        <textarea name="content" rows="4" required class="w-full border-slate-300 rounded-lg text-sm" placeholder="Detalhes da aula..."></textarea>
+                    </div>
+                    <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                        <button type="button" @click="newPlanModalOpen = false" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 font-bold text-sm hover:bg-slate-50">Cancelar</button>
+                        <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold text-sm hover:bg-indigo-700">Guardar e Notificar Direção</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div x-show="openMatricula" 
+         class="relative z-50" 
+         aria-labelledby="modal-title" 
+         role="dialog" 
+         aria-modal="true"
+         style="display: none;">
+         
+        <div x-show="openMatricula" 
+             x-transition:enter="ease-out duration-300" 
+             x-transition:enter-start="opacity-0" 
+             x-transition:enter-end="opacity-100" 
+             x-transition:leave="ease-in duration-200" 
+             x-transition:leave-start="opacity-100" 
+             x-transition:leave-end="opacity-0" 
+             class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity"></div>
+
+        <div class="fixed inset-0 z-50 overflow-y-auto">
+            <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+                <div x-show="openMatricula" 
+                     x-transition:enter="ease-out duration-300" 
+                     x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
+                     x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" 
+                     x-transition:leave="ease-in duration-200" 
+                     x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" 
+                     x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
+                     class="relative transform overflow-hidden rounded-xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-3xl"
+                     @click.away="openMatricula = false">
+                    
+                    <div class="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+                        <h3 class="text-lg font-bold text-slate-800">Nova Matrícula Presencial</h3>
+                        <button @click="openMatricula = false" class="text-slate-400 hover:text-slate-600">
+                            <i data-feather="x" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+
+                    <form method="POST" action="{% url 'students:internal_enrollment_create' %}" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                            
+                            <div class="md:col-span-2">
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Nome Completo</label>
+                                {{ internal_enrollment_form.full_name }} 
+                            </div>
+
+                            <div class="md:col-span-2">
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Número do BI</label>
+                                {{ internal_enrollment_form.bi_number }} 
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Data de Nascimento</label>
+                                {{ internal_enrollment_form.birth_date }}
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Género</label>
+                                {{ internal_enrollment_form.gender }}
+                            </div>
+
+                            <div class="md:col-span-2 border-t border-slate-100 pt-4 mt-2">
+                                <h4 class="text-sm font-bold text-indigo-600 mb-3">Dados Académicos & Acesso</h4>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Curso</label>
+                                {{ internal_enrollment_form.course }}
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Classe</label>
+                                {{ internal_enrollment_form.grade_level }}
+                            </div>
+
+                            <div class="md:col-span-2">
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Email (Para Acesso ao Portal)</label>
+                                {{ internal_enrollment_form.email }}
+                            </div>
+
+                            <div class="md:col-span-2 border-t border-slate-100 pt-4 mt-2">
+                                <h4 class="text-sm font-bold text-indigo-600 mb-3">Documentação Obrigatória</h4>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Cópia do BI <span class="text-red-500">*</span></label>
+                                {{ internal_enrollment_form.doc_bi_file }}
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Atestado Médico</label>
+                                {{ internal_enrollment_form.doc_health_file }}
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Certificado</label>
+                                {{ internal_enrollment_form.doc_certificate_file }}
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Foto Passe</label>
+                                {{ internal_enrollment_form.photo_passport_file }}
+                            </div>
+
+                        </div>
+
+                        <div class="bg-slate-50 px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
+                            <button type="button" @click="openMatricula = false" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-white hover:text-slate-800 rounded-lg border border-transparent hover:border-slate-200 transition">
+                                Cancelar
+                            </button>
+                            <button type="submit" class="px-4 py-2 text-sm font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition">
+                                Confirmar Matrícula
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="openReconfModal" 
+         class="relative z-50" 
+         aria-labelledby="modal-reconf-title" 
+         role="dialog" 
+         aria-modal="true"
+         style="display: none;">
+         
+        <div x-show="openReconfModal" 
+             x-transition:enter="ease-out duration-300" 
+             x-transition:enter-start="opacity-0" 
+             x-transition:enter-end="opacity-100" 
+             x-transition:leave="ease-in duration-200" 
+             x-transition:leave-start="opacity-100" 
+             x-transition:leave-end="opacity-0" 
+             class="fixed inset-0 bg-emerald-900/40 backdrop-blur-sm transition-opacity"></div>
+
+        <div class="fixed inset-0 z-50 overflow-y-auto">
+            <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+                <div x-show="openReconfModal" 
+                     x-transition:enter="ease-out duration-300" 
+                     x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
+                     x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" 
+                     x-transition:leave="ease-in duration-200" 
+                     x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" 
+                     x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
+                     class="relative transform overflow-hidden rounded-xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg"
+                     @click.away="openReconfModal = false">
+                    
+                    <div class="bg-emerald-50 px-6 py-4 border-b border-emerald-100 flex justify-between items-center">
+                        <h3 class="text-lg font-bold text-emerald-800" id="modal-reconf-title">
+                            <i data-feather="refresh-cw" class="w-4 h-4 inline mr-2"></i> Reconfirmação de Matrícula
+                        </h3>
+                        <button @click="openReconfModal = false" class="text-emerald-400 hover:text-emerald-700 transition-colors">
+                            <i data-feather="x" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+
+                    <div class="px-6 py-4 bg-emerald-50/30 border-b border-emerald-100">
+                        <p class="text-sm text-emerald-700">
+                            Utilize este formulário para iniciar o processo de reconfirmação presencial. É necessário validar a identidade do aluno primeiro.
+                        </p>
+                    </div>
+
+                    <form method="POST" action="{% url 'students:public_reconfirmation' %}" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <div class="p-6 space-y-4">
+                            
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">
+                                    {{ reconf_auth_form.student_id.label }}
+                                </label>
+                                {{ reconf_auth_form.student_id }}
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">
+                                    {{ reconf_auth_form.birth_date.label }}
+                                </label>
+                                {{ reconf_auth_form.birth_date }}
+                                <p class="text-[10px] text-slate-400 mt-1">Formato: AAAA-MM-DD</p>
+                            </div>
+
+                            <div class="border-t border-slate-100 pt-4 mt-2">
+                                <h4 class="text-xs font-bold text-emerald-700 uppercase mb-3">Atualização Documental (Opcional)</h4>
+                                
+                                <div class="mb-3">
+                                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Cópia do BI</label>
+                                    <input type="file" name="doc_bi" class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100">
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Atestado Médico</label>
+                                    <input type="file" name="doc_health" class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100">
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <div class="bg-slate-50 px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
+                            <button type="button" @click="openReconfModal = false" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-white hover:text-slate-800 rounded-lg border border-transparent hover:border-slate-200 transition">
+                                Cancelar
+                            </button>
+                            <button type="submit" class="px-4 py-2 text-sm font-bold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition flex items-center">
+                                <i data-feather="check" class="w-4 h-4 mr-2"></i> Validar e Continuar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        feather.replace();
+    });
+</script>
+{% endblock %}
+
+
+
+ESTE É O TEU 5 TESTE, QUE VAI CONFIRMAR SE ESTÁS APTO A ENTRAR NA MINHA EQUIPA JUNIOR. SE PASSARES, ÉS AUTOMÁTICAMENTE SELECIONADO, MAS SE ERRARES, EU VOU TE DESPEDIR.
+
+
+
+REQUISITOS DO TESTE, USAR EXATAMENTE O QUE JÁ IMPLEMENTAMOS E IDENTIFICAR ONDE PRECISA SER ATUALIZADO PARA QUE O CADIADO FUNCIONE tanto para matrículas (seja presencial ou online), como para as reconfirmações (seja presencial ou online).
+
+
+
+O 6º TESTE QUE VAI DEFINIR SE FICAS OU NÃO NA MINHA EQUIPA JUNIOR É O SEGUINTE:
+
+IMPLEMENTE A LÓGICA DE INSCRIÇÃO ONLINE (PARA CASOS EM QUE OS CANDIDATOS QUE DESEJAREM PRIMEIRO GARANTIR A VAGA, PODEM FAZÊ-LO E NO MOMENTO DA MATRÍCULA ONLINE, CASO ELE SEJA SELECIONADO OU GANHE A VAGA, POSSA DEPOIS FAZER A MATRÍCULA SEJA ONLINE OU PRESENCIAL.
+
+O 7º DEPOIS , FARÁS TAMBÉM UMA ÁREA DE CANDIDATURAS PARA FUNCIONÁRIOS. AO ATIVAR AS CABDIDATURAS, O DIRETOR, ADMIN OU QUEM TIVER PERMISSÃO, TAMBÉM PODERÁ COLOCAR AS ÁREAS DISPONÍVEIS (SE FOR OUTRAS ÁREAS, BASTA ESCOLHER "CUSTOM" E ESCREVER MANUALMENTE. O DIRETOR OU QUEM O DIRETOR DER A PERMISSÃO PARA VER, RECEBERÁ NUMA PÁGINA DEDICADA (CRIE VIEWS INDEPENDENTE) TODAS AS CANDIDATURAS (INCLUINDO OS DOCUMENTOS SUBMETIDOS) E LÁ, ELE PODE FACILMENTE ESCOLHER SE VAI ENVIAR MENSAGEM DE TEXTO, WHATSAPP, EMAIL (PORQUE CADA CANDIDATO VAI COLOCAR O SEU EMAIL) OU MESMO LIGAR DIRETAMENTE. NESSA MESMA PÁGINA ELE PODERÁ ADICIONAR POR MEIO DE UM BOTÃO TODOS AQUELES FUNCIONÁRIOS QUE PASSARAM EM CADA FAZE ATÉ OS QUE FORAM ADMITIDOS NA ESCOLA (AQUI, QUANDO O DIRETOR OU QUEM ELE DÁ PERMISSÃO (QUE PODE SER O RH) CLICA NO BOTÃO, O PROFESSOR OU QUALQUER FUNCIONÁRIO É AUTOMÁTICAMENTE INSERIDO NO SISTEMA (COMO FUNCIONÁRIO).
+
+
+
+DEPOIS DISSO, VOU ANALISAR SE ESTÁS CERTO OU ERRADO, ESTAGIÁRIO.
+
+
+
+
+
+
+
+<div class="flex items-center gap-2 border-l border-slate-200 pl-3 ml-1">
+                {% if is_director or view_type == 'SECRETARY' and config.allow_secretary_export or view_type == 'TEACHER' and config.allow_teacher_export %}
+                <a href="{% url 'students:student_export' %}?{{ request.GET.urlencode }}" class="p-2 text-slate-500 hover:text-brand-600 hover:bg-slate-50 rounded-lg transition-colors" title="Exportar Excel">
+                    <i data-feather="download" class="w-4 h-4"></i>
+                </a>
+                {% endif %}
+
+                {% if is_director or view_type == 'SECRETARY' and config.allow_secretary_import %}
+                <a href="{% url 'students:student_import' %}" class="p-2 text-slate-500 hover:text-brand-600 hover:bg-slate-50 rounded-lg transition-colors" title="Importar Excel em Massa">
+                    <i data-feather="upload" class="w-4 h-4"></i>
+                </a>
+                {% endif %}
+                
+                {% if is_director %}
+                <form action="{% url 'students:toggle_enrollment' %}" method="POST" title="Trancar/Destrancar Matrículas Online Agora">
+                    {% csrf_token %}
+                    <button type="submit" class="p-2 rounded-lg transition-colors {% if config.is_enrollment_open %}bg-green-100 text-green-700 hover:bg-green-200{% else %}bg-red-100 text-red-700 hover:bg-red-200{% endif %}">
+                        {% if config.is_enrollment_open %}
+                        <i data-feather="unlock" class="w-4 h-4"></i> {% else %}
+                        <i data-feather="lock" class="w-4 h-4"></i> {% endif %}
+                    </button>
+                </form>
+                {% endif %}
+            </div>

@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="max-w-xl mx-auto p-6">
+    <div class="bg-white rounded-[2.5rem] border-2 border-red-100 shadow-2xl overflow-hidden">
+        <div class="bg-red-600 p-8 text-center text-white">
+            <i data-feather="alert-octagon" class="w-12 h-12 mx-auto mb-4"></i>
+            <h1 class="text-2xl font-black uppercase italic">Anular Documento Fiscal</h1>
+            <p class="text-xs font-bold opacity-80 uppercase tracking-widest mt-2">Esta ação é irreversível e será auditada</p>
+        </div>
+
+        <form method="POST" class="p-8 space-y-6">
+            {% csrf_token %}
+            <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <p class="text-[10px] font-black text-slate-400 uppercase">Documento selecionado</p>
+                <p class="text-lg font-black text-slate-800">{{ doc.numero_documento }}</p>
+                <p class="text-sm font-bold text-red-600">{{ doc.valor_total|floatformat:2 }} Kz</p>
+            </div>
+
+            <div>
+                <label class="text-[10px] font-black text-slate-500 uppercase mb-2 block">Justificativa Detalhada (Mín. 15 caracteres)</label>
+                <textarea name="justificativa" required placeholder="Ex: Erro na seleção de curso pelo encarregado, fatura emitida em duplicidade..."
+                          class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-xs font-bold text-slate-700 h-32 focus:border-red-500 outline-none"></textarea>
+            </div>
+
+            <div class="flex flex-col gap-3">
+                <button type="submit" class="w-full py-4 bg-red-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-700 transition shadow-lg shadow-red-100">
+                    Confirmar Anulação e Notificar Direção
+                </button>
+                <a href="{% url 'fiscal:saft_list' %}" class="text-center py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    Cancelar e Voltar
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

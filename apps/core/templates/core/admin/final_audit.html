@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+    
+    <div class="md:flex md:items-center md:justify-between mb-8">
+        <div class="min-w-0 flex-1">
+            <h2 class="text-2xl font-bold leading-7 text-slate-900 sm:truncate sm:text-3xl sm:tracking-tight">
+                Auditoria Financeira & Risco
+            </h2>
+            <p class="mt-1 text-sm text-slate-500">
+                Relatório executivo consolidado do exercício de {{ year }}.
+            </p>
+        </div>
+        <div class="mt-4 flex md:ml-4 md:mt-0">
+            <button onclick="window.print()" class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50">
+                <i data-feather="printer" class="w-4 h-4 mr-2 text-slate-500"></i>
+                Imprimir Relatório
+            </button>
+        </div>
+    </div>
+
+    <div class="mb-8">
+        <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center">
+            <i data-feather="activity" class="w-5 h-5 mr-2 text-brand-600"></i> Demonstração do Resultado (Operação Loja/Stock)
+        </h3>
+        <dl class="grid grid-cols-1 gap-5 sm:grid-cols-3">
+            
+            <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6 border border-slate-200">
+                <dt class="truncate text-sm font-medium text-slate-500">Receita Bruta (Loja)</dt>
+                <dd class="mt-1 text-3xl font-semibold tracking-tight text-emerald-600">
+                    {{ audit.dre.receita|floatformat:2 }} Kz
+                </dd>
+                <dd class="mt-2 text-xs text-slate-400">Vendas confirmadas e pagas.</dd>
+            </div>
+
+            <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6 border border-slate-200">
+                <dt class="truncate text-sm font-medium text-slate-500">Custos & Despesas (Stock)</dt>
+                <dd class="mt-1 text-3xl font-semibold tracking-tight text-rose-600">
+                    {{ audit.dre.despesas|floatformat:2 }} Kz
+                </dd>
+                <dd class="mt-2 text-xs text-slate-400">Compras de material confirmadas.</dd>
+            </div>
+
+            <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6 border border-slate-200">
+                <dt class="truncate text-sm font-medium text-slate-500">Resultado Operacional (EBITDA)</dt>
+                <dd class="mt-1 text-3xl font-semibold tracking-tight text-indigo-600">
+                    {{ audit.dre.ebitda|floatformat:2 }} Kz
+                </dd>
+                <dd class="mt-2 text-xs text-slate-400">Saldo líquido da operação comercial.</dd>
+            </div>
+        </dl>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        <div class="bg-white rounded-xl shadow-sm border border-red-100 overflow-hidden">
+            <div class="border-b border-red-100 bg-red-50/50 px-4 py-5 sm:px-6">
+                <h3 class="text-base font-semibold leading-6 text-red-900 flex items-center">
+                    <i data-feather="alert-triangle" class="w-5 h-5 mr-2"></i> Gestão de Inadimplência
+                </h3>
+            </div>
+            <div class="px-4 py-5 sm:p-6">
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <p class="text-sm font-medium text-slate-500">Montante em Risco</p>
+                        <p class="text-2xl font-bold text-red-600">{{ audit.risco.total_inadimplente|floatformat:2 }} Kz</p>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-slate-500">Alunos Devedores</p>
+                        <p class="text-2xl font-bold text-slate-800">{{ audit.risco.qtd_devedores }}</p>
+                    </div>
+                </div>
+
+                <div class="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <i data-feather="info" class="h-5 w-5 text-red-400"></i>
+                        </div>
+                        <div class="ml-3">
+                            <h3 class="text-sm font-medium text-red-800">Ação Recomendada</h3>
+                            <div class="mt-2 text-sm text-red-700">
+                                <p>Existem faturas vencidas. O sistema pode enviar notificações automáticas via painel do aluno para todos os responsáveis listados acima.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {% if audit.risco.qtd_devedores > 0 %}
+                    <form action="{% url 'core:notify_debtors_bulk' %}" method="POST" onsubmit="return confirm('ATENÇÃO: Você está prestes a notificar {{ audit.risco.qtd_devedores }} encarregados sobre débitos pendentes. Esta ação enviará alertas para os painéis dos usuários. Deseja continuar?');">
+                        {% csrf_token %}
+                        <button type="submit" class="w-full flex justify-center items-center rounded-md bg-red-600 px-3 py-3 text-sm font-semibold text-white shadow-sm hover:bg-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 transition-colors">
+                            <i data-feather="bell" class="w-4 h-4 mr-2"></i>
+                            Executar Cobrança em Massa
+                        </button>
+                    </form>
+                {% else %}
+                    <button disabled class="w-full flex justify-center items-center rounded-md bg-slate-100 px-3 py-3 text-sm font-semibold text-slate-400 cursor-not-allowed">
+                        <i data-feather="check-circle" class="w-4 h-4 mr-2"></i>
+                        Nenhuma pendência para notificar
+                    </button>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="border-b border-slate-200 bg-slate-50 px-4 py-5 sm:px-6">
+                <h3 class="text-base font-semibold leading-6 text-slate-900 flex items-center">
+                    <i data-feather="bar-chart-2" class="w-5 h-5 mr-2 text-brand-600"></i> Métricas de Eficiência
+                </h3>
+            </div>
+            <div class="px-4 py-5 sm:p-6">
+                <ul role="list" class="divide-y divide-slate-100">
+                    <li class="flex items-center justify-between py-4">
+                        <div class="flex items-center">
+                            <div class="rounded-md bg-slate-100 p-2">
+                                <i data-feather="trash-2" class="h-5 w-5 text-slate-500"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-slate-900">Índice de Desperdício</p>
+                                <p class="text-xs text-slate-500">Material danificado ou perdido</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm font-bold text-slate-900">{{ audit.desperdicio }}</p>
+                        </div>
+                    </li>
+                    <li class="flex items-center justify-between py-4">
+                        <div class="flex items-center">
+                            <div class="rounded-md bg-emerald-100 p-2">
+                                <i data-feather="trending-up" class="h-5 w-5 text-emerald-600"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-slate-900">Crescimento (YoY)</p>
+                                <p class="text-xs text-slate-500">Comparativo anual</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                                +{{ revenue_growth }}%
+                            </span>
+                        </div>
+                    </li>
+                </ul>
+                <div class="mt-6 border-t border-slate-100 pt-4">
+                    <p class="text-xs text-slate-500 text-center italic">
+                        Auditoria gerada automaticamente em {{ today|date:"d/m/Y H:i" }}.<br>
+                        Dados baseados nos registros contábeis do Tenant.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    feather.replace();
+</script>
+{% endblock %}

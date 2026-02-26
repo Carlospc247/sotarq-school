@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="pt-pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}SOTARQ SCHOOL | Segurança Digital{% endblock %}</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        [x-cloak] { display: none !important; }
+        
+        /* Estética SOTARQ: Gradiente sutil de fundo para páginas externas */
+        .bg-sotarq-pattern {
+            background-color: #f8fafc;
+            background-image: radial-gradient(#e2e8f0 0.5px, transparent 0.5px);
+            background-size: 24px 24px;
+        }
+    </style>
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="bg-sotarq-pattern min-h-screen">
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="fixed bottom-8 w-full text-center">
+        <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">
+            &copy; 2026 SOTARQ ENTERPRISE - Todos os direitos reservados
+        </p>
+        <div class="flex justify-center gap-4 mt-2">
+            <span class="text-[8px] font-bold text-slate-300 uppercase">Segurança AGT v4</span>
+            <span class="text-[8px] font-bold text-slate-300 uppercase">Protocolo RSA-2048</span>
+        </div>
+    </footer>
+
+    <script src="https://unpkg.com/feather-icons"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            feather.replace();
+        });
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

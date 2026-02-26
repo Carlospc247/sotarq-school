@@ -1,0 +1,78 @@
+# === SOTARQ SCHOOL GITIGNORE ===
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Ambientes Virtuais (VENV)
+venv/
+env/
+ENV/
+.env
+.venv
+
+# Database (Ignora db local, mas mantém estrutura se usar SQLite para testes)
+*.sqlite3
+*.db
+
+# Django especificidades
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+static/collected/
+
+# Segredos e Configurações Sensíveis
+.env
+*.env
+.env.local
+secrets.json
+
+# Logs
+*.log
+logs/
+
+# WeasyPrint / Relatórios Temporários
+*.pdf
+temp_reports/
+
+# IDEs e Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+.project
+.pydevproject
+.settings/
+
+# Sistema Operacional (Windows/Mac)
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Documentação Gerada
+htmlcov/
+.tox/
+.coverage
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Chaves de Criptografia e Certificados (CRÍTICO)
+*.pem
+*.key
+certs_backup/
+private_key.pem
+public_key.pem
+
+# Logs de manutenção e sistema
+maintenance_logs/
+setup_logs/
+*.txt

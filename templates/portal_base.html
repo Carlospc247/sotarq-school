@@ -1,0 +1,134 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-ao" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Portal do Aluno | {{ school_branding.school_name }}{% endblock %}</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        
+        /* White-Label Variables */
+        :root {
+            --primary: {{ school_branding.primary_color|default:'#4f46e5' }};
+        }
+        
+        .text-brand { color: var(--primary); }
+        .bg-brand { background-color: var(--primary); }
+        .border-brand { border-color: var(--primary); }
+        
+        .active-nav {
+            background-color: var(--primary);
+            color: white;
+            box-shadow: 0 10px 20px -5px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body class="bg-[#F8FAFC] text-slate-900 min-h-screen">
+
+    <nav class="md:hidden fixed bottom-6 left-6 right-6 h-16 bg-white/90 backdrop-blur-xl rounded-full z-50 flex items-center justify-around px-4 shadow-2xl border border-white/50">
+        <a href="{% url 'portal:dashboard' %}" class="p-3 text-slate-400 hover:text-brand transition-all">
+            <i class="fas fa-home text-lg"></i>
+        </a>
+        <a href="#" class="p-3 text-slate-400 hover:text-brand transition-all">
+            <i class="fas fa-file-invoice text-lg"></i>
+        </a>
+        <a href="{% url 'portal:notifications' %}" class="relative p-3 text-brand transition-all">
+            <i class="fas fa-bell text-lg"></i>
+            {% if unread_notifications_count > 0 %}
+            <span class="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500"></span>
+            {% endif %}
+        </a>
+        <a href="#" class="p-3 text-slate-400 hover:text-brand transition-all">
+            <i class="fas fa-user-circle text-lg"></i>
+        </a>
+    </nav>
+
+    <div class="flex h-screen overflow-hidden">
+        
+        <aside class="hidden md:flex w-72 bg-white flex-col border-r border-slate-100 p-6">
+            <div class="flex items-center gap-3 mb-10 px-2">
+                <div class="w-10 h-10 rounded-xl bg-brand flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                    {{ school_branding.school_name|slice:":1" }}
+                </div>
+                <h1 class="text-sm font-black tracking-tight text-slate-800 leading-tight">
+                    {{ school_branding.school_name }}
+                </h1>
+            </div>
+
+            <nav class="flex-1 space-y-2">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 px-4">Menu Principal</p>
+                
+                <a href="{% url 'portal:dashboard' %}" 
+                   class="flex items-center px-4 py-3.5 rounded-2xl transition-all font-bold text-sm group
+                          {% if request.resolver_match.url_name == 'dashboard' %}active-nav{% else %}text-slate-500 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+                    <i class="fas fa-columns w-5 mr-3"></i> Dashboard
+                </a>
+                
+                <a href="#" class="flex items-center px-4 py-3.5 text-slate-500 hover:bg-slate-50 hover:text-slate-900 rounded-2xl transition-all font-bold text-sm">
+                    <i class="fas fa-book w-5 mr-3"></i> Boletim
+                </a>
+
+                <a href="#" class="flex items-center px-4 py-3.5 text-slate-500 hover:bg-slate-50 hover:text-slate-900 rounded-2xl transition-all font-bold text-sm">
+                    <i class="fas fa-wallet w-5 mr-3"></i> Pagamentos
+                </a>
+                
+                <form action="{% url 'core:logout' %}" method="POST" class="mt-8">
+                    {% csrf_token %}
+                    <button type="submit" class="flex items-center w-full px-4 py-3.5 text-red-500 hover:bg-red-50 rounded-2xl transition-all font-bold text-sm">
+                        <i class="fas fa-sign-out-alt w-5 mr-3"></i> Terminar Sessão
+                    </button>
+                </form>
+            </nav>
+        </aside>
+
+        <main class="flex-1 flex flex-col h-full overflow-hidden bg-[#F8FAFC]">
+            
+            <header class="h-20 flex items-center justify-between px-8 md:px-12 flex-shrink-0">
+                <div class="flex items-center">
+                    <h2 class="text-lg font-black text-slate-800 tracking-tight md:block hidden">
+                        Olá, <span class="text-brand">{{ request.user.first_name }}!</span>
+                    </h2>
+                </div>
+
+                <div class="flex items-center gap-6">
+                    <a href="{% url 'portal:notifications' %}" class="relative text-slate-400 hover:text-brand transition-colors">
+                        <i class="fas fa-bell text-xl"></i>
+                        {% if unread_notifications_count > 0 %}
+                        <span class="absolute -top-1 -right-1 flex h-4 w-4">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-4 w-4 bg-red-600 text-[8px] text-white justify-center items-center font-bold">
+                                {{ unread_notifications_count }}
+                            </span>
+                        </span>
+                        {% endif %}
+                    </a>
+
+                    <div class="h-8 w-[1px] bg-slate-200 hidden md:block"></div>
+
+                    <div class="flex items-center gap-3">
+                        <div class="text-right hidden md:block">
+                            <p class="text-sm font-bold text-slate-900 leading-none">{{ request.user.get_full_name }}</p>
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                                {{ request.user.student_profile.registration_number }}
+                            </p>
+                        </div>
+                        <div class="w-10 h-10 rounded-full bg-brand text-white flex items-center justify-center font-black shadow-lg shadow-indigo-200">
+                            {{ request.user.first_name|slice:":1" }}
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <section class="flex-1 overflow-y-auto px-6 md:px-12 pb-32 md:pb-12">
+                {% block content %}{% endblock %}
+            </section>
+        </main>
+    </div>
+</body>
+</html>

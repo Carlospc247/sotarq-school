@@ -1,0 +1,15 @@
+<div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px;">
+    <h2 style="color: #2563eb;">Pagamento Confirmado!</h2>
+    <p>Prezado(a) Encarregado(a),</p>
+    <p>Informamos que o pagamento referente à fatura <strong>{{ invoice_number }}</strong> do aluno <strong>{{ student_name }}</strong> foi processado e validado pela nossa tesouraria.</p>
+    
+    <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
+        <p style="margin: 0; font-size: 14px; color: #64748b;">Valor Validado:</p>
+        <p style="margin: 0; font-size: 24px; font-weight: bold; color: #1e293b;">{{ amount }} Kz</p>
+    </div>
+
+    <p>O recibo oficial com QR Code de verificação segue em anexo a este e-mail e também está disponível na Dashboard do Aluno.</p>
+    
+    <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+    <p style="font-size: 12px; color: #94a3b8; text-align: center;">Este é um e-mail automático enviado pelo sistema de gestão da {{ school_name }}.</p>
+</div>

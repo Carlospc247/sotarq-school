@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificação de Documento - Sotarq School</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; text-align: center; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ccc; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        .status-authentic { color: green; font-weight: bold; font-size: 1.2em; }
+        .status-invalid { color: red; font-weight: bold; font-size: 1.2em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Verificação de Autenticidade do Documento</h1>
+        {% if verification_status == 'AUTÊNTICO' %}
+            <p class="status-authentic">✔️ Documento AUTÊNTICO</p>
+            <p>Este documento do tipo <strong>{{ document.document_type.name }}</strong> foi emitido pela <strong>{{ tenant_name }}</strong>.</p>
+            <p><strong>Aluno:</strong> {{ student.full_name }}</p>
+            <p><strong>Emitido em:</strong> {{ document.issued_at|date:"d/m/Y H:i" }}</p>
+            {% else %}
+            <p class="status-invalid">❌ Documento INVÁLIDO ou Token Expirado/Utilizado.</p>
+            <p>A autenticidade deste documento não pôde ser confirmada ou o link de verificação não é mais válido.</p>
+        {% endif %}
+        <p>Para mais informações, contacte a instituição.</p>
+    </div>
+</body>
+</html>

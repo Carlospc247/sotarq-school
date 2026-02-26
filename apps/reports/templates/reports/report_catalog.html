@@ -1,0 +1,55 @@
+{% extends 'base_staff.html' %}
+
+{% block content %}
+<div class="p-8">
+    <h1 class="text-2xl font-black text-slate-800 mb-6 uppercase tracking-tighter">Centro de Relatórios & Inteligência</h1>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+            <div class="flex items-center space-x-3 mb-4">
+                <div class="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                </div>
+                <h3 class="text-lg font-bold text-slate-800">Boletins de Notas (Trimestral)</h3>
+            </div>
+            
+            <p class="text-sm text-slate-500 mb-6">Selecione a turma para gerar todos os boletins com QR Code de autenticação.</p>
+
+            <form id="bulletinForm" class="space-y-4">
+                <select id="classSelect" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm">
+                    <option value="">Escolher Turma...</option>
+                    {% for klass in classes %}
+                        <option value="{{ klass.id }}">{{ klass.name }} ({{ klass.grade_level }})</option>
+                    {% endfor %}
+                </select>
+                
+                <button type="button" onclick="triggerBulletins()" class="w-full py-3 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all">
+                    Iniciar Geração em Massa
+                </button>
+            </form>
+        </div>
+
+        <div class="bg-slate-900 p-6 rounded-3xl text-white">
+            <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Métricas de Performance</h3>
+            <div class="space-y-4">
+                <div class="flex justify-between items-center border-b border-white/10 pb-2">
+                    <span class="text-sm">Média Global da Escola</span>
+                    <span class="text-xl font-black text-emerald-400">14.2</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm">Taxa de Aproveitamento</span>
+                    <span class="text-xl font-black text-blue-400">88%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function triggerBulletins() {
+    const classId = document.getElementById('classSelect').value;
+    if (!classId) return alert('Selecione uma turma');
+    window.location.href = `/reports/trigger/bulletin/${classId}/`;
+}
+</script>
+{% endblock %}

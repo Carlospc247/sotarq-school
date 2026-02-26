@@ -1,0 +1,36 @@
+{% extends 'public_base.html' %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-12">
+    <div class="text-center mb-12">
+        <h1 class="text-3xl font-black text-slate-900">A Nossa Oferta Formativa</h1>
+        <p class="text-slate-500 mt-2">Explore os cursos disponíveis para o ano letivo corrente.</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {% for course in courses %}
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden group">
+            <div class="h-2 w-full bg-brand"></div>
+            <div class="p-8">
+                <div class="flex justify-between items-start mb-4">
+                    <span class="px-3 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase rounded-full">
+                        {{ course.get_level_display }}
+                    </span>
+                    <i data-feather="bookmark" class="text-slate-300 group-hover:text-brand transition-colors"></i>
+                </div>
+                <h3 class="text-xl font-bold text-slate-800 mb-2">{{ course.name }}</h3>
+                <p class="text-sm text-slate-500 mb-6">Código: {{ course.code }} | Duração: {{ course.duration_years }} Anos</p>
+                
+                <a href="{% url 'students:public_enrollment' %}" class="block w-full py-3 text-center rounded-xl bg-slate-50 text-brand font-bold text-sm hover:bg-brand hover:text-white transition-colors">
+                    Candidatar-me
+                </a>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-span-full text-center py-20">
+            <p class="text-slate-400">Nenhum curso disponível de momento.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

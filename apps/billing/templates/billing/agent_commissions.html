@@ -1,0 +1,56 @@
+{% extends 'base_staff.html' %}
+{% load humanize %}
+
+{% block content %}
+<div class="p-8 animate-fade-in space-y-10">
+    <div class="flex justify-between items-end bg-slate-900 p-10 rounded-[3rem] text-white shadow-2xl">
+        <div>
+            <h1 class="text-3xl font-black uppercase italic">Comissões & Billing Global</h1>
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">Controlo de Subagentes e Receita SaaS</p>
+        </div>
+        <button onclick="openModal('setupCommissions')" class="px-6 py-4 bg-indigo-600 rounded-2xl font-black text-[10px] uppercase">Configurar Taxas</button>
+    </div>
+
+    <div class="bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden">
+        <div class="px-8 py-6 bg-slate-50 border-b border-slate-100">
+            <h3 class="text-xs font-black text-slate-800 uppercase tracking-tighter">Histórico de Faturamento por Origem</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead class="bg-slate-50/50">
+                    <tr class="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                        <th class="px-8 py-4">Escola (Tenant)</th>
+                        <th class="px-8 py-4">Subagente Responsável</th>
+                        <th class="px-8 py-4 text-right">Valor Fatura</th>
+                        <th class="px-8 py-4 text-right">Comissão ({{ agent.commission_pct }}%)</th>
+                        <th class="px-8 py-4 text-center">Estado</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50">
+                    {% for inv in invoices %}
+                    <tr class="hover:bg-indigo-50/20 transition-all text-sm">
+                        <td class="px-8 py-4 font-bold text-slate-700">{{ inv.tenant.name }}</td>
+                        <td class="px-8 py-4">
+                            <span class="text-xs font-medium text-slate-500">
+                                {{ inv.tenant.sub_agent.user.get_full_name|default:"Venda Direta" }}
+                            </span>
+                        </td>
+                        <td class="px-8 py-4 text-right font-black text-slate-900">{{ inv.amount|intcomma }} Kz</td>
+                        <td class="px-8 py-4 text-right font-bold text-emerald-600">
+                            {% if inv.tenant.sub_agent %}
+                                {{ inv.get_commission_value|intcomma }} Kz
+                            {% else %} --- {% endif %}
+                        </td>
+                        <td class="px-8 py-4 text-center">
+                            <span class="px-3 py-1 rounded-full text-[9px] font-black uppercase {% if inv.status == 'paid' %}bg-emerald-100 text-emerald-700{% else %}bg-amber-100 text-amber-700{% endif %}">
+                                {{ inv.status }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

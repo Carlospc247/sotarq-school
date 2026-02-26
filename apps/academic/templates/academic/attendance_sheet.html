@@ -1,0 +1,60 @@
+<div class="p-4 bg-slate-50 min-h-screen sm:min-h-0 sm:rounded-3xl overflow-hidden" x-data="{ sending: false }">
+    <div class="mb-6 flex justify-between items-start">
+        <div>
+            <h3 class="text-xl font-black text-slate-800 uppercase italic leading-tight">Chamada Diária</h3>
+            <p class="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">
+                {{ allocation.class_room.name }} • {{ allocation.subject.name }}
+            </p>
+        </div>
+        <button @click="attendanceModalOpen = false" class="p-2 bg-white rounded-full shadow-sm text-slate-400 hover:text-red-500 transition-colors">
+            <i data-feather="x" class="w-5 h-5"></i>
+        </button>
+    </div>
+
+    <div class="space-y-3 overflow-y-auto max-h-[70vh] pb-20 px-1">
+        {% for student in students %}
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-4 group" 
+             id="row-{{ student.id }}"
+             :class="sending === '{{ student.id }}' ? 'opacity-50 pointer-events-none' : ''">
+            
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center font-black text-indigo-600 text-xs">
+                        {{ forloop.counter }}
+                    </div>
+                    <div>
+                        <p class="text-sm font-black text-slate-800 uppercase leading-tight">{{ student.full_name }}</p>
+                        <p class="text-[9px] font-bold text-slate-400 uppercase">Faltas acumuladas: 
+                            <span id="count-{{ student.id }}" class="text-red-500">
+                                {% with student.academic_grades.all|first as grade %}
+                                    {{ grade.unjustified_absences|default:0 }}
+                                {% endwith %}
+                            </span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+                <button hx-post="{% url 'academic:daily_attendance' allocation.id %}"
+                        hx-vals='{"student_id": "{{ student.id }}", "type": "P"}'
+                        hx-swap="none"
+                        hx-on::before-request="sending = '{{ student.id }}'"
+                        hx-on::after-request="sending = false"
+                        class="py-4 bg-emerald-50 text-emerald-700 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all active:scale-95">
+                    Presente
+                </button>
+                <button hx-post="{% url 'academic:daily_attendance' allocation.id %}"
+                        hx-vals='{"student_id": "{{ student.id }}", "type": "FI"}'
+                        hx-target="#count-{{ student.id }}"
+                        hx-on::before-request="sending = '{{ student.id }}'"
+                        hx-on::after-request="sending = false"
+                        class="py-4 bg-red-50 text-red-700 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all active:scale-95">
+                    Falta (FI)
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+<script>feather.replace();</script>

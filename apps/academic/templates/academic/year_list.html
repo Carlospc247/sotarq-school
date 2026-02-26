@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mx-auto max-w-5xl px-4 py-8">
+    
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-2xl font-black text-slate-800">Anos Letivos</h1>
+            <p class="text-sm text-slate-500">Gerencie o calendário escolar.</p>
+        </div>
+        <a href="{% url 'core:dashboard' %}" class="text-slate-500 hover:text-slate-800 font-bold text-sm flex items-center">
+            <i data-feather="arrow-left" class="w-4 h-4 mr-2"></i> Voltar
+        </a>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <div class="lg:col-span-1">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 sticky top-4">
+                <h3 class="font-bold text-slate-800 mb-4 border-b border-slate-100 pb-2">Novo Ano Letivo</h3>
+                <form method="POST">
+                    {% csrf_token %}
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Nome / Designação</label>
+                            {{ form.name }}
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Data Início</label>
+                            {{ form.start_date }}
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Data Fim</label>
+                            {{ form.end_date }}
+                        </div>
+                        <div class="flex items-center gap-2 pt-2 bg-slate-50 p-2 rounded border border-slate-100">
+                            {{ form.is_active }}
+                            <label class="text-xs font-bold text-slate-700 cursor-pointer" for="id_is_active">Definir como Ativo</label>
+                        </div>
+                        
+                        <button type="submit" class="w-full py-2.5 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 flex items-center justify-center">
+                            <i data-feather="plus" class="w-4 h-4 mr-2"></i> Criar Ano Letivo
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="lg:col-span-2">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <table class="min-w-full divide-y divide-slate-200">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">Designação</th>
+                            <th class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">Período</th>
+                            <th class="px-6 py-3 text-center text-xs font-bold text-slate-500 uppercase">Status</th>
+                            <th class="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200">
+                        {% for year in years %}
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-6 py-4">
+                                <span class="font-bold text-slate-800 text-sm">{{ year.name }}</span>
+                            </td>
+                            <td class="px-6 py-4 text-xs text-slate-500">
+                                {{ year.start_date|date:"d/m/Y" }} <br> a {{ year.end_date|date:"d/m/Y" }}
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                {% if year.is_active %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
+                                        <span class="w-2 h-2 mr-1.5 bg-emerald-500 rounded-full animate-pulse"></span> ATIVO
+                                    </span>
+                                {% else %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-400 border border-slate-200">
+                                        Inativo
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 text-right">
+                                <div class="flex items-center justify-end gap-2">
+                                    
+                                    {% if not year.is_active %}
+                                        <form action="{% url 'academic:year_activate' year.id %}" method="POST" onsubmit="return confirm('Tem a certeza que deseja ATIVAR o ano {{ year.name }}? Qualquer outro ano ativo será fechado.');" class="inline">
+                                            {% csrf_token %}
+                                            <button type="submit" class="text-[10px] font-bold text-indigo-600 hover:text-indigo-900 border border-indigo-200 bg-indigo-50 px-3 py-1.5 rounded transition hover:bg-indigo-100 uppercase cursor-pointer">
+                                                Ativar
+                                            </button>
+                                        </form>
+
+                                        <form action="{% url 'academic:year_delete' year.id %}" method="POST" onsubmit="return confirm('Tem a certeza que deseja ELIMINAR este ano letivo?');" class="inline">
+                                            {% csrf_token %}
+                                            <button type="submit" class="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded border border-transparent hover:border-red-100 transition" title="Eliminar">
+                                                <i data-feather="trash-2" class="w-4 h-4"></i>
+                                            </button>
+                                        </form>
+                                    
+                                    {% else %}
+                                        <form action="{% url 'academic:year_deactivate' year.id %}" method="POST" onsubmit="return confirm('Tem a certeza que deseja DESATIVAR o ano letivo corrente? O sistema ficará sem ano ativo.');" class="inline">
+                                            {% csrf_token %}
+                                            <button type="submit" class="text-[10px] font-bold text-amber-700 hover:text-amber-900 border border-amber-200 bg-amber-50 px-3 py-1.5 rounded transition hover:bg-amber-100 uppercase cursor-pointer flex items-center gap-1">
+                                                <i data-feather="power" class="w-3 h-3"></i> Desativar
+                                            </button>
+                                        </form>
+                                    {% endif %}
+
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="px-6 py-12 text-center text-slate-400">
+                                <p>Nenhum ano letivo registado.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    if (typeof feather !== 'undefined') { feather.replace(); }
+</script>
+{% endblock %}

@@ -1,0 +1,401 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+<div class="max-w-6xl mx-auto py-8 px-4" x-data="schoolSettings()">
+    <div class="mb-8 flex justify-between items-end">
+        <div>
+            <h1 class="text-2xl font-black text-slate-800">Configurações da Escola</h1>
+            <p class="text-sm text-slate-500">Gestão completa da identidade institucional, portal público e website.</p>
+        </div>
+    </div>
+
+    <form method="POST" enctype="multipart/form-data" class="space-y-8" @submit="prepareSubmit">
+        {% csrf_token %}
+
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center border-b pb-2">
+                <i data-feather="image" class="w-5 h-5 mr-2 text-brand-600"></i> Identidade Visual
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Nome da Instituição</label>
+                    {{ form.school_name }}
+                </div>
+                
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Logotipo Principal</label>
+                    <input type="file" name="logo" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                    {% if form.instance.logo %}
+                        <p class="text-xs text-green-600 mt-1">Atual: {{ form.instance.logo.name }}</p>
+                    {% endif %}
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Favicon</label>
+                    <input type="file" name="favicon" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-slate-50 file:text-slate-700 hover:file:bg-slate-100">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Cor Primária (Sistema)</label>
+                    <div class="flex items-center gap-3">
+                        {{ form.primary_color }}
+                        <span class="text-xs text-slate-400">Botões e Links do ERP</span>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Cor Secundária (Sistema)</label>
+                    <div class="flex items-center gap-3">
+                        {{ form.secondary_color }}
+                        <span class="text-xs text-slate-400">Sidebar do ERP</span>
+                    </div>
+                </div>
+
+                <div class="md:col-span-2 border-t border-slate-100 pt-4 mt-2">
+                    <h4 class="text-sm font-bold text-slate-700 mb-4">Cores do Site Público</h4>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Cabeçalho (Fundo)</label>
+                            {{ form.site_header_bg }}
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Cabeçalho (Texto)</label>
+                            {{ form.site_header_text }}
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Rodapé (Fundo)</label>
+                            {{ form.site_footer_bg }}
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Rodapé (Texto)</label>
+                            {{ form.site_footer_text }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center border-b pb-2">
+                <i data-feather="monitor" class="w-5 h-5 mr-2 text-brand-600"></i> Portal do Aluno (Banner)
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Modo de Exibição</label>
+                    {{ form.hero_mode }}
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Título de Destaque</label>
+                    {{ form.hero_title }}
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Subtítulo / Slogan</label>
+                    {{ form.hero_subtitle }}
+                </div>
+                <div class="border-t border-slate-100 pt-4 mt-2 md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Imagem 1 (Principal)</label>
+                        <input type="file" name="hero_image_1" class="text-xs text-slate-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Imagem 2</label>
+                        <input type="file" name="hero_image_2" class="text-xs text-slate-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Imagem 3</label>
+                        <input type="file" name="hero_image_3" class="text-xs text-slate-500">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center border-b pb-2">
+                <i data-feather="layout" class="w-5 h-5 mr-2 text-brand-600"></i> Conteúdo & Cards
+            </h3>
+            
+            <div class="mb-6">
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Barra de Novidades (Ticker)</label>
+                {{ form.news_ticker }}
+            </div>
+
+            <div class="mb-8 border border-slate-100 rounded-lg p-4 bg-slate-50/50">
+                <div class="flex justify-between items-center mb-4">
+                    <h4 class="text-sm font-bold text-slate-700">Cards Informativos (Destaques)</h4>
+                    <button type="button" @click="addCard()" class="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded hover:bg-indigo-700 transition shadow-sm">
+                        + Adicionar Card
+                    </button>
+                </div>
+                
+                <input type="hidden" name="site_info_cards" :value="JSON.stringify(cards)">
+
+                <div class="grid grid-cols-1 gap-4">
+                    <template x-for="(card, index) in cards" :key="index">
+                        <div class="bg-white p-4 rounded border border-slate-200 shadow-sm relative group hover:border-indigo-200 transition-colors">
+                            <button type="button" @click="removeCard(index)" class="absolute top-2 right-2 text-red-400 hover:text-red-600 transition-colors">
+                                <i data-feather="x" class="w-4 h-4"></i>
+                            </button>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-[10px] uppercase text-slate-400 font-bold">Título</label>
+                                    <input type="text" x-model="card.title" class="w-full text-sm border-slate-200 rounded p-1.5 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" placeholder="Ex: Ensino Rigoroso">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] uppercase text-slate-400 font-bold">Ícone (Feather)</label>
+                                    <input type="text" x-model="card.icon" class="w-full text-sm border-slate-200 rounded p-1.5 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" placeholder="Ex: book, award, users">
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="block text-[10px] uppercase text-slate-400 font-bold">Conteúdo</label>
+                                    <textarea x-model="card.content" rows="2" class="w-full text-sm border-slate-200 rounded p-1.5 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" placeholder="Descrição curta do card..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                    <div x-show="cards.length === 0" class="text-center py-4 text-slate-400 text-xs italic">
+                        Nenhum card configurado. Adicione para exibir destaques na home.
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <label class="block text-xs font-bold text-slate-500 uppercase">Conteúdo Estático / Embeds (HTML)</label>
+                {{ form.custom_html_content }}
+                
+                <div class="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                    <p class="text-xs font-bold text-slate-700 mb-3 flex items-center">
+                        <i data-feather="help-circle" class="w-4 h-4 mr-2 text-brand-600"></i>
+                        O que posso colocar aqui?
+                    </p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="flex items-start p-3 bg-white border border-slate-100 rounded shadow-sm hover:border-brand-200 transition-colors">
+                            <div class="flex-shrink-0 mt-0.5"><i data-feather="video" class="w-4 h-4 text-red-500"></i></div>
+                            <div class="ml-3">
+                                <h4 class="text-xs font-bold text-slate-800">Vídeos & Institucional</h4>
+                                <p class="text-[10px] text-slate-500 leading-tight mt-1">YouTube > Partilhar > Incorporar. Cole o código iframe aqui.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start p-3 bg-white border border-slate-100 rounded shadow-sm hover:border-brand-200 transition-colors">
+                            <div class="flex-shrink-0 mt-0.5"><i data-feather="map-pin" class="w-4 h-4 text-emerald-500"></i></div>
+                            <div class="ml-3">
+                                <h4 class="text-xs font-bold text-slate-800">Localização</h4>
+                                <p class="text-[10px] text-slate-500 leading-tight mt-1">Google Maps > Partilhar > Incorporar mapa.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start p-3 bg-white border border-slate-100 rounded shadow-sm hover:border-brand-200 transition-colors">
+                            <div class="flex-shrink-0 mt-0.5"><i data-feather="clipboard" class="w-4 h-4 text-indigo-500"></i></div>
+                            <div class="ml-3">
+                                <h4 class="text-xs font-bold text-slate-800">Pesquisas</h4>
+                                <p class="text-[10px] text-slate-500 leading-tight mt-1">Embed de Google Forms ou Microsoft Forms.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center border-b pb-2">
+                <i data-feather="percent" class="w-5 h-5 mr-2 text-brand-600"></i> Configuração de Avaliação Acadêmica
+            </h3>
+            <p class="text-xs text-slate-500 mb-6">Defina o peso de cada componente para o cálculo automático da Média Trimestral (MT). 
+                <br><span class="font-bold text-amber-600">Fórmula aplicada:</span> (MAC x Peso + NPP x Peso + NPT x Peso) / Soma dos Pesos.
+            </p>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Peso MAC (Avaliação Contínua)</label>
+                    {{ form.weight_mac }}
+                    <p class="text-[10px] text-slate-400 mt-1">Ex: 1.0 (Peso normal)</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Peso NPP (Prova Parcial)</label>
+                    {{ form.weight_npp }}
+                    <p class="text-[10px] text-slate-400 mt-1">Ex: 1.0</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Peso NPT (Prova Trimestral)</label>
+                    {{ form.weight_npt }}
+                    <p class="text-[10px] text-slate-400 mt-1">Ex: 2.0 (Se a prova final valer o dobro)</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center border-b pb-2">
+                <i data-feather="briefcase" class="w-5 h-5 mr-2 text-brand-600"></i> Informações Legais & Financeiras
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">NIF</label>
+                    {{ form.tax_id }}
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Banco</label>
+                    {{ form.bank_name }}
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">IBAN Principal</label>
+                    {{ form.iban_primary }}
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center border-b pb-2">
+                <i data-feather="share-2" class="w-5 h-5 mr-2 text-brand-600"></i> Contactos
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Email</label>
+                    {{ form.official_email }}
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Telefone</label>
+                    {{ form.phone_contact }}
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Endereço</label>
+                    {{ form.address }}
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Facebook</label>
+                    {{ form.facebook_link }}
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Instagram</label>
+                    {{ form.instagram_link }}
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center border-b pb-2">
+                <i data-feather="calendar" class="w-5 h-5 mr-2 text-brand-600"></i> Calendário & Matrículas
+            </h3>
+            
+            <div class="mb-6 pb-6 border-b border-slate-100">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center">
+                        <div class="flex items-center h-5">
+                            {% if enrollment_access_blocked %}
+                                <input type="checkbox" disabled class="w-4 h-4 text-slate-300 border-slate-300 rounded cursor-not-allowed bg-slate-100">
+                            {% else %}
+                                {{ form.is_enrollment_open }}
+                            {% endif %}
+                        </div>
+                        <div class="ml-3 text-sm">
+                            <label class="font-bold text-slate-700">Novas Matrículas (Externos)</label>
+                            <p class="text-xs text-slate-500">Habilita o formulário de candidatura no site público.</p>
+                        </div>
+                    </div>
+                    {% if enrollment_access_blocked %}
+                        <span class="px-2 py-1 bg-red-100 text-red-700 text-[10px] font-bold rounded flex items-center gap-1">
+                            <i data-feather="lock" class="w-3 h-3"></i> SEM LICENÇA
+                        </span>
+                    {% endif %}
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4 pl-8">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Data de Início</label>
+                        {{ form.enrollment_start_date }}
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Data de Fim</label>
+                        {{ form.enrollment_end_date }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center">
+                        <div class="flex items-center h-5">
+                            {{ form.is_reconfirmation_open }}
+                        </div>
+                        <div class="ml-3 text-sm">
+                            <label class="font-bold text-slate-700">Reconfirmações (Internos)</label>
+                            <p class="text-xs text-slate-500">Permite aos alunos atuais garantirem vaga para o próximo ano Lectivo</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4 pl-8">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Data de Início</label>
+                        {{ form.reconfirmation_start_date }}
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Data de Fim</label>
+                        {{ form.reconfirmation_end_date }}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4 mt-6 pt-6 border-t border-slate-100">
+                <div class="flex items-center p-3 bg-slate-50 rounded-lg">
+                    {{ form.allow_secretary_export }} <label class="ml-3 text-sm font-medium text-slate-900">Permitir Exp. Secretaria</label>
+                </div>
+                <div class="flex items-center p-3 bg-slate-50 rounded-lg">
+                    {{ form.allow_teacher_export }} <label class="ml-3 text-sm font-medium text-slate-900">Permitir Exp. Professor</label>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mt-8">
+                <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center border-b pb-2">
+                    <i data-feather="shield-off" class="w-5 h-5 mr-2 text-brand-600"></i> Exceções e Notificações BI
+                </h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Destinatários do Relatório Mensal</label>
+                        {{ form.executive_report_emails }}
+                        <p class="text-[10px] text-slate-400 mt-2">Os relatórios de performance serão enviados automaticamente para estes endereços.</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Professores Autorizados (Durante Pausa)</label>
+                        <div class="max-h-40 overflow-y-auto p-3 border rounded-lg bg-slate-50">
+                            {{ form.break_exceptions }}
+                        </div>
+                        <p class="text-[10px] text-slate-400 mt-2">Selecione os professores que poderão lançar notas mesmo com o sistema bloqueado.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-end pt-6 pb-12">
+            <button type="submit" class="px-8 py-4 bg-slate-900 text-white font-bold rounded-xl hover:bg-indigo-600 transition-all shadow-xl hover:shadow-2xl flex items-center">
+                <i data-feather="save" class="w-5 h-5 mr-2"></i>
+                Salvar Configurações
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('schoolSettings', () => ({
+            // Carrega o JSON do backend ou inicia array vazio
+            cards: {{ form.instance.site_info_cards|default:"[]"|safe }},
+            
+            addCard() {
+                this.cards.push({ title: '', icon: 'star', content: '' });
+                // Re-renderiza ícones após adicionar elemento ao DOM
+                this.$nextTick(() => feather.replace());
+            },
+            removeCard(index) {
+                this.cards.splice(index, 1);
+            },
+            prepareSubmit() {
+                // Alpine atualiza automaticamente o input hidden vinculado
+                // através do atributo :value="JSON.stringify(cards)"
+            }
+        }))
+    });
+    
+    // Inicialização dos ícones ao carregar a página
+    feather.replace();
+</script>
+{% endblock %}

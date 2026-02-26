@@ -1,0 +1,11 @@
+<td class="px-6 py-4 text-center">
+    <input type="number" step="0.1" name="value" value="{{ grade.mac1 }}"
+           class="w-16 p-2 text-center border rounded-lg focus:ring-2 focus:ring-blue-600 outline-none"
+           hx-post="{% url 'academic:update_grade' grade.id %}"
+           hx-vals='{"field": "mac1"}'
+           hx-swap="outerHTML"
+           hx-target="#grade-row-{{ grade.id }} grade-inputs">
+</td>
+<td class="px-6 py-4 text-center font-black bg-blue-50 {% if grade.mt1 < 10 %}text-red-600{% else %}text-blue-700{% endif %}">
+    {{ grade.mt1|floatformat:1 }}
+</td>

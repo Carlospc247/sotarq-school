@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>Boletim de Notas - SOTARQ School</title>
+    <style>
+        @page { size: A4; margin: 1.5cm; @bottom-right { content: "Pág " counter(page) " de " counter(pages); font-family: 'Helvetica', sans-serif; font-size: 9pt; } }
+        body { font-family: 'Helvetica', sans-serif; font-size: 10pt; color: #333; }
+        .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid {{ primary_color|default:'#1e293b' }}; padding-bottom: 10px; }
+        .header h1 { margin: 0; text-transform: uppercase; font-size: 16pt; color: {{ primary_color|default:'#1e293b' }}; }
+        .header p { margin: 2px; font-size: 10pt; }
+        .student-info { width: 100%; margin-bottom: 20px; border: 1px solid #eee; padding: 10px; border-radius: 8px; }
+        .label { font-weight: bold; color: #666; text-transform: uppercase; font-size: 8pt; }
+        .value { font-size: 11pt; font-weight: bold; }
+        table.grades { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        table.grades th, table.grades td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        table.grades th { background-color: #f8f9fa; color: #333; text-transform: uppercase; font-size: 8pt; }
+        table.grades td.subject { text-align: left; font-weight: bold; }
+        /* Cores Legais Artigo 35.º */
+        .negative { color: #dc2626; font-weight: bold; } 
+        .positive { color: #16a34a; font-weight: bold; }
+        .footer { margin-top: 50px; width: 100%; text-align: center; }
+        .signature-line { display: inline-block; width: 200px; border-top: 1px solid #000; margin: 0 20px; padding-top: 5px; font-size: 9pt; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        {% if logo_url %}<img src="{{ logo_url }}" style="height: 60px; margin-bottom: 10px;">{% endif %}
+        <h1>{{ school_name }}</h1>
+        <p>Ano Lectivo: {{ academic_year.name }}</p>
+        <p><strong>BOLETIM DE NOTAS - {{ current_term }}º TRIMESTRE</strong></p>
+    </div>
+
+    <table class="student-info">
+        <tr>
+            <td width="50%">
+                <div class="label">Nome do Aluno</div>
+                <div class="value">{{ student.full_name }}</div>
+            </td>
+            <td width="25%">
+                <div class="label">Nº Processo</div>
+                <div class="value">{{ student.registration_number }}</div>
+            </td>
+            <td width="25%">
+                <div class="label">Turma</div>
+                <div class="value">{{ class.name }}</div>
+            </td>
+        </tr>
+    </table>
+
+    <table class="grades">
+        <thead>
+            <tr>
+                <th width="40%">Disciplina</th>
+                <th width="12%">MAC</th>
+                <th width="12%">NPP</th>
+                <th width="12%">NPT</th>
+                <th width="24%">Classificação Final</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for grade in grades %}
+            <tr>
+                <td class="subject">{{ grade.subject.name }}</td>
+                <td>{{ grade.mac1|default:"-" }}</td>
+                <td>{{ grade.npp1|default:"-" }}</td>
+                <td>{{ grade.npt1|default:"-" }}</td>
+                
+                <td class="{% if grade.mt1 < 10 or grade.is_failed_by_attendance %}negative{% else %}positive{% endif %}">
+                    {% if grade.is_failed_by_attendance %}
+                        <span style="font-size: 8pt;">RETIDO (FALTAS)</span>
+                    {% else %}
+                        {{ grade.get_final_display_grade }}
+                        {% if grade_level_index <= 6 %}
+                            <br><span style="font-size: 7pt; color: #999;">({{ grade.mt1|floatformat:1 }}v)</span>
+                        {% endif %}
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" style="padding: 20px;">Nenhuma nota lançada.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="footer">
+        <div style="margin-bottom: 40px;">
+            <div class="signature-line">O Diretor de Turma</div>
+            <div class="signature-line">O Diretor Pedagógico</div>
+        </div>
+        <p style="font-size: 8pt; color: #999;">
+            Documento processado por SOTARQ School em {{ generated_at|date:"d/m/Y H:i" }}.<br>
+            A validade legal deste documento depende do carimbo oficial e assinatura.
+        </p>
+    </div>
+</body>
+</html>

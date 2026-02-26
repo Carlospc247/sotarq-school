@@ -1,0 +1,12 @@
+<div class="relative group">
+    <label class="flex items-center gap-4 w-full p-4 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:border-brand hover:bg-slate-50 transition-all">
+        <div class="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 group-hover:text-brand group-hover:bg-white transition-colors">
+            <i data-feather="{{ icon }}" class="w-6 h-6"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+            <span class="text-[10px] font-black text-slate-400 uppercase block tracking-wider">{{ label }}</span>
+            <span class="file-label text-xs font-bold text-slate-700 truncate block mt-0.5">Selecione o ficheiro...</span>
+        </div>
+        <input type="file" name="{{ name }}" required class="hidden" onchange="handleFileSelect(this)" accept=".pdf,.jpg,.jpeg,.png">
+    </label>
+</div>

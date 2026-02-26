@@ -1,0 +1,67 @@
+{% extends 'public_base.html' %}
+
+{% block content %}
+<div class="min-h-[60vh] flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-slate-50">
+    <div class="max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-lg border border-slate-100">
+        <div class="text-center">
+            <h2 class="mt-2 text-2xl font-black text-slate-900">Consultar Situação</h2>
+            <p class="mt-2 text-sm text-slate-500">Insira o Nº de Processo para validar a matrícula.</p>
+        </div>
+
+        <form class="mt-8 space-y-6" action="" method="GET">
+            <div class="rounded-md shadow-sm -space-y-px">
+                <div>
+                    <label for="q" class="sr-only">Nº de Processo</label>
+                    <input id="q" name="q" type="text" required 
+                           class="appearance-none rounded-lg relative block w-full px-3 py-3 border border-slate-300 placeholder-slate-400 text-slate-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm" 
+                           placeholder="Ex: 20260045">
+                </div>
+            </div>
+
+            <div>
+                <button type="submit" class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-bold rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all">
+                    Pesquisar
+                </button>
+            </div>
+        </form>
+
+        {% if error_message %}
+            <div class="p-4 bg-red-50 border-l-4 border-red-500 text-red-700 text-sm rounded">
+                {{ error_message }}
+            </div>
+        {% endif %}
+
+        {% if student %}
+            <div class="mt-6 border-t border-slate-100 pt-6">
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-xs font-bold text-slate-400 uppercase">Estado</span>
+                    {% if student.is_active and not student.is_suspended %}
+                        <span class="px-2 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full">ATIVO / REGULAR</span>
+                    {% else %}
+                        <span class="px-2 py-1 bg-red-100 text-red-700 text-xs font-bold rounded-full">IRREGULAR / SUSPENSO</span>
+                    {% endif %}
+                </div>
+                
+                <div class="space-y-3">
+                    <div>
+                        <span class="text-xs text-slate-500 block">Nome do Aluno</span>
+                        <span class="text-sm font-bold text-slate-900">{{ student.full_name }}</span>
+                    </div>
+                    <div>
+                        <span class="text-xs text-slate-500 block">Turma Atual</span>
+                        <span class="text-sm font-medium text-slate-900">
+                            {{ student.current_class.name|default:"Aguardando Colocação" }}
+                        </span>
+                    </div>
+                     <div>
+                        <span class="text-xs text-slate-500 block">Curso</span>
+                        <span class="text-sm font-medium text-slate-900">
+                            {{ student.current_class.grade_level.course.name|default:"-" }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

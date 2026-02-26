@@ -1,0 +1,159 @@
+{% extends 'public_base.html' %}
+
+{% block title %}Candidatura Online | {{ school_branding.school_name }}{% endblock %}
+
+{% block content %}
+<div class="w-full max-w-4xl mx-auto my-8">
+    <div class="text-center mb-12">
+        <span class="inline-block py-1 px-3 rounded-full bg-brand/10 text-brand text-[10px] font-bold uppercase tracking-widest mb-4 border border-brand/20">
+            Ano Letivo 2025/2026
+        </span>
+        <h1 class="text-4xl md:text-5xl font-black text-slate-900 mb-4 tracking-tight">Candidatura Online</h1>
+        <p class="text-slate-500 text-lg max-w-lg mx-auto">
+            Garanta a sua vaga na <span class="text-brand font-bold">{{ school_branding.school_name }}</span> em poucos passos simples e seguros.
+        </p>
+    </div>
+
+    <form method="POST" enctype="multipart/form-data" class="bg-white rounded-[2rem] shadow-2xl shadow-slate-200/50 border border-slate-100 overflow-hidden relative">
+        {% csrf_token %}
+        
+        <div class="h-1.5 w-full bg-slate-50">
+            <div class="h-full bg-brand w-1/4 rounded-r-full"></div>
+        </div>
+
+        <div class="p-8 md:p-12 space-y-12">
+            
+            <section>
+                <div class="flex items-center gap-4 mb-8">
+                    <div class="w-10 h-10 rounded-xl bg-brand text-white flex items-center justify-center font-bold text-lg shadow-lg shadow-brand/30">1</div>
+                    <div>
+                        <h3 class="text-xl font-bold text-slate-800">Dados do Candidato</h3>
+                        <p class="text-xs text-slate-400 font-medium uppercase tracking-wider">Informação Pessoal</p>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="col-span-2">
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Nome Completo</label>
+                        <input type="text" name="full_name" required placeholder="Conforme documento de identificação"
+                               class="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand focus:border-brand font-bold text-slate-700 outline-none transition-all placeholder:font-normal">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Data de Nascimento</label>
+                        <input type="date" name="birth_date" required 
+                               class="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand outline-none font-bold text-slate-700">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Gênero</label>
+                        <div class="relative">
+                            <select name="gender" class="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand outline-none font-bold text-slate-700 appearance-none">
+                                <option value="M">Masculino</option>
+                                <option value="F">Feminino</option>
+                            </select>
+                            <i data-feather="chevron-down" class="absolute right-5 top-4 w-5 h-5 text-slate-400 pointer-events-none"></i>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <div class="flex items-center gap-4 mb-8">
+                    <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-lg">2</div>
+                    <div>
+                        <h3 class="text-xl font-bold text-slate-800">Documentação</h3>
+                        <p class="text-xs text-slate-400 font-medium uppercase tracking-wider">Uploads Obrigatórios</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {% include "students/partials/file_input.html" with name="doc_bi" label="Cópia do BI" icon="user" %}
+                    {% include "students/partials/file_input.html" with name="doc_health" label="Atestado Médico" icon="activity" %}
+                    
+                    {% include "students/partials/file_input.html" with name="doc_certificate" label="Certificado / Declaração" icon="file-text" %}
+                    {% include "students/partials/file_input.html" with name="photo_passport" label="Foto Tipo Passe" icon="camera" %}
+                </div>
+            </section>
+
+            <section x-data="{ showDetails: false }">
+                <div class="bg-amber-50 border border-amber-100 rounded-2xl p-6 transition-all duration-300">
+                    <div class="flex items-center justify-between cursor-pointer" @click="showDetails = !showDetails">
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center flex-shrink-0">
+                                <i data-feather="alert-circle" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-slate-800 text-sm">Atenção Especial / Saúde</h4>
+                                <p class="text-xs text-slate-500">O aluno possui alguma condição de saúde ou necessidade educativa?</p>
+                            </div>
+                        </div>
+                        
+                        <div class="relative inline-flex items-center h-6 rounded-full w-11 transition-colors focus:outline-none"
+                             :class="showDetails ? 'bg-brand' : 'bg-slate-300'">
+                            <span class="translate-x-1 inline-block w-4 h-4 transform bg-white rounded-full transition-transform"
+                                  :class="showDetails ? 'translate-x-6' : 'translate-x-1'"></span>
+                        </div>
+                        <input type="hidden" name="has_special_needs" :value="showDetails ? 'True' : 'False'">
+                    </div>
+
+                    <div x-show="showDetails" x-collapse class="mt-4 pt-4 border-t border-amber-200/50">
+                        <label class="block text-xs font-bold text-amber-800 uppercase mb-2">Descreva a situação (Opcional)</label>
+                        <textarea name="observations" rows="3" placeholder="Ex: Alergia a amendoim, asma, dificuldades visuais..."
+                                  class="w-full p-4 bg-white border border-amber-200 rounded-xl text-sm focus:ring-2 focus:ring-amber-400 outline-none resize-none"></textarea>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Curso</label>
+                        <select name="course_id" required class="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand font-bold text-slate-700">
+                            {% for course in courses %}
+                            <option value="{{ course.id }}">{{ course.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Classe</label>
+                        <select name="grade_level_id" required class="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand font-bold text-slate-700">
+                            {% for level in levels %}
+                            <option value="{{ level.id }}">{{ level.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-span-2 pt-4 border-t border-slate-100">
+                        <h4 class="font-bold text-slate-800 mb-4 text-sm uppercase">Dados do Encarregado</h4>
+                        <div class="grid md:grid-cols-3 gap-4">
+                            <input type="text" name="guardian_name" required placeholder="Nome Completo" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold">
+                            <input type="tel" name="guardian_phone" required placeholder="Telefone" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold">
+                            <input type="email" name="guardian_email" required placeholder="Email (Obrigatório)" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold">
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+
+        <div class="bg-slate-50 px-8 py-6 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-4">
+            <p class="text-xs text-slate-400 font-medium text-center md:text-left">
+                Ao submeter, concorda com os termos da <span class="font-bold text-slate-600">{{ school_branding.school_name }}</span>.
+            </p>
+            <button type="submit" class="w-full md:w-auto px-8 py-4 bg-brand text-white rounded-xl font-bold text-sm hover:bg-opacity-90 hover:-translate-y-1 transition-all shadow-xl shadow-brand/20 flex items-center justify-center gap-2">
+                <span>Confirmar Candidatura</span>
+                <i data-feather="arrow-right" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+    function handleFileSelect(input) {
+        const label = input.parentElement.querySelector('.file-label');
+        if (input.files && input.files[0]) {
+            label.innerText = input.files[0].name;
+            label.classList.add('text-emerald-600');
+            input.parentElement.classList.add('border-emerald-200', 'bg-emerald-50');
+        }
+    }
+</script>
+{% endblock %}

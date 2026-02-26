@@ -1,0 +1,84 @@
+{% extends "portal_base.html" %}
+
+{% block content %}
+<div class="animate-fade-in space-y-6 py-6 max-w-7xl mx-auto">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100">
+        <div class="flex items-center space-x-5">
+            <div class="w-16 h-16 bg-brand rounded-3xl flex items-center justify-center text-white shadow-xl shadow-indigo-100 animate-pulse">
+                <i class="fas fa-map-marked-alt text-2xl"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-black text-slate-800 uppercase italic leading-none">Rastreio em Directo</h1>
+                <p class="text-slate-500 font-medium mt-2">Viatura: <span class="text-brand font-black">{{ bus.plate_number }}</span> | Aluno: <span class="font-bold">{{ student.full_name }}</span></p>
+            </div>
+        </div>
+        <div id="gps-status" class="flex items-center gap-2 px-6 py-3 bg-emerald-50 text-emerald-700 rounded-2xl border border-emerald-100">
+            <span class="relative flex h-3 w-3">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+            </span>
+            <span class="text-xs font-black uppercase tracking-widest">Sinal GPS Activo</span>
+        </div>
+    </div>
+
+    <div class="relative group">
+        <div id="map" class="w-full h-[600px] bg-slate-200 rounded-[3.5rem] overflow-hidden shadow-2xl border-8 border-white"></div>
+        
+        <div class="absolute top-8 left-8 z-10 space-y-4">
+            <div class="bg-white/90 backdrop-blur-md p-5 rounded-2xl shadow-xl border border-white/50 w-64">
+                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Próxima Paragem Estimada</p>
+                <h4 class="text-sm font-black text-slate-800" id="next-stop">Ponto {{ student.neighborhood|default:"Residencial" }}</h4>
+            </div>
+            <div class="bg-slate-900 p-5 rounded-2xl shadow-xl text-white w-64">
+                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Velocidade da Viatura</p>
+                <h4 class="text-xl font-black text-brand italic" id="bus-speed">-- km/h</h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_key }}"></script>
+<script>
+    let map, busMarker;
+    const busId = "{{ bus.id }}";
+
+    function initMap() {
+        const initialPos = { lat: {{ bus.current_lat|default:-15.00 }}, lng: {{ bus.current_lng|default:13.00 }} };
+        map = new google.maps.Map(document.getElementById("map"), {
+            zoom: 16,
+            center: initialPos,
+            disableDefaultUI: true,
+            zoomControl: true,
+            styles: [/* Estilos customizados para visibilidade de elite */]
+        });
+
+        busMarker = new google.maps.Marker({
+            position: initialPos,
+            map: map,
+            icon: {
+                url: "/static/img/bus-icon-top.png",
+                scaledSize: new google.maps.Size(50, 50)
+            },
+            title: "Autocarro Escolar"
+        });
+    }
+
+    async function updateLocation() {
+        try {
+            const response = await fetch(`/transport/api/location/${busId}/`);
+            const data = await response.json();
+            if (data.lat && data.lng) {
+                const newPos = new google.maps.LatLng(data.lat, data.lng);
+                busMarker.setPosition(newPos);
+                map.panTo(newPos);
+                document.getElementById('bus-speed').innerText = `${data.speed || '---'} km/h`;
+            }
+        } catch (e) { 
+            document.getElementById('gps-status').innerText = "Ligação Interrompida";
+        }
+    }
+
+    google.maps.event.addDomListener(window, 'load', initMap);
+    setInterval(updateLocation, 5000); // Rigor Sênior: Polling a cada 5 segundos
+</script>
+{% endblock %}

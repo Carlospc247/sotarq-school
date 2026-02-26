@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Novo Empréstimo | SOTARQ{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-barcode mr-2"></i> Registo de Empréstimo Rápido</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="loanForm">
+                        {% csrf_token %}
+                        
+                        <div class="form-group mb-4">
+                            <label for="student_id" class="font-weight-bold">1. Selecionar Aluno</label>
+                            <select name="student_id" id="student_id" class="form-control select2" required>
+                                <option value="">Procure por Nome ou Nº de Processo...</option>
+                                {% for student in students %}
+                                    <option value="{{ student.id }}">{{ student.full_name }} ({{ student.process_number }})</option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">O sistema verificará bloqueios financeiros automaticamente.</small>
+                        </div>
+
+                        <hr>
+
+                        <div class="form-group mb-4">
+                            <label for="barcode" class="font-weight-bold">2. Ler Código de Barras do Livro</label>
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                </div>
+                                <input type="text" name="barcode" id="barcode" 
+                                       class="form-control form-control-lg border-primary" 
+                                       placeholder="Passe o leitor aqui..." 
+                                       required autofocus>
+                            </div>
+                            <p id="scanStatus" class="small mt-2 text-info">Aguardando leitura do código...</p>
+                        </div>
+
+                        <div class="alert alert-info py-2">
+                            <i class="fas fa-info-circle"></i> O prazo de devolução será calculado com base na configuração da escola.
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'library:library_dashboard' %}" class="btn btn-secondary">Cancelar</a>
+                            <button type="submit" class="btn btn-success btn-lg">Confirmar Empréstimo</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const barcodeInput = document.getElementById('barcode');
+        const scanStatus = document.getElementById('scanStatus');
+
+        // Garante que o foco volta para o input após qualquer clique
+        document.addEventListener('click', () => {
+            barcodeInput.focus();
+        });
+
+        // Feedback visual quando o leitor atua
+        barcodeInput.addEventListener('input', function() {
+            if (this.value.length > 3) {
+                scanStatus.innerText = "Código lido: " + this.value + ". Processando...";
+                scanStatus.classList.replace('text-info', 'text-success');
+            }
+        });
+    });
+</script>
+{% endblock %}

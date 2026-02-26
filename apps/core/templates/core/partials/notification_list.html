@@ -1,0 +1,12 @@
+{% for n in notifications %}
+<a href="{{ n.link }}" class="block p-4 hover:bg-blue-50 transition border-l-4 border-transparent hover:border-blue-600">
+    <p class="text-xs font-black text-gray-900 mb-1">{{ n.title }}</p>
+    <p class="text-xs text-gray-500 leading-tight">{{ n.message }}</p>
+    <p class="text-[10px] text-gray-400 mt-2">{{ n.created_at|timesince }} atrás</p>
+</a>
+{% empty %}
+<div class="p-8 text-center">
+    <i class="fas fa-check-circle text-gray-200 text-3xl mb-2"></i>
+    <p class="text-xs text-gray-400">Nenhuma notificação nova.</p>
+</div>
+{% endfor %}

@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto py-12 px-4">
+    <div class="mb-10 text-center">
+        <h1 class="text-3xl font-black text-slate-800 uppercase italic tracking-tighter">Auditoria de Notas</h1>
+        <p class="text-slate-500 font-bold uppercase text-xs tracking-widest mt-2">
+            Selecione uma disciplina da turma: <span class="text-indigo-600">{{ klass.name }}</span>
+        </p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% for subject in subjects %}
+        <a href="{% url 'academic:grading_sheet' klass.id subject.id term %}" 
+           class="group p-6 bg-white border border-slate-200 rounded-[2rem] shadow-sm hover:shadow-xl hover:border-indigo-500 transition-all duration-300 relative overflow-hidden">
+            
+            <div class="relative z-10">
+                <div class="w-12 h-12 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                    <i data-feather="book" class="w-6 h-6"></i>
+                </div>
+                <h3 class="font-black text-slate-800 uppercase text-sm leading-tight mb-1 group-hover:text-indigo-600 transition-colors">
+                    {{ subject.name }}
+                </h3>
+                <p class="text-[10px] font-bold text-slate-400 uppercase italic">{{ subject.code|default:"S/REF" }}</p>
+            </div>
+
+            <i data-feather="bookmark" class="absolute -right-4 -bottom-4 w-24 h-24 text-slate-50 group-hover:text-indigo-50 transition-colors rotate-12"></i>
+        </a>
+        {% empty %}
+        <div class="col-span-full py-20 text-center bg-slate-50 rounded-[2.5rem] border-2 border-dashed border-slate-200">
+            <i data-feather="alert-circle" class="w-12 h-12 text-slate-300 mx-auto mb-4"></i>
+            <p class="text-slate-400 font-bold uppercase text-xs">Nenhuma disciplina cadastrada para esta classe.</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="mt-12 flex justify-center">
+        <a href="{% url 'academic:student_dashboard' %}" class="px-8 py-3 bg-slate-100 text-slate-500 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-200 transition">
+            Voltar ao Dashboard
+        </a>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        feather.replace();
+    });
+</script>
+{% endblock %}

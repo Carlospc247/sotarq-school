@@ -1,0 +1,63 @@
+{% extends 'base_staff.html' %}
+{% load humanize %}
+
+{% block content %}
+<div class="p-8 animate-fade-in space-y-10">
+    <div class="flex justify-between items-end bg-indigo-900 p-10 rounded-[3rem] text-white shadow-2xl relative overflow-hidden">
+        <div class="relative z-10">
+            <h1 class="text-3xl font-black uppercase italic leading-none">Ranking de Subagentes</h1>
+            <p class="text-[10px] font-bold text-indigo-300 uppercase tracking-widest mt-2">Análise de Performance e ROI de Parcerias</p>
+        </div>
+        <i data-feather="trending-up" class="w-16 h-16 opacity-20"></i>
+    </div>
+
+    <div class="bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden">
+        <table class="w-full text-left">
+            <thead class="bg-slate-50 border-b border-slate-100">
+                <tr class="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    <th class="px-8 py-6">Parceiro (Subagente)</th>
+                    <th class="px-8 py-6 text-center">Escolas Trazidas</th>
+                    <th class="px-8 py-6 text-center">Retenção</th>
+                    <th class="px-8 py-6 text-right">Faturamento Total (SaaS)</th>
+                    <th class="px-8 py-6 text-right text-indigo-600">Comissão Acumulada</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-50">
+                {% for agent in agents_perf %}
+                <tr class="hover:bg-slate-50/50 transition-all group">
+                    <td class="px-8 py-6">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-black text-xs">
+                                {{ agent.name|slice:":1" }}
+                            </div>
+                            <span class="text-sm font-black text-slate-700">{{ agent.name }}</span>
+                        </div>
+                    </td>
+                    <td class="px-8 py-6 text-center">
+                        <span class="text-xs font-bold text-slate-500">{{ agent.schools }} Instituições</span>
+                    </td>
+                    <td class="px-8 py-6 text-center">
+                        <div class="flex flex-col items-center">
+                            <span class="text-xs font-black {% if agent.retention < 50 %}text-red-500{% else %}text-emerald-500{% endif %}">
+                                {{ agent.retention }}%
+                            </span>
+                            <div class="w-16 bg-slate-100 h-1 rounded-full mt-1 overflow-hidden">
+                                <div class="bg-emerald-500 h-full" style="width: {{ agent.retention }}%"></div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-8 py-6 text-right">
+                        <span class="text-sm font-black text-slate-900">{{ agent.revenue|intcomma }} Kz</span>
+                    </td>
+                    <td class="px-8 py-6 text-right">
+                        <span class="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-[11px] font-black">
+                            {{ agent.commission|intcomma }} Kz
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,18 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'django'
+    dns_sd_configs:
+      - names:
+        - 'tasks.web' # SEGREDO SWARM: 'tasks.web' encontra o IP de TODAS as 10 réplicas
+        type: 'A'
+        port: 8000
+    metrics_path: '/metrics'
+
+  - job_name: 'node-exporter' # Monitoriza o servidor físico (CPU/RAM)
+    dns_sd_configs:
+      - names:
+        - 'tasks.node-exporter'
+        type: 'A'
+        port: 9100

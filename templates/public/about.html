@@ -1,0 +1,67 @@
+{% extends 'public_base.html' %}
+
+{% block content %}
+{% if school_branding.hero_mode == 'CAROUSEL' %}
+    <div class="relative w-full h-[500px] overflow-hidden mb-12 bg-slate-900" x-data="{ activeSlide: 1 }">
+        {% if school_branding.hero_image_1 %}
+        <div x-show="activeSlide === 1" class="absolute inset-0 transition-opacity duration-1000 ease-in-out">
+            <img src="{{ school_branding.hero_image_1.url }}" class="w-full h-full object-cover opacity-60">
+        </div>
+        {% endif %}
+        {% if school_branding.hero_image_2 %}
+        <div x-show="activeSlide === 2" class="absolute inset-0 transition-opacity duration-1000 ease-in-out" style="display: none;">
+            <img src="{{ school_branding.hero_image_2.url }}" class="w-full h-full object-cover opacity-60">
+        </div>
+        {% endif %}
+        
+        <div class="absolute inset-0 flex items-center justify-center text-center px-4">
+            <div class="max-w-4xl">
+                <h1 class="text-5xl font-black text-white mb-4 drop-shadow-lg">{{ school_branding.hero_title }}</h1>
+                <p class="text-xl text-slate-100 font-medium drop-shadow-md">{{ school_branding.hero_subtitle }}</p>
+            </div>
+        </div>
+        
+        <div class="absolute bottom-5 left-0 right-0 flex justify-center space-x-2">
+            <button @click="activeSlide = 1" class="w-3 h-3 rounded-full bg-white opacity-50 hover:opacity-100"></button>
+            {% if school_branding.hero_image_2 %}<button @click="activeSlide = 2" class="w-3 h-3 rounded-full bg-white opacity-50 hover:opacity-100"></button>{% endif %}
+        </div>
+    </div>
+
+{% elif school_branding.hero_mode == 'SINGLE' %}
+    <div class="relative bg-slate-900 py-24 mb-16 overflow-hidden">
+        {% if school_branding.hero_image_1 %}
+            <img src="{{ school_branding.hero_image_1.url }}" class="absolute inset-0 w-full h-full object-cover opacity-20">
+        {% endif %}
+        <div class="relative container mx-auto px-4 text-center">
+            <h1 class="text-4xl md:text-6xl font-black text-white mb-6 tracking-tight">
+                {{ school_branding.hero_title }}
+            </h1>
+            <p class="text-lg md:text-xl text-slate-300 max-w-2xl mx-auto leading-relaxed">
+                {{ school_branding.hero_subtitle }}
+            </p>
+        </div>
+    </div>
+
+{% else %}
+    <div class="container mx-auto px-4 py-20 text-center mb-8">
+        <h1 class="text-4xl font-black text-slate-900 mb-6">
+            {{ school_branding.hero_title }} <span class="text-brand">SOTARQ</span>
+        </h1>
+        <p class="text-lg text-slate-600 leading-relaxed max-w-3xl mx-auto">
+            {{ school_branding.hero_subtitle }}
+        </p>
+    </div>
+{% endif %}
+
+<div class="container mx-auto px-4 pb-16">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div class="bg-white p-8 rounded-2xl shadow-lg border-t-4 border-brand hover:-translate-y-2 transition-transform duration-300">
+            <div class="w-14 h-14 bg-brand/10 rounded-2xl flex items-center justify-center mx-auto mb-6 text-brand">
+                <i data-feather="book" class="w-7 h-7"></i>
+            </div>
+            <h3 class="text-xl font-bold text-slate-800 mb-3 text-center">Ensino Rigoroso</h3>
+            <p class="text-sm text-slate-500 text-center leading-relaxed">Currículo alinhado com padrões internacionais de excelência.</p>
+        </div>
+        </div>
+</div>
+{% endblock %}

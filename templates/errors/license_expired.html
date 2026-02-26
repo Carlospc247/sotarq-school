@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>Acesso Suspenso | Sotarq SaaS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 h-screen flex flex-col justify-center items-center">
+
+    <div class="bg-white p-8 rounded-lg shadow-xl max-w-lg w-full text-center border-t-8 border-red-600">
+        <div class="mb-6 flex justify-center">
+            <svg class="h-20 w-20 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+        </div>
+        
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">Acesso Suspenso</h1>
+        <p class="text-gray-500 mb-6">A licença de uso para <strong>{{ request.tenant.name }}</strong> não está ativa ou expirou.</p>
+        
+        <div class="bg-red-50 p-4 rounded text-left mb-6 border border-red-100">
+            <h3 class="font-bold text-red-800 text-sm uppercase mb-2">Motivos Possíveis:</h3>
+            <ul class="list-disc list-inside text-sm text-red-700 space-y-1">
+                <li>Pagamento da mensalidade em atraso.</li>
+                <li>Período de demonstração encerrado.</li>
+                <li>Contrato cancelado.</li>
+            </ul>
+        </div>
+
+        <p class="text-sm text-gray-600 mb-8">
+            Para regularizar o acesso e desbloquear o sistema imediatamente, contacte o departamento financeiro.
+        </p>
+        
+        <a href="mailto:financeiro@sotarq.com" class="inline-block bg-red-600 text-white font-bold py-3 px-6 rounded hover:bg-red-700 transition duration-200">
+            Contactar Suporte Financeiro
+        </a>
+        
+        <div class="mt-8 text-xs text-gray-400">
+            ID da Escola: #23{{ request.tenant.id|stringformat:"03d" }} |
+            Esquema: {{ request.tenant.schema_name }}
+            
+        </div>
+        <p class="mt-4 text-[10px] text-gray-300">
+            SOTARQ SaaS &copy; {% now "Y" %} - Sistema de Gestão Escolar Enterprise
+        </p>
+    </div>
+
+</body>
+</html>

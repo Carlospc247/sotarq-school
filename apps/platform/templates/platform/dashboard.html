@@ -1,0 +1,82 @@
+{% extends 'base_staff.html' %} 
+{% load humanize %}
+
+{% block content %}
+<div class="p-8 animate-fade-in space-y-10">
+    <div class="flex justify-between items-end bg-slate-900 p-10 rounded-[3.5rem] text-white shadow-2xl relative overflow-hidden">
+        <div class="relative z-10">
+            <h1 class="text-4xl font-black tracking-tighter uppercase italic leading-none">Global Intelligence</h1>
+            <p class="text-slate-400 font-bold uppercase tracking-[0.3em] text-[10px] mt-4">Sotarq SaaS Control Tower &bull; Auditoria Global</p>
+        </div>
+        <div class="relative z-10 text-right">
+            <span class="text-[10px] font-black text-emerald-400 uppercase">Rede Ativa</span>
+            <h4 class="text-xl font-black">{{ subagents_count }} Parceiros</h4>
+        </div>
+        <i data-feather="globe" class="absolute -right-10 -bottom-10 w-64 h-64 text-white/5"></i>
+    </div>
+
+    <!--BOTÃO DO PÁNICO-->
+    {% if security_alerts %}
+    <div class="bg-rose-50 border-2 border-rose-200 p-8 rounded-[3rem] animate-pulse mb-10">
+        <div class="flex justify-between items-center">
+            <div>
+                <h3 class="text-rose-600 font-black uppercase italic tracking-tighter text-xl">⚠️ Alertas de Intrusão</h3>
+                <p class="text-[10px] font-bold text-rose-400 uppercase tracking-widest mt-1">Viagens Impossíveis Detectadas em {{ security_alerts|length }} contas</p>
+                <p class="text-[10px] font-bold text-rose-400 uppercase tracking-widest mt-1">Parece que um usuário (ou aluno) fizesse login de dois países ou províncias diferentes em menos de 1 hora</p>
+            </div>
+            <a href="{% url 'platform:security_hub' %}" class="px-6 py-3 bg-rose-600 text-white rounded-2xl font-black text-[10px] uppercase">Intervir Agora</a>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div class="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:scale-105 transition-all">
+            <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">MRR Realizado</p>
+            <h2 class="text-3xl font-black text-emerald-600 mt-2">{{ metrics.mrr|intcomma }} Kz</h2>
+        </div>
+        <div class="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
+            <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Churn Rate</p>
+            <h2 class="text-3xl font-black text-red-500 mt-2">{{ metrics.churn }}%</h2>
+        </div>
+        <div class="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
+            <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">LTV Médio</p>
+            <h2 class="text-3xl font-black text-indigo-600 mt-2">{{ metrics.ltv|intcomma }} Kz</h2>
+        </div>
+        <div class="bg-indigo-600 p-8 rounded-[2.5rem] text-white shadow-xl shadow-indigo-100">
+            <p class="text-[9px] font-black text-indigo-200 uppercase tracking-widest">Escolas Onboard</p>
+            <h2 class="text-3xl font-black mt-2">{{ metrics.active_schools }} / {{ metrics.total_clients }}</h2>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden">
+        <div class="px-8 py-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+            <h3 class="text-xs font-black text-slate-800 uppercase tracking-tighter">🚨 Rastreio Forense Global (Audit Log)</h3>
+            <a href="{% url 'audit:logs' %}" class="text-[10px] font-black text-indigo-600 uppercase underline">Ver Tudo</a>
+        </div>
+        <table class="w-full text-left">
+            <thead class="bg-slate-50/50">
+                <tr class="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                    <th class="px-8 py-4">Usuário</th>
+                    <th class="px-8 py-4">Acção</th>
+                    <th class="px-8 py-4">Objecto</th>
+                    <th class="px-8 py-4">Timestamp</th>
+                </tr>
+            </thead>
+            <tbody class="text-sm divide-y divide-slate-50">
+                {% for log in recent_audit_logs %}
+                <tr class="hover:bg-slate-50/80 transition-all">
+                    <td class="px-8 py-4 font-bold text-slate-700">{{ log.user.username }}</td>
+                    <td class="px-8 py-4">
+                        <span class="px-2 py-1 rounded text-[8px] font-black {% if log.action == 'DELETE' %}bg-red-100 text-red-600{% else %}bg-indigo-100 text-indigo-600{% endif %}">
+                            {{ log.action }}
+                        </span>
+                    </td>
+                    <td class="px-8 py-4 text-xs font-medium text-slate-500">{{ log.content_type.model }} (ID: {{ log.object_id }})</td>
+                    <td class="px-8 py-4 text-xs text-slate-400 font-mono">{{ log.timestamp|date:"d/m H:i:s" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

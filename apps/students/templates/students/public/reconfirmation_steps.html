@@ -1,0 +1,77 @@
+{% extends 'public_base.html' %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-12">
+    <div class="max-w-3xl mx-auto bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden">
+        
+        <div class="bg-slate-50 px-8 py-6 border-b border-slate-200 flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-black text-slate-800">Confirmar Matrícula</h1>
+                <p class="text-sm text-slate-500 mt-1">Upload de documentos obrigatórios.</p>
+            </div>
+            <div class="hidden sm:block text-right">
+                <p class="text-xs text-slate-400 uppercase tracking-widest font-bold">Aluno</p>
+                <p class="text-sm font-bold text-brand-600">{{ student.full_name }}</p>
+                <p class="text-xs text-slate-500">{{ student.registration_number }}</p>
+            </div>
+        </div>
+
+        <div class="p-8">
+            <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-8 flex items-start gap-3">
+                <div class="flex-shrink-0">
+                    <i data-feather="info" class="w-5 h-5 text-blue-600"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-bold text-blue-800">Requisitos para validação</h3>
+                    <p class="text-xs text-blue-600 mt-1">
+                        Certifique-se de que os documentos estão legíveis (PDF ou Imagem). 
+                        O tamanho máximo permitido por arquivo é de 5MB.
+                    </p>
+                </div>
+            </div>
+
+            <form method="POST" enctype="multipart/form-data" class="space-y-6">
+                {% csrf_token %}
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="group">
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Cópia do BI / Cédula</label>
+                        {{ form.doc_bi }}
+                        {% if form.doc_bi.errors %}
+                            <p class="text-xs text-red-500 mt-1">{{ form.doc_bi.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div class="group">
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Atestado Médico</label>
+                        {{ form.doc_health }}
+                    </div>
+
+                    <div class="md:col-span-2 group">
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Comprovativo de Pagamento</label>
+                        <div class="border-2 border-dashed border-slate-200 rounded-xl p-6 hover:bg-slate-50 transition-colors text-center">
+                            {{ form.doc_payment_proof }}
+                            <p class="text-xs text-slate-400 mt-2">Carregue o talão de depósito ou transferência.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-6 border-t border-slate-100 mt-6">
+                    <label class="block text-sm font-bold text-slate-800 mb-2">Realizado pelo Encarregado? (Opcional)</label>
+                    <input type="text" name="guardian_bi_id" 
+                           class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-all" 
+                           placeholder="Digite o Nº do BI do Encarregado para registo de auditoria">
+                </div>
+
+                <div class="flex justify-end pt-4">
+                    <button type="submit" class="inline-flex items-center justify-center px-8 py-4 border border-transparent text-sm font-bold rounded-xl text-white bg-brand-600 hover:bg-brand-700 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5">
+                        <i data-feather="send" class="w-4 h-4 mr-2"></i>
+                        Finalizar Processo
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>feather.replace()</script>
+{% endblock %}

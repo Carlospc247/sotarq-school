@@ -1,0 +1,70 @@
+{% extends 'portal_base.html' %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto p-6 md:p-10 animate-fade-in">
+    <div class="flex items-center justify-between mb-10">
+        <div>
+            <h1 class="text-3xl font-black text-slate-900 tracking-tighter uppercase">Centro de Alertas</h1>
+            <p class="text-slate-500 font-medium">Histórico de comunicações e atualizações importantes.</p>
+        </div>
+        <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center">
+            <i class="fas fa-bell"></i>
+        </div>
+    </div>
+
+    
+
+    <div class="space-y-4">
+        {% for notification in notifications %}
+        <div class="group relative p-6 rounded-[2rem] border transition-all duration-300 
+            {% if not notification.read_at %}
+                bg-white border-indigo-100 shadow-xl shadow-indigo-50/50
+            {% else %}
+                bg-slate-50/50 border-transparent opacity-75 hover:opacity-100
+            {% endif %}">
+            
+            <div class="flex items-start gap-5">
+                <div class="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 
+                    {% if not notification.read_at %}bg-indigo-600 text-white{% else %}bg-slate-200 text-slate-500{% endif %}">
+                    <i class="fas fa-{{ notification.icon|default:'envelope-open-text' }}"></i>
+                </div>
+
+                <div class="flex-1">
+                    <div class="flex justify-between items-start mb-1">
+                        <h3 class="text-base font-black text-slate-800">{{ notification.title }}</h3>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                            {{ notification.created_at|timesince }} atrás
+                        </span>
+                    </div>
+                    <p class="text-sm text-slate-600 leading-relaxed">{{ notification.message }}</p>
+                    
+                    {% if notification.action_url %}
+                    <div class="mt-4">
+                        <a href="{{ notification.action_url }}" class="inline-flex items-center text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-800">
+                            Ver detalhes <i class="fas fa-arrow-right ml-2 text-[8px]"></i>
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+
+                {% if not notification.read_at %}
+                <div class="absolute top-6 right-6">
+                    <span class="flex h-2 w-2">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-indigo-600"></span>
+                    </span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% empty %}
+        <div class="text-center py-20 bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-200">
+            <div class="text-slate-300 mb-4 text-5xl">
+                <i class="fas fa-comment-slash"></i>
+            </div>
+            <p class="text-slate-500 font-bold">A sua caixa de entrada está limpa por agora.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

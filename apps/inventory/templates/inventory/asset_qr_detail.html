@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Auditoria: {{ asset.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-3">
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Ficha do Ativo</h5>
+            <span class="badge badge-info">{{ asset.category.name }}</span>
+        </div>
+        <div class="card-body">
+            <div class="text-center mb-4">
+                <i class="fas fa-box-open fa-4x text-secondary"></i>
+                <h4 class="mt-2 font-weight-bold">{{ asset.name }}</h4>
+                <p class="text-muted">S/N: {{ asset.serial_number|default:"Não registado" }}</p>
+            </div>
+
+            <ul class="list-group list-group-flush">
+                <li class="list-group-item d-flex justify-content-between">
+                    <span>Unidade/Escola:</span>
+                    <strong>{{ asset.unit.name }}</strong>
+                </li>
+                <li class="list-group-item d-flex justify-content-between">
+                    <span>Data de Compra:</span>
+                    <strong>{{ asset.purchase_date|date:"d/m/Y" }}</strong>
+                </li>
+                <li class="list-group-item d-flex justify-content-between">
+                    <span>Preço de Aquisição:</span>
+                    <span class="text-dark">{{ asset.purchase_price }} Kz</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between bg-light">
+                    <span class="font-weight-bold">Valor Atual:</span>
+                    <span class="text-success font-weight-bold">{{ current_value|floatformat:2 }} Kz</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between">
+                    <span class="text-danger">Depreciação:</span>
+                    <span class="text-danger">- {{ total_depreciated|floatformat:2 }} Kz</span>
+                </li>
+            </ul>
+
+            <div class="mt-4">
+                <h6>Localização e Responsabilidade:</h6>
+                <div class="alert alert-secondary py-2 small">
+                    Ativo localizado na unidade <strong>{{ asset.unit.name }}</strong>. 
+                    Última verificação de inventário: {{ asset.updated_at|date:"d/m/Y" }}.
+                </div>
+            </div>
+
+            <div class="mt-4 no-print">
+                <a href="{% url 'inventory:dashboard' %}" class="btn btn-outline-secondary btn-block">
+                    <i class="fas fa-arrow-left"></i> Voltar ao Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    @media (max-width: 576px) {
+        .container { padding-left: 10px; padding-right: 10px; }
+        .card-body { padding: 15px; }
+    }
+</style>
+{% endblock %}

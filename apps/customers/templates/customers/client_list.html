@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="animate-fade-in">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+        
+        <div class="bg-gradient-to-br from-indigo-600 to-violet-700 p-6 rounded-[2.5rem] shadow-xl text-white border border-white/10">
+            <p class="text-indigo-100 text-xs font-bold uppercase tracking-widest">Alunos Ativos</p>
+            <h3 class="text-4xl font-black mt-2">{{ total_alunos }}</h3>
+            <div class="mt-4 text-[10px] bg-white/20 w-fit px-3 py-1 rounded-full">Operacional</div>
+        </div>
+
+        <div class="bg-gradient-to-br from-emerald-500 to-teal-600 p-6 rounded-[2.5rem] shadow-xl text-white border border-white/10">
+            <p class="text-emerald-50 text-xs font-bold uppercase tracking-widest">Receita do Mês</p>
+            <h3 class="text-4xl font-black mt-2">{{ receita_mes|floatformat:0 }} <span class="text-lg">Kz</span></h3>
+            <div class="mt-4 text-[10px] bg-white/20 w-fit px-3 py-1 rounded-full">Validado AGT</div>
+        </div>
+
+        <div class="bg-gradient-to-br from-orange-500 to-red-600 p-6 rounded-[2.5rem] shadow-xl text-white border border-white/10">
+            <p class="text-orange-50 text-xs font-bold uppercase tracking-widest">Inadimplência</p>
+            <h3 class="text-4xl font-black mt-2">{{ faturas_atrasadas|floatformat:0 }} <span class="text-lg">Kz</span></h3>
+            <div class="mt-4 text-[10px] bg-white/20 w-fit px-3 py-1 rounded-full">Urgente</div>
+        </div>
+
+        <div class="bg-gradient-to-br from-amber-400 to-orange-500 p-6 rounded-[2.5rem] shadow-xl text-white border border-white/10 md:col-span-2 lg:col-span-1">
+            <p class="text-amber-50 text-xs font-bold uppercase tracking-widest">Transporte</p>
+            <h3 class="text-4xl font-black mt-2">Ativo</h3>
+            <div class="mt-4 text-[10px] bg-white/20 w-fit px-3 py-1 rounded-full">Frota em Rota</div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+            <h4 class="text-sm font-black text-slate-400 uppercase tracking-widest mb-6">Fluxo de Caixa Trimestral</h4>
+            <canvas id="revenueChart" height="220"></canvas>
+        </div>
+        <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+            <h4 class="text-sm font-black text-slate-400 uppercase tracking-widest mb-6">Estado de Cobrança</h4>
+            <div class="max-w-[250px] mx-auto">
+                <canvas id="courseChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Injeção de dados reais vindo da View retificada
+    const revenueData = {{ chart_receita_data|safe }};
+    const pieData = {{ chart_pie_data|safe }};
+
+    new Chart(document.getElementById('revenueChart'), {
+        type: 'line',
+        data: {
+            labels: {{ chart_receita_labels|safe }},
+            datasets: [{
+                label: 'Receita Realizada',
+                data: revenueData,
+                borderColor: '#4f46e5',
+                backgroundColor: 'rgba(79, 70, 229, 0.05)',
+                fill: true,
+                tension: 0.4,
+                pointRadius: 6,
+                pointBackgroundColor: '#fff',
+                pointBorderWidth: 3
+            }]
+        },
+        options: {
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, grid: { display: false } }, x: { grid: { display: false } } }
+        }
+    });
+
+    new Chart(document.getElementById('courseChart'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Pagos', 'Vencidos', 'Pendentes'],
+            datasets: [{
+                data: pieData,
+                backgroundColor: ['#10b981', '#ef4444', '#f59e0b'],
+                borderWidth: 8,
+                borderColor: '#ffffff'
+            }]
+        },
+        options: { cutout: '80%', plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, padding: 20 } } } }
+    });
+</script>
+{% endblock %}

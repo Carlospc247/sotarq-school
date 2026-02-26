@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="space-y-6" x-data="{ selectedDetails: null }">
+    
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-black text-slate-800 uppercase tracking-tight">
+                {% if is_global_view %} Auditoria Central SOTARQ {% else %} Auditoria Institucional {% endif %}
+            </h1>
+            <p class="text-sm text-slate-500 italic">
+                {% if is_global_view %}
+                    <span class="text-brand-600 font-bold uppercase">Controlo Global:</span> Monitorizando todos os eventos do ecossistema.
+                {% else %}
+                    <span class="text-slate-700 font-bold uppercase">Unidade:</span> {{ request.tenant.name }}
+                {% endif %}
+            </p>
+        </div>
+
+        <form method="GET" class="flex items-center space-x-2 bg-white p-2 rounded-xl shadow-sm border border-slate-100">
+            <select name="action" class="text-[10px] font-bold uppercase border-none focus:ring-0 bg-transparent">
+                <option value="">Ações</option>
+                {% for action in actions %}
+                <option value="{{ action }}" {% if current_filters.action == action %}selected{% endif %}>{{ action }}</option>
+                {% endfor %}
+            </select>
+            <input type="text" name="user" placeholder="Usuário..." value="{{ current_filters.user }}"
+                   class="text-[10px] border-none focus:ring-0 w-24 bg-transparent">
+            <button type="submit" class="bg-slate-900 text-white p-2 rounded-lg hover:bg-brand-600 transition">
+                <i data-feather="filter" class="w-4 h-4"></i>
+            </button>
+        </form>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead class="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                        <th class="px-6 py-4 text-[10px] font-black text-slate-500 uppercase">Data/Hora</th>
+                        <th class="px-6 py-4 text-[10px] font-black text-slate-500 uppercase">Operador</th>
+                        <th class="px-6 py-4 text-[10px] font-black text-slate-500 uppercase">Ação</th>
+                        <th class="px-6 py-4 text-[10px] font-black text-slate-500 uppercase">Objeto</th>
+                        <th class="px-6 py-4 text-[10px] font-black text-slate-500 uppercase">IP</th>
+                        {% if is_global_view %}
+                        <th class="px-6 py-4 text-[10px] font-black text-slate-500 uppercase">Origem/Escola</th>
+                        {% endif %}
+                        <th class="px-6 py-4 text-[10px] font-black text-slate-500 uppercase text-right">Dados</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for log in page_obj %}
+                    <tr class="hover:bg-slate-50/50 transition-colors">
+                        <td class="px-6 py-4 text-xs text-slate-600">{{ log.timestamp|date:"d/m/Y H:i:s" }}</td>
+                        <td class="px-6 py-4">
+                            <span class="text-xs font-bold text-slate-800">{{ log.user.username|default:"Sistema" }}</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 rounded text-[9px] font-black uppercase 
+                                {% if log.action == 'DELETE' %}bg-red-100 text-red-700
+                                {% elif log.action == 'CREATE' %}bg-emerald-100 text-emerald-700
+                                {% else %}bg-blue-100 text-blue-700{% endif %}">
+                                {{ log.action }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="text-[10px] font-mono text-slate-500">{{ log.content_type }}</div>
+                            <div class="text-[9px] text-slate-400 font-bold italic">ID: {{ log.object_id }}</div>
+                        </td>
+                        <td class="px-6 py-4 text-[10px] font-mono text-slate-400">{{ log.ip_address|default:"---" }}</td>
+                        
+                        {% if is_global_view %}
+                        <td class="px-6 py-4 text-[10px] font-bold text-brand-600">{{ log.tenant_name|default:"SOTARQ CORE" }}</td>
+                        {% endif %}
+
+                        <td class="px-6 py-4 text-right">
+                            <button @click="selectedDetails = {{ log.details|default:'{}' }}" 
+                                    class="text-brand-600 hover:text-brand-900 text-[10px] font-black uppercase">
+                                Inspecionar
+                            </button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="{% if is_global_view %}7{% else %}6{% endif %}" class="px-6 py-12 text-center text-slate-400 italic">
+                            Nenhum rastro encontrado.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if page_obj.has_other_pages %}
+        <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+            <span class="text-[10px] font-bold text-slate-500 uppercase">Pág {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+            <div class="flex space-x-1">
+                {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}&action={{ current_filters.action }}&user={{ current_filters.user }}" 
+                   class="p-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 transition"><i data-feather="chevron-left" class="w-3 h-3"></i></a>
+                {% endif %}
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}&action={{ current_filters.action }}&user={{ current_filters.user }}" 
+                   class="p-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 transition"><i data-feather="chevron-right" class="w-3 h-3"></i></a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div x-show="selectedDetails" x-cloak 
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+        
+        <div @click.away="selectedDetails = null" class="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-slate-200">
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-white">
+                <h3 class="text-xs font-black uppercase tracking-widest text-slate-800 italic">Inspeção de Metadados</h3>
+                <button @click="selectedDetails = null" class="text-slate-400 hover:text-slate-600 transition-colors">
+                    <i data-feather="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <div class="p-6 bg-slate-50">
+                <pre class="text-[10px] font-mono text-slate-700 overflow-auto max-h-96 p-4 bg-white border border-slate-200 rounded-xl shadow-inner" 
+                     x-text="JSON.stringify(selectedDetails, null, 2)"></pre>
+            </div>
+            <div class="p-4 bg-white text-right">
+                <button @click="selectedDetails = null" class="px-4 py-2 bg-slate-900 text-white text-[10px] font-black uppercase rounded-lg">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

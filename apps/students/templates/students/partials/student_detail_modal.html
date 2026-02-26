@@ -1,0 +1,175 @@
+{% load static %}
+
+<div class="relative">
+    <div class="h-32 w-full bg-gradient-to-r from-slate-800 to-indigo-900"></div>
+    <div class="px-8 pb-6">
+        <div class="relative flex flex-col sm:flex-row items-end -mt-12 sm:-mt-16 gap-6">
+            
+            <div class="relative">
+                {% if student.enrollment_requests.last.photo_passport %}
+                    <img class="h-32 w-32 rounded-xl ring-4 ring-white shadow-lg object-cover bg-white" 
+                         src="{{ student.enrollment_requests.last.photo_passport.url }}" alt="{{ student.full_name }}">
+                {% else %}
+                    <div class="h-32 w-32 rounded-xl ring-4 ring-white shadow-lg bg-slate-100 flex items-center justify-center text-slate-400">
+                        <i data-feather="user" class="h-16 w-16"></i>
+                    </div>
+                {% endif %}
+                <span class="absolute -bottom-2 -right-2 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border-2 border-white
+                    {% if student.is_suspended %}bg-red-500 text-white{% else %}bg-emerald-500 text-white{% endif %}">
+                    {% if student.is_suspended %}Bloqueado{% else %}Ativo{% endif %}
+                </span>
+            </div>
+
+            <div class="flex-1 text-center sm:text-left mb-2">
+                <h2 class="text-2xl font-black text-slate-800">{{ student.full_name }}</h2>
+                <div class="flex flex-wrap items-center justify-center sm:justify-start gap-4 mt-2 text-sm text-slate-500 font-medium">
+                    <span class="flex items-center gap-1">
+                        <i data-feather="hash" class="w-4 h-4"></i> {{ student.registration_number }}
+                    </span>
+                    <span class="flex items-center gap-1" title="Número de Identificação (BI)">
+                        <i data-feather="credit-card" class="w-4 h-4"></i> {{ student.enrollment_requests.last.observations|default:"BI Pendente"|slice:"22:" }} 
+                        </span>
+                    <span class="flex items-center gap-1">
+                        <i data-feather="book" class="w-4 h-4"></i> {{ student.current_class.name|default:"Sem Turma" }}
+                    </span>
+                    <span class="flex items-center gap-1">
+                        <i data-feather="mail" class="w-4 h-4"></i> {{ student.user.email }}
+                    </span>
+                </div>
+            </div>
+
+            <div class="flex gap-2 mb-2">
+                {% if can_edit %}
+                    <a href="{% url 'students:student_edit' student.id %}" class="px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg text-xs font-bold transition flex items-center shadow-sm border border-indigo-100">
+                        <i data-feather="edit-2" class="w-3 h-3 mr-2"></i> Editar
+                    </a>
+                {% endif %}
+
+                {% if can_print %}
+                    <a href="{% url 'students:student_print_file' student.id %}" target="_blank" class="px-4 py-2 bg-slate-800 text-white hover:bg-slate-700 rounded-lg text-xs font-bold transition flex items-center shadow-md">
+                        <i data-feather="printer" class="w-3 h-3 mr-2"></i> Ficha
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="px-8 py-6 bg-slate-50 border-t border-slate-100">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <div class="space-y-6">
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center">
+                    <i data-feather="info" class="w-3 h-3 mr-2"></i> Dados Pessoais
+                </h4>
+                <div class="space-y-3 text-sm">
+                    <div class="flex justify-between border-b border-slate-50 pb-2">
+                        <span class="text-slate-500">Género:</span>
+                        <span class="font-semibold text-slate-700">{{ student.get_gender_display }}</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-50 pb-2">
+                        <span class="text-slate-500">Nascimento:</span>
+                        <span class="font-semibold text-slate-700">{{ student.birth_date|date:"d/m/Y" }}</span>
+                    </div>
+                    <div class="flex justify-between pt-1">
+                        <span class="text-slate-500">Idade:</span>
+                        <span class="font-semibold text-slate-700">{{ student.birth_date|timesince }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center">
+                    <i data-feather="users" class="w-3 h-3 mr-2"></i> Encarregados
+                </h4>
+                {% for relation in student.guardians.all %}
+                <div class="mb-3 last:mb-0 p-3 bg-slate-50 rounded-lg border border-slate-100">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="font-bold text-slate-800 text-sm">{{ relation.guardian.full_name }}</span>
+                        {% if relation.is_financial_responsible %}
+                            <i data-feather="dollar-sign" class="w-3 h-3 text-emerald-500" title="Responsável Financeiro"></i>
+                        {% endif %}
+                    </div>
+                    <div class="flex items-center gap-2 text-xs font-mono text-indigo-600">
+                        <i data-feather="phone" class="w-3 h-3"></i> {{ relation.guardian.phone }}
+                    </div>
+                </div>
+                {% empty %}
+                <p class="text-xs text-slate-400 italic">Nenhum encarregado vinculado.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="lg:col-span-2 space-y-6">
+            
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center">
+                    <i data-feather="award" class="w-3 h-3 mr-2"></i> Situação Académica
+                </h4>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="p-3 bg-indigo-50 rounded-lg text-center">
+                        <p class="text-xs text-indigo-400 font-bold uppercase">Curso</p>
+                        <p class="text-sm font-bold text-indigo-900 truncate">{{ student.current_class.grade_level.course.code|default:"-" }}</p>
+                    </div>
+                    <div class="p-3 bg-indigo-50 rounded-lg text-center">
+                        <p class="text-xs text-indigo-400 font-bold uppercase">Classe</p>
+                        <p class="text-sm font-bold text-indigo-900">{{ student.current_class.grade_level.name|default:"-" }}</p>
+                    </div>
+                    <div class="p-3 bg-indigo-50 rounded-lg text-center">
+                        <p class="text-xs text-indigo-400 font-bold uppercase">Turma</p>
+                        <p class="text-sm font-bold text-indigo-900">{{ student.current_class.name|default:"-" }}</p>
+                    </div>
+                    <div class="p-3 bg-indigo-50 rounded-lg text-center">
+                        <p class="text-xs text-indigo-400 font-bold uppercase">Duração</p>
+                        <p class="text-sm font-bold text-indigo-900">{{ student.current_class.academic_year.name|default:"-" }}</p>
+                    </div>
+                </div>
+            </div>
+
+            {% if can_view_finance %}
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center">
+                            <i data-feather="credit-card" class="w-3 h-3 mr-2"></i> Financeiro
+                        </h4>
+                        
+                        <a href="{% url 'students:student_financial_extract' student.id %}" target="_blank" class="text-xs font-bold text-indigo-600 hover:underline flex items-center bg-indigo-50 px-2 py-1 rounded">
+                            <i data-feather="external-link" class="w-3 h-3 mr-1"></i> Ver Extrato
+                        </a>
+                    </div>
+                    
+                    {% if student.is_suspended %}
+                        <div class="flex items-center p-4 bg-red-50 text-red-800 rounded-lg border border-red-100">
+                            <i data-feather="alert-circle" class="w-5 h-5 mr-3"></i>
+                            <div>
+                                <p class="font-bold text-sm">Acesso Bloqueado</p>
+                                <p class="text-xs">Existem mensalidades em atraso crítico. Regularize na tesouraria.</p>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="flex items-center p-4 bg-emerald-50 text-emerald-800 rounded-lg border border-emerald-100">
+                            <i data-feather="check-circle" class="w-5 h-5 mr-3"></i>
+                            <div>
+                                <p class="font-bold text-sm">Situação Regular</p>
+                                <p class="text-xs">Nenhuma pendência impeditiva encontrada.</p>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            {% endif %}
+
+        </div>
+    </div>
+</div>
+
+<div class="bg-slate-100 px-8 py-4 flex justify-between items-center border-t border-slate-200">
+    <p class="text-xs text-slate-400">Criado em: {{ student.created_at|date:"d/m/Y" }}</p>
+    <button type="button" class="px-6 py-2.5 bg-white border border-slate-300 text-slate-700 font-bold rounded-lg hover:bg-slate-50 transition shadow-sm" onclick="document.querySelector('[x-data]').__x.$data.modalOpen = false">
+        Fechar Janela
+    </button>
+</div>
+
+<script>
+    if (typeof feather !== 'undefined') { feather.replace(); }
+</script>

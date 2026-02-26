@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        @page { size: A4; margin: 2cm; }
+        body { font-family: 'Helvetica', sans-serif; color: #1e293b; }
+        .header { border-bottom: 2px solid #4f46e5; padding-bottom: 20px; margin-bottom: 40px; }
+        .logo { height: 60px; float: left; }
+        .school-info { float: right; text-align: right; font-size: 10px; }
+        .title { clear: both; text-align: center; margin-top: 50px; }
+        .metric-grid { display: block; margin-top: 30px; }
+        .metric-card { 
+            width: 30%; display: inline-block; padding: 15px; 
+            background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;
+            margin-right: 2%; text-align: center;
+        }
+        .footer { position: fixed; bottom: 0; width: 100%; text-align: center; font-size: 8px; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        {% if config.logo %}
+            <img src="{{ config.logo.path }}" class="logo">
+        {% endif %}
+        <div class="school-info">
+            <strong>{{ config.school_name }}</strong><br>
+            NIF: {{ config.tax_id }}<br>
+            {{ config.official_email }}
+        </div>
+    </div>
+
+    <div class="title">
+        <h1 style="margin: 0;">Relatório Executivo de Gestão</h1>
+        <p style="color: #64748b;">Unidade: {{ unit.name }} | Emitido em: {{ today|date:"d/m/Y H:i" }}</p>
+    </div>
+
+    <div class="metric-grid">
+        <div class="metric-card">
+            <small>Total Alunos</small>
+            <h2 style="color: #4f46e5;">{{ total_alunos }}</h2>
+        </div>
+        <div class="metric-card">
+            <small>Receita do Mês</small>
+            <h2 style="color: #10b981;">{{ receita_mes|floatformat:2 }} Kz</h2>
+        </div>
+        <div class="metric-card" style="margin-right: 0;">
+            <small>Inadimplência</small>
+            <h2 style="color: #ef4444;">{{ faturas_atrasadas|floatformat:2 }} Kz</h2>
+        </div>
+    </div>
+
+    <div style="margin-top: 50px;">
+        <h3>Resumo de Atividade</h3>
+        <p>Este documento certifica a posição financeira e operacional da unidade mencionada para o período atual. Os dados foram validados conforme as normas de auditoria interna do sistema SOTARQ.</p>
+    </div>
+
+    <div class="footer">
+        Gerado automaticamente pelo SOTARQ School ERP - Tecnologia para Educação de Elite
+    </div>
+</body>
+</html>

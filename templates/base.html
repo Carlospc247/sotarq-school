@@ -1,0 +1,414 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt" class="h-full">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ school_config.school_name|default:"SOTARQ School" }} | Enterprise ERP</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        [x-cloak] { display: none !important; }
+        .loader-blur { backdrop-filter: blur(10px); }
+
+        /* Variáveis CSS Dinâmicas (White-Label) */
+        :root {
+            --primary-color: {{ school_config.primary_color|default:"#4f46e5" }};
+            --secondary-color: {{ school_config.secondary_color|default:"#1e293b" }};
+        }
+
+        .bg-primary { background-color: var(--primary-color); }
+        .text-primary { color: var(--primary-color); }
+        
+        /* Scrollbar Personalizada para o Menu */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: #0f172a; } 
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    </style>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f8fafc',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '{{ school_config.primary_color|default:"#4f46e5" }}',
+                            700: '#4338ca',
+                            800: '#3730a3',
+                            900: '#312e81',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+
+<body x-data="{ 
+        sidebarPos: localStorage.getItem('sidebarPos') || 'left', 
+        sidebarOpen: localStorage.getItem('sidebarOpen') === 'true' || true,
+        isLoading: true,
+        togglePos() {
+            const positions = ['left', 'right', 'top', 'floating'];
+            let current = positions.indexOf(this.sidebarPos);
+            this.sidebarPos = positions[(current + 1) % positions.length];
+            localStorage.setItem('sidebarPos', this.sidebarPos);
+        },
+        toggleSidebar() {
+            this.sidebarOpen = !this.sidebarOpen;
+            localStorage.setItem('sidebarOpen', this.sidebarOpen);
+        }
+    }" x-init="window.onload = () => { setTimeout(() => isLoading = false, 800) }"
+    class="h-screen w-full bg-slate-50 flex overflow-hidden" :class="{ 
+        'flex-row': sidebarPos === 'left', 
+        'flex-row-reverse': sidebarPos === 'right', 
+        'flex-col': sidebarPos === 'top',
+        'relative': sidebarPos === 'floating'
+    }">
+
+    <div x-show="isLoading" class="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white/90 loader-blur transition-opacity duration-500">
+        <div class="w-16 h-16 border-4 border-indigo-100 border-t-brand-600 rounded-full animate-spin"></div>
+        <p class="mt-4 text-xs font-bold text-indigo-900 tracking-[0.2em] uppercase animate-pulse">Carregando Sistema...</p>
+    </div>
+
+    <nav x-show="sidebarPos === 'top'" class="w-full bg-slate-900 text-slate-400 shadow-lg z-50">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <div class="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-brand-600/50">S</div>
+                    <span class="ml-3 text-white font-extrabold text-xl tracking-tight uppercase">
+                        {{ school_config.school_name|default:request.tenant.name }}
+                    </span>
+                </div>
+                <div class="flex items-center space-x-6">
+                    <button @click="toggleSidebar" class="hover:text-white"><i data-feather="menu"></i></button>
+                    <button @click="togglePos()" class="flex items-center p-2 hover:bg-slate-800 rounded-lg transition-colors">
+                        <i data-feather="layout" class="mr-2"></i><span class="text-xs font-bold">Layout</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    {% if request.tenant.schema_name != 'public' %}
+    <aside x-show="sidebarPos !== 'top'" :class="{ 
+                'w-72': sidebarOpen, 'w-20': !sidebarOpen,
+                'border-r border-slate-800': sidebarPos === 'left', 'border-l border-slate-800': sidebarPos === 'right',
+                'absolute top-4 left-4 z-50 rounded-2xl shadow-2xl backdrop-blur-md bg-slate-900/95 h-[calc(100%-2rem)]': sidebarPos === 'floating'
+            }" class="hidden md:flex flex-col bg-slate-900 text-slate-400 transition-all duration-300 z-50">
+
+        <div class="p-6 flex items-center justify-between h-20 shrink-0">
+            <div class="flex items-center" x-show="sidebarOpen">
+                {% if school_config.logo %}
+                    <img src="{{ school_config.logo.url }}" class="w-8 h-8 object-contain" alt="Logo">
+                {% else %}
+                    <div class="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-brand-600/50">
+                        {{ school_config.school_name|first|default:"S" }}
+                    </div>
+                {% endif %}
+                <span class="ml-3 text-white font-extrabold text-sm tracking-tight truncate uppercase leading-tight">
+                    {{ school_config.school_name|default:request.tenant.name }}
+                </span>
+            </div>
+            <button @click="toggleSidebar" class="hover:text-white p-1 rounded-md hover:bg-slate-800 transition-colors">
+                <i data-feather="menu" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <nav class="flex-1 px-4 space-y-1 overflow-y-auto overflow-x-hidden pb-6">
+            
+            <a href="{% url 'core:dashboard' %}" 
+               class="flex items-center p-3 mb-6 rounded-xl font-bold transition-all duration-200
+               {% if request.resolver_match.url_name == 'dashboard' %}bg-brand-600 text-white shadow-lg shadow-brand-600/30{% else %}text-brand-100 bg-brand-600/10 hover:bg-brand-600/20{% endif %}">
+                <i data-feather="home" class="mr-3 w-5 h-5"></i><span x-show="sidebarOpen">Dashboard</span>
+            </a>
+
+            <div x-show="sidebarOpen" x-transition.opacity.duration.200ms>
+                
+                <p class="text-[10px] font-black text-slate-600 uppercase tracking-widest px-3 mt-6 mb-2">Pedagógico</p>
+                
+                {% if user.current_role == 'ADMIN' or user.current_role == 'DIRECTOR' or user.current_role == 'PEDAGOGIC' %}
+                    {% if 'academic' in active_modules %}
+                    <a href="{% url 'academic:student_dashboard' %}" class="flex items-center p-2.5 hover:text-white hover:bg-slate-800 rounded-lg transition-colors group text-sm font-medium">
+                        <i data-feather="book-open" class="mr-3 w-4 h-4 text-blue-400 group-hover:text-white transition-colors"></i>
+                        <span>Académico</span>
+                    </a>
+                    {% endif %}
+                {% endif %}
+                
+                {% if user.current_role == 'TEACHER' %}
+                    {% if 'teachers' in active_modules %}
+                    <a href="{% url 'teachers:dashboard' %}" class="flex items-center p-2.5 hover:text-white hover:bg-slate-800 rounded-lg transition-colors group text-sm font-medium">
+                        <i data-feather="users" class="mr-3 w-4 h-4 text-purple-400 group-hover:text-white transition-colors"></i>
+                        <span>Professores</span>
+                    </a>
+                    {% endif %}
+                {% endif %}
+                
+                {% if 'students' in active_modules %}
+                <a href="{% url 'students:student_list' %}" class="flex items-center p-2.5 hover:text-white hover:bg-slate-800 rounded-lg transition-colors group text-sm font-medium">
+                    <i data-feather="user" class="mr-3 w-4 h-4 text-indigo-400 group-hover:text-white transition-colors"></i>
+                    <span>Gestão de Alunos</span>
+                </a>
+                {% endif %}
+
+                {% if user.current_role == 'ADMIN' or user.current_role == 'DIRECTOR' or user.current_role == 'DIRECT_FINANC' or user.current_role == 'DIRECT_FINANC' or user.current_role == 'ACCOUNTANT' %}
+                    <p class="text-[10px] font-black text-slate-600 uppercase tracking-widest px-3 mt-6 mb-2">Administrativo</p>
+                    
+                    
+                    {% if 'finance' in active_modules %}
+                    <a href="{% url 'finance:daily_cash_flow' %}" class="flex items-center p-2.5 hover:text-white hover:bg-slate-800 rounded-lg transition-colors group text-sm font-medium">
+                        <i data-feather="dollar-sign" class="mr-3 w-4 h-4 text-emerald-400 group-hover:text-white transition-colors"></i>
+                        <span>Financeiro</span>
+                    </a>
+                    {% endif %}
+                    
+                    {% if 'saft' in active_modules %}
+                    <a href="{% url 'saft:audit_dashboard' %}" class="flex items-center p-2.5 hover:text-white hover:bg-slate-800 rounded-lg transition-colors group text-sm font-medium">
+                        <i data-feather="file-text" class="mr-3 w-4 h-4 text-rose-400 group-hover:text-white transition-colors"></i>
+                        <span>SAFT (AGT)</span>
+                    </a>
+                    {% endif %}
+                {% endif %}
+
+                {% if user.current_role == 'ADMIN' or user.current_role == 'SECRETARY' %}
+                <p class="text-[10px] font-black text-slate-600 uppercase tracking-widest px-3 mt-6 mb-2">Administrativo</p>
+
+                <a href="{% url 'finance:secretary_dashboard' %}" class="flex items-center p-2.5 hover:text-white hover:bg-slate-800 rounded-lg transition-colors group text-sm font-medium">
+                    
+                    <i data-feather="briefcase" class="mr-3 w-4 h-4 text-emerald-400 group-hover:text-white transition-colors"></i>
+                    <span>Secretaria</span>
+                </a>
+                {% endif %}
+                
+                
+                {% if 'compras' in active_modules %}
+                <a href="{% url 'compras:stock_dashboard' %}" class="flex items-center p-2.5 hover:text-white hover:bg-slate-800 rounded-lg transition-colors group text-sm font-medium">
+                    <i data-feather="shopping-cart" class="mr-3 w-4 h-4 text-amber-400 group-hover:text-white transition-colors"></i>
+                    <span>Compras & Stock</span>
+                </a>
+                {% endif %}
+
+                <p class="text-[10px] font-black text-slate-600 uppercase tracking-widest px-3 mt-6 mb-2">Logística</p>
+                
+                {% if 'transport' in active_modules %}
+                <a href="{% url 'transport:dashboard' %}" class="flex items-center p-2.5 hover:text-white hover:bg-slate-800 rounded-lg transition-colors group text-sm font-medium">
+                    <i data-feather="truck" class="mr-3 w-4 h-4 text-orange-400 group-hover:text-white transition-colors"></i>
+                    <span>Transporte</span>
+                </a>
+                {% endif %}
+                
+                {% if 'cafeteria' in active_modules %}
+                <a href="{% url 'cafeteria:pos_checkout' %}" class="flex items-center p-2.5 hover:text-white hover:bg-slate-800 rounded-lg transition-colors group text-sm font-medium">
+                    <i data-feather="coffee" class="mr-3 w-4 h-4 text-red-400 group-hover:text-white transition-colors"></i>
+                    <span>Cantina</span>
+                </a>
+                {% endif %}
+                
+                <p class="text-[10px] font-black text-slate-600 uppercase tracking-widest px-3 mt-6 mb-2">Governança</p>
+                
+                {% if 'reports' in active_modules %}
+                <a href="{% url 'reports:report_catalog' %}" class="flex items-center p-2.5 hover:text-white hover:bg-slate-800 rounded-lg transition-colors group text-sm font-medium">
+                    <i data-feather="bar-chart-2" class="mr-3 w-4 h-4 text-indigo-500 group-hover:text-white transition-colors"></i>
+                    <span>Relatórios BI</span>
+                </a>
+                {% endif %}
+                
+                {% if 'audit' in active_modules %}
+                    {% if request.user.is_staff %}
+                    <a href="{% url 'audit:logs' %}" class="flex items-center p-2.5 hover:text-white hover:bg-slate-800 rounded-lg transition-colors group text-sm font-medium">
+                        <i data-feather="clipboard" class="mr-3 w-4 h-4 text-brand-400 group-hover:text-white transition-colors"></i>
+                        <span>Auditoria</span>
+                    </a>
+                    {% endif %}
+                {% endif %}
+
+                {% if user.is_manager %}
+                <div class="mt-8">
+                    <h3 class="px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                        Direção & Estratégia
+                    </h3>
+                    <div class="mt-4 space-y-1">
+                
+                        <a href="{% url 'core:final_audit' %}"
+                            class="group flex items-center px-4 py-2.5 text-sm font-medium rounded-lg transition-colors
+                           {% if 'audit' in request.path %} bg-brand-50 text-brand-700 {% else %} text-slate-600 hover:bg-slate-50 hover:text-slate-900 {% endif %}">
+                            <i data-feather="pie-chart"
+                                class="mr-3 h-5 w-5 flex-shrink-0 {% if 'audit' in request.path %} text-brand-600 {% else %} text-slate-400 group-hover:text-slate-500 {% endif %}"></i>
+                            Auditoria & Risco
+                        </a>
+                
+                        <a href="{% url 'core:school_settings' %}"
+                            class="group flex items-center px-4 py-2.5 text-sm font-medium rounded-lg transition-colors
+                           {% if 'settings' in request.path %} bg-brand-50 text-brand-700 {% else %} text-slate-600 hover:bg-slate-50 hover:text-slate-900 {% endif %}">
+                            <i data-feather="settings"
+                                class="mr-3 h-5 w-5 flex-shrink-0 {% if 'settings' in request.path %} text-brand-600 {% else %} text-slate-400 group-hover:text-slate-500 {% endif %}"></i>
+                            Configurações Escola
+                        </a>
+                
+                        <a href="{% url 'core:user_management_list' %}"
+                            class="group flex items-center px-4 py-2.5 text-sm font-medium rounded-lg transition-colors
+                           {% if 'management/users' in request.path %} bg-brand-50 text-brand-700 {% else %} text-slate-600 hover:bg-slate-50 hover:text-slate-900 {% endif %}">
+                            <i data-feather="users"
+                                class="mr-3 h-5 w-5 flex-shrink-0 {% if 'management/users' in request.path %} text-brand-600 {% else %} text-slate-400 group-hover:text-slate-500 {% endif %}"></i>
+                            Gestão de Staff
+                        </a>
+                
+                    </div>
+                </div>
+                {% endif %}
+                
+                <script>
+                    feather.replace();
+                </script>
+                
+                {% if 'portal' in active_modules and user.is_staff %}
+                <div class="mt-4 px-2 pb-4">
+                    <a href="{% url 'portal:student_dashboard' %}"
+                        class="flex items-center justify-center w-full p-3 bg-gradient-to-r from-slate-800 to-slate-700 text-slate-300 rounded-xl hover:from-brand-600 hover:to-brand-500 hover:text-white transition-all duration-300 group border border-slate-700 hover:border-brand-500">
+                        <i data-feather="globe" class="w-4 h-4 mr-2"></i>
+                        <span class="text-xs font-bold uppercase tracking-wider">Ver Portal</span>
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </nav>
+
+        <div class="p-4 border-t border-slate-800 shrink-0">
+            <button @click="togglePos()" class="w-full flex items-center justify-center p-3 bg-slate-800 rounded-xl hover:bg-brand-600 hover:text-white transition-all text-xs font-bold text-slate-400">
+                <i data-feather="layout" class="mr-2 w-4 h-4"></i><span x-show="sidebarOpen">Mudar Layout</span>
+            </button>
+        </div>
+    </aside>
+    {% endif %}
+
+    <main class="flex-1 flex flex-col min-h-0 overflow-hidden bg-slate-50 relative">
+        
+        <header class="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-8 z-40 sticky top-0">
+            <div>
+                <h2 class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter italic">SOTARQ Intelligence</h2>
+                <p class="text-lg font-black text-slate-800 uppercase tracking-tight leading-none">
+                    {{ school_config.school_name|default:request.tenant.name }}
+                </p>
+            </div>
+
+            <div class="flex items-center space-x-4 pl-6 border-l border-slate-200">
+                <div class="relative mr-2" x-data="{ open: false }">
+                    <button @click="open = !open" class="relative p-2 text-slate-400 hover:text-brand-600 transition-colors">
+                        <i data-feather="bell" class="w-6 h-6"></i>
+                        <span id="notification-badge" class="absolute top-1 right-1 inline-flex items-center justify-center px-2 py-1 text-[10px] font-black leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full hidden">
+                            0
+                        </span>
+                    </button>
+                </div>
+
+                <div class="text-right hidden sm:block">
+                    <p class="text-xs font-black text-slate-800 leading-none">{{ request.user.first_name }} {{ request.user.last_name }}</p>
+                    <p class="text-[10px] text-brand-600 font-bold uppercase mt-0.5">{{ request.user.get_current_role_display|default:request.user.current_role }}</p>
+                </div>
+                
+                <div class="relative group cursor-pointer">
+                    <div class="h-10 w-10 rounded-full bg-brand-600 border-2 border-white shadow-lg flex items-center justify-center text-white font-black text-sm">
+                        {{ request.user.username|slice:":2"|upper }}
+                    </div>
+                    <div class="absolute right-0 mt-2 w-32 bg-white rounded-lg shadow-xl border border-slate-100 py-1 hidden group-hover:block animate-fade-in-down">
+                        <form id="logout-form" action="{% url 'core:logout' %}" method="POST">
+                            {% csrf_token %}
+                            <button type="submit" class="block w-full text-left px-4 py-2 text-xs font-bold text-red-600 hover:bg-red-50 uppercase tracking-wider">Sair</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="flex-1 overflow-y-auto p-4 sm:p-8 scroll-smooth">
+            {% if messages %}
+                <div class="mb-6 space-y-2 max-w-4xl mx-auto">
+                    {% for message in messages %}
+                    <div class="p-4 rounded-xl shadow-sm text-sm font-bold flex items-center animate-fade-in-down
+                        {% if message.tags == 'success' %}bg-emerald-100 text-emerald-800 border border-emerald-200
+                        {% elif message.tags == 'error' %}bg-red-100 text-red-800 border border-red-200
+                        {% else %}bg-blue-100 text-blue-800 border border-blue-200{% endif %}">
+                        
+                        {% if message.tags == 'success' %}<i data-feather="check-circle" class="w-4 h-4 mr-2"></i>
+                        {% elif message.tags == 'error' %}<i data-feather="alert-circle" class="w-4 h-4 mr-2"></i>
+                        {% else %}<i data-feather="info" class="w-4 h-4 mr-2"></i>{% endif %}
+                        
+                        {{ message }}
+                    </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            feather.replace();
+        });
+    </script>
+
+
+    <audio id="notif-sound" src="{% static 'sounds/bip.mp3' %}" preload="auto"></audio>
+
+    <script>
+        // Gerenciador de Notificações SOTARQ
+        const NotificationEngine = {
+            lastChecked: new Date().toISOString(),
+
+            init() {
+                // Solicita permissão para Push do Navegador
+                if (Notification.permission !== "granted") {
+                    Notification.requestPermission();
+                }
+                // Verifica a cada 30 segundos
+                setInterval(() => this.checkNew(), 30000);
+            },
+
+            checkNew() {
+                // Usamos a tag de URL do Django para evitar erros de caminho
+                fetch("{% url 'core:check_new_notifications' %}?since=" + this.lastChecked)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.count > 0) {
+                            this.playAlert();
+                            this.showBrowserPush(data.latest);
+                            // Atualiza o sininho se ele existir na página
+                            if (typeof updateNotificationBadge === 'function') updateNotificationBadge(data.total_unread);
+                        }
+                        this.lastChecked = new Date().toISOString();
+                    });
+            },
+
+            playAlert() {
+                const sound = document.getElementById('notif-sound');
+                sound.play().catch(e => console.log("Áudio bloqueado pelo navegador até interação do usuário."));
+            },
+
+            showBrowserPush(notif) {
+                if (Notification.permission === "granted") {
+                    new Notification(notif.title, {
+                        body: notif.message,
+                        icon: "{% static 'img/logo_small.png' %}"
+                    }).onclick = () => window.location.href = notif.link || "#";
+                }
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => NotificationEngine.init());
+    </script>
+</body>
+</html>

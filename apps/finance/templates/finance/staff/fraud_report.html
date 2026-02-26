@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mx-auto max-w-7xl px-4 py-8">
+    <div class="mb-8">
+        <h1 class="text-2xl font-black text-slate-800 uppercase italic leading-none">Controlo de Fraudes</h1>
+        <p class="text-xs text-red-500 font-bold uppercase tracking-widest mt-2">Incidências de metadados em comprovativos</p>
+    </div>
+
+    <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+        <table class="w-full text-left">
+            <thead class="bg-slate-50 border-b border-slate-100">
+                <tr>
+                    <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase">Estudante / Turma</th>
+                    <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase">Evidência Técnica</th>
+                    <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase text-right">Ação</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-50">
+                {% for student in students %}
+                <tr>
+                    <td class="px-6 py-4">
+                        <p class="text-sm font-black text-slate-800">{{ student.full_name }}</p>
+                        <p class="text-[10px] text-slate-400 font-bold italic">{{ student.registration_number }} • {{ student.current_class.name }}</p>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="p-3 bg-red-50 border border-red-100 rounded-xl">
+                            <p class="text-[10px] text-red-600 font-bold leading-relaxed">{{ student.fraud_lock_details }}</p>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                        <div class="flex justify-end gap-2">
+                            {% with last_payment=student.invoices.last.payments.last %}
+                            <a href="{{ last_payment.proof_file.url }}" target="_blank" class="p-3 bg-slate-100 text-slate-500 rounded-2xl hover:bg-slate-200 transition">
+                                <i data-feather="file-text" class="w-4 h-4"></i>
+                            </a>
+                            {% endwith %}
+                            
+                            <form action="{% url 'finance:unblock_student_fraud' student.id %}" method="POST" onsubmit="return confirm('Confirmar desbloqueio manual?')">
+                                {% csrf_token %}
+                                <button type="submit" class="p-3 bg-emerald-600 text-white rounded-2xl shadow-lg shadow-emerald-100 hover:bg-emerald-700">
+                                    <i data-feather="unlock" class="w-4 h-4"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3" class="p-20 text-center text-slate-400 font-bold uppercase text-xs">Sem tentativas de fraude detectadas.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,4 @@
+<option value="">---------</option>
+{% for class in classes %}
+    <option value="{{ class.id }}">{{ class.name }} - {{ class.get_period_display }}</option>
+{% endfor %}

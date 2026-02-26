@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto py-8 px-4">
+    <div class="mb-8">
+        <a href="{% url 'portal:dashboard' %}" class="text-xs font-bold text-slate-500 hover:text-slate-800 flex items-center mb-2">
+            <i data-feather="arrow-left" class="w-3 h-3 mr-1"></i> Voltar ao Dashboard
+        </a>
+        <h1 class="text-2xl font-black text-slate-800">Seus Códigos de Autenticidade</h1>
+        <p class="text-sm text-slate-500">Forneça estes códigos a terceiros para validar os seus dados sem entregar documentos físicos.</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        {% if student %}
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="bg-blue-100 p-2 rounded-lg"><i data-feather="user-check" class="w-5 h-5 text-blue-600"></i></div>
+                <div>
+                    <h3 class="font-bold text-slate-800">Status de Estudante</h3>
+                    <p class="text-[10px] text-slate-400">Para comprovar matrícula ativa.</p>
+                </div>
+            </div>
+            
+            <div class="bg-slate-50 p-4 rounded border border-slate-200 font-mono text-sm text-center select-all cursor-pointer hover:bg-slate-100 transition-colors" title="Clique para copiar">
+                {{ student.birth_date|date:"Y-m-d" }}#{{ student.registration_number }}#{{ student.guardians.first.guardian.id|default:"0" }}
+            </div>
+            <p class="text-[10px] text-slate-400 mt-2 text-center">DataNasc # ID Aluno # ID Encarregado</p>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="bg-purple-100 p-2 rounded-lg"><i data-feather="award" class="w-5 h-5 text-purple-600"></i></div>
+                <div>
+                    <h3 class="font-bold text-slate-800">Certificado Recente</h3>
+                    <p class="text-[10px] text-slate-400">Para comprovar habilitações.</p>
+                </div>
+            </div>
+            
+            {% if student.enrollments.last %}
+            <div class="bg-slate-50 p-4 rounded border border-slate-200 font-mono text-sm text-center select-all">
+                {{ student.enrollments.last.academic_year.end_date|date:"Y-m-d" }}#{{ student.registration_number }}
+            </div>
+            <p class="text-[10px] text-slate-400 mt-2 text-center">Data Fim Ano # ID Aluno</p>
+            {% else %}
+            <div class="text-center py-4 text-slate-400 text-xs italic">
+                Nenhum ano letivo concluído ainda.
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if user.teacher_profile %}
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 md:col-span-2">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="bg-indigo-100 p-2 rounded-lg"><i data-feather="briefcase" class="w-5 h-5 text-indigo-600"></i></div>
+                <div>
+                    <h3 class="font-bold text-slate-800">Vínculo Profissional</h3>
+                    <p class="text-[10px] text-slate-400">Para comprovar que trabalha nesta instituição.</p>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <p class="text-xs font-bold text-slate-500 mb-2">Código de Validação:</p>
+                    <div class="bg-slate-50 p-3 rounded border border-slate-200 font-mono text-sm text-center select-all">
+                        #{{ user.teacher_profile.employee_number }}#@{{ user.first_name }}
+                    </div>
+                </div>
+                <div>
+                    <p class="text-xs font-bold text-slate-500 mb-2">Código de Declaração:</p>
+                    <div class="bg-slate-50 p-3 rounded border border-slate-200 font-mono text-sm text-center select-all">
+                        ##{% now "Y" %}#{{ user.teacher_profile.employee_number }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+<script>feather.replace();</script>
+{% endblock %}

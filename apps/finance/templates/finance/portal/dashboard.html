@@ -1,0 +1,11 @@
+{% if not has_overdue_invoices %}
+<div class="mt-4 p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex items-center justify-between">
+    <div>
+        <p class="text-emerald-800 font-bold text-sm">Parabéns! Suas contas estão em dia.</p>
+        <p class="text-emerald-600 text-[10px] uppercase font-black">Certidão de Quitação {{ current_year }} disponível</p>
+    </div>
+    <a href="{% url 'finance:download_clearance' %}" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all">
+        Baixar Certidão
+    </a>
+</div>
+{% endif %}

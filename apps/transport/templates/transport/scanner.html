@@ -1,0 +1,66 @@
+{% extends 'base_staff.html' %}
+{% block content %}
+<div class="min-h-screen bg-slate-900 p-4 md:p-8">
+    <div class="bg-white rounded-[3rem] p-8 shadow-2xl mb-8 flex justify-between items-center">
+        <div>
+            <span class="px-4 py-1 bg-indigo-100 text-indigo-700 rounded-full text-[10px] font-black uppercase tracking-widest">Em Rota</span>
+            <h1 class="text-2xl font-black text-slate-800 mt-2">{{ bus.plate_number }}</h1>
+            <p class="text-xs text-slate-400 font-bold uppercase tracking-widest">Operador: {{ request.user.get_full_name }}</p>
+        </div>
+        <i data-feather="map-pin" class="w-10 h-10 text-slate-200"></i>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for enrollment in active_students %}
+        <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col justify-between">
+            <div class="flex items-center gap-4 mb-6">
+                <div class="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center font-black text-indigo-600">
+                    {{ enrollment.student.full_name|slice:":1" }}
+                </div>
+                <div>
+                    <h4 class="text-sm font-black text-slate-800">{{ enrollment.student.full_name }}</h4>
+                    <p class="text-[9px] text-slate-400 font-bold uppercase">{{ enrollment.student.registration_number }}</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="updateStatus('{{ enrollment.student.id }}', 'IN')" 
+                        class="py-3 bg-emerald-50 text-emerald-600 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-emerald-500 hover:text-white transition-all">
+                    Entrou
+                </button>
+                <button onclick="updateStatus('{{ enrollment.student.id }}', 'HOME')" 
+                        class="py-3 bg-red-50 text-red-600 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all">
+                    Entregue
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+function updateStatus(studentId, status) {
+    // Captura GPS no dispositivo do Vigilante (Rigor Sênior)
+    navigator.geolocation.getCurrentPosition((pos) => {
+        const data = {
+            student_id: studentId,
+            event_type: status,
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude
+        };
+
+        fetch("{% url 'transport:process_checkpoint' %}", {
+            method: 'POST',
+            headers: {'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        })
+        .then(r => r.json())
+        .then(res => {
+            if(res.status === 'success') {
+                alert(`Status de ${status} registado. Notificação enviada.`);
+            }
+        });
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,189 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ school_branding.school_name|default:"SOTARQ School" }}{% endblock %}</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <style>
+        /* SISTEMA DE CORES DINÂMICO (White-Label Engine) */
+        :root {
+            /* Cores do Sistema (Buttons, Links) */
+            --primary: {{ school_branding.primary_color|default:'#4f46e5' }};
+            --secondary: {{ school_branding.secondary_color|default:'#1e293b' }};
+            
+            /* Cores do Site (Header, Footer) - Adicionado conforme requisito */
+            --header-bg: {{ school_branding.site_header_bg|default:'#FFFFFF' }};
+            --header-text: {{ school_branding.site_header_text|default:'#1e293b' }};
+            --footer-bg: {{ school_branding.site_footer_bg|default:'#FFFFFF' }};
+            --footer-text: {{ school_branding.site_footer_text|default:'#64748b' }};
+        }
+        
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* Classes utilitárias que usam as variáveis da escola */
+        .text-brand { color: var(--primary); }
+        .bg-brand { background-color: var(--primary); }
+        .border-brand { border-color: var(--primary); }
+        .hover-bg-brand:hover { background-color: var(--primary); opacity: 0.9; }
+        
+        .bg-pattern {
+            background-color: #f8fafc;
+            background-image: radial-gradient(var(--primary) 0.5px, transparent 0.5px), radial-gradient(var(--primary) 0.5px, #f8fafc 0.5px);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 10px;
+            opacity: 1;
+        }
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen flex flex-col selection:bg-indigo-100 selection:text-indigo-700">
+
+    <header class="glass-nav border-b border-slate-200 sticky top-0 z-50 transition-all duration-300" 
+            style="background-color: var(--header-bg); color: var(--header-text);">
+        <div class="container mx-auto px-4 h-20 flex items-center justify-between">
+            <a href="/" class="flex items-center gap-3 group">
+                {% if school_branding.logo %}
+                    <img src="{{ school_branding.logo.url }}" alt="Logo" class="h-10 w-auto object-contain transition-transform group-hover:scale-105">
+                {% else %}
+                    <div class="h-10 w-10 rounded-xl bg-brand flex items-center justify-center text-white font-black text-xl shadow-lg shadow-indigo-200">
+                        {{ school_branding.school_name|slice:":1"|default:"S" }}
+                    </div>
+                {% endif %}
+                
+                <div class="flex flex-col">
+                    <span class="font-bold text-lg leading-tight tracking-tight group-hover:text-brand transition-colors"
+                          style="color: var(--header-text);">
+                        {{ school_branding.school_name|default:"SOTARQ School" }}
+                    </span>
+                    <span class="text-[10px] font-bold uppercase tracking-widest opacity-70"
+                          style="color: var(--header-text);">Site Oficial</span>
+                </div>
+            </a>
+            
+            <nav class="hidden md:flex items-center gap-8 text-sm font-bold" style="color: var(--header-text);">
+
+                <a href="/portal/about/" class="hover:text-brand transition-colors">A Escola</a>
+
+                <a href="/portal/courses/" class="hover:text-brand transition-colors">Oferta Formativa</a>
+
+
+                {% if not enrollment_access_blocked %}
+                    <a href="{% url 'students:public_enrollment' %}" class="hover:text-brand transition-colors relative py-2 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-brand after:transition-all hover:after:w-full">
+                        Matrícula online
+                    </a>
+                {% endif %}
+
+                {% if school_branding.is_recruitment_open %}
+                    <a href="{% url 'core:public_job_apply' %}" class="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 transition-colors animate-pulse">
+                        <i data-feather="briefcase" class="w-4 h-4"></i>
+                        Trabalhe Conosco
+                    </a>
+                {% endif %}
+                
+                <a href="{% url 'core:login' %}" class="ml-4 px-6 py-2.5 text-sm font-bold text-white bg-brand rounded-xl hover:opacity-90 shadow-lg shadow-indigo-100 transition-all transform hover:-translate-y-0.5">
+                    Área Reservada
+                </a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="flex-grow relative">
+        <div class="absolute inset-0 bg-pattern opacity-[0.03] pointer-events-none -z-10"></div>
+        
+        {% if messages %}
+            <div class="fixed top-24 right-5 z-50 space-y-3 w-full max-w-md animate-fade-in-down">
+                {% for message in messages %}
+                <div class="p-4 rounded-2xl shadow-xl backdrop-blur-md border border-white/50 flex items-center gap-3
+                    {% if message.tags == 'success' %}bg-emerald-50/90 text-emerald-800 border-emerald-100
+                    {% elif message.tags == 'error' %}bg-red-50/90 text-red-800 border-red-100
+                    {% else %}bg-blue-50/90 text-blue-800 border-blue-100{% endif %}">
+                    
+                    {% if message.tags == 'success' %}<i data-feather="check-circle" class="w-5 h-5"></i>
+                    {% elif message.tags == 'error' %}<i data-feather="alert-circle" class="w-5 h-5"></i>
+                    {% else %}<i data-feather="info" class="w-5 h-5"></i>{% endif %}
+                    
+                    <span class="font-medium text-sm">{{ message }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="border-t border-slate-100 pt-12 pb-8 mt-auto" 
+            style="background-color: var(--footer-bg); color: var(--footer-text);">
+        <div class="container mx-auto px-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+                <div class="col-span-1 md:col-span-2">
+                    <h4 class="font-bold mb-4" style="color: var(--footer-text);">{{ school_branding.school_name }}</h4>
+                    <p class="text-sm leading-relaxed max-w-xs opacity-80">
+                        Comprometidos com a excelência académica e a inovação tecnológica.
+                    </p>
+                </div>
+                <div>
+                    <h5 class="font-bold mb-4 text-xs uppercase tracking-wider opacity-70">Acesso Rápido</h5>
+                    <ul class="space-y-2 text-sm opacity-80">
+                        <li><a href="{% url 'students:public_enrollment' %}" class="hover:text-brand">Matrículas</a></li>
+                        <li><a href="#" class="hover:text-brand">Consultar Pautas</a></li>
+                        <li><a href="{% url 'academic:student_dashboard' %}" class="hover:text-brand">Portal do Aluno</a></li>
+                        <li><a href="/portal/contact/" class="hover:text-brand">Contactos</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h5 class="font-bold mb-4 text-xs uppercase tracking-wider opacity-70">Contactos</h5>
+                    <ul class="space-y-2 text-sm opacity-80">
+                        <li class="flex items-center gap-2"><i data-feather="mail" class="w-3 h-3"></i> {{ school_branding.official_email|default:"geral@escola.com" }}</li>
+                        <li class="flex items-center gap-2"><i data-feather="phone" class="w-3 h-3"></i> {{ school_branding.phone_contact|default:"Terminais indisponíveis" }}</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="border-t border-slate-200/20 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+                <p class="text-xs opacity-60">
+                    &copy; {% now "Y" %} {{ school_branding.school_name }}. 
+                    Powered by <a href="https://www.sotarqsoftware.com" target="_blank" class="font-bold hover:text-brand transition-colors">SOTARQ SOFTWARE</a>.
+                </p>
+
+                <div class="flex gap-4">
+                    {% if school_branding.facebook_link %}
+                    <a href="{{ school_branding.facebook_link }}" target="_blank" title="Facebook" class="hover:text-brand transition-colors opacity-70 hover:opacity-100">
+                        <i data-feather="facebook" class="w-4 h-4"></i>
+                    </a>
+                    {% endif %}
+
+                    {% if school_branding.instagram_link %}
+                    <a href="{{ school_branding.instagram_link }}" target="_blank" title="Instagram" class="hover:text-brand transition-colors opacity-70 hover:opacity-100">
+                        <i data-feather="instagram" class="w-4 h-4"></i>
+                    </a>
+                    {% endif %}
+                    
+                    {% if school_branding.website_link %}
+                    <a href="{{ school_branding.website_link }}" target="_blank" title="Website" class="hover:text-brand transition-colors opacity-70 hover:opacity-100">
+                        <i data-feather="globe" class="w-4 h-4"></i>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        feather.replace();
+        // Auto-dismiss alerts
+        setTimeout(() => {
+            document.querySelectorAll('.fixed > div').forEach(el => el.remove());
+        }, 6000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+<div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center border-b pb-2">
+                <i data-feather="calendar" class="w-5 h-5 mr-2 text-brand-600"></i> Calendário & Matrículas
+            </h3>
+            
+            <div class="mb-6 pb-6 border-b border-slate-100">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center">
+                        <div class="flex items-center h-5">
+                            {% if enrollment_access_blocked %}
+                                <input type="checkbox" disabled class="w-4 h-4 text-slate-300 border-slate-300 rounded cursor-not-allowed bg-slate-100">
+                            {% else %}
+                                {{ form.is_enrollment_open }}
+                            {% endif %}
+                        </div>
+                        <div class="ml-3 text-sm">
+                            <label class="font-bold text-slate-700">Novas Matrículas (Externos)</label>
+                            <p class="text-xs text-slate-500">Habilita o formulário de candidatura no site público.</p>
+                        </div>
+                    </div>
+                    {% if enrollment_access_blocked %}
+                        <span class="px-2 py-1 bg-red-100 text-red-700 text-[10px] font-bold rounded flex items-center gap-1">
+                            <i data-feather="lock" class="w-3 h-3"></i> SEM LICENÇA
+                        </span>
+                    {% endif %}
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4 pl-8">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Data de Início</label>
+                        {{ form.enrollment_start_date }}
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Data de Fim</label>
+                        {{ form.enrollment_end_date }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center">
+                        <div class="flex items-center h-5">
+                            {{ form.is_reconfirmation_open }}
+                        </div>
+                        <div class="ml-3 text-sm">
+                            <label class="font-bold text-slate-700">Reconfirmações (Internos)</label>
+                            <p class="text-xs text-slate-500">Permite aos alunos atuais garantirem vaga para o próximo ano.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4 pl-8">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Data de Início</label>
+                        {{ form.reconfirmation_start_date }}
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Data de Fim</label>
+                        {{ form.reconfirmation_end_date }}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4 mt-6 pt-6 border-t border-slate-100">
+                <div class="flex items-center p-3 bg-slate-50 rounded-lg">
+                    {{ form.allow_secretary_export }} <label class="ml-3 text-sm font-medium text-slate-900">Exp. Secretaria</label>
+                </div>
+                <div class="flex items-center p-3 bg-slate-50 rounded-lg">
+                    {{ form.allow_teacher_export }} <label class="ml-3 text-sm font-medium text-slate-900">Exp. Professor</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-end pt-6">
+            <button type="submit" class="px-8 py-4 bg-slate-900 text-white font-bold rounded-xl hover:bg-indigo-600 transition-all shadow-xl hover:shadow-2xl flex items-center">
+                <i data-feather="save" class="w-5 h-5 mr-2"></i> Salvar Configurações
+            </button>
+        </div>
+    </form>
+</div>

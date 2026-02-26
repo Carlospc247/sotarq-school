@@ -1,0 +1,77 @@
+{% extends 'public_base.html' %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-16">
+    <div class="max-w-5xl mx-auto bg-white rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col md:flex-row border border-slate-100">
+        
+        <div class="bg-slate-900 p-12 md:w-2/5 text-white flex flex-col justify-between relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-32 h-32 bg-brand opacity-20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+            
+            <div>
+                <h2 class="text-3xl font-black mb-2">Fale Conosco</h2>
+                <p class="text-slate-400 text-sm mb-10 font-medium">Canais oficiais de atendimento.</p>
+                
+                <div class="space-y-8">
+                    <div class="flex items-start gap-5 group">
+                        <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center group-hover:bg-brand transition-colors">
+                            <i data-feather="map-pin" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-sm text-slate-200">Localização</h4>
+                            <p class="text-xs text-slate-400 mt-1 leading-relaxed w-3/4">
+                                {{ school_branding.address|default:"Endereço não disponível"|linebreaksbr }}
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center gap-5 group">
+                        <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center group-hover:bg-brand transition-colors">
+                            <i data-feather="mail" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-sm text-slate-200">Email</h4>
+                            <p class="text-xs text-slate-400 mt-1">{{ school_branding.official_email }}</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-5 group">
+                        <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center group-hover:bg-brand transition-colors">
+                            <i data-feather="phone" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-sm text-slate-200">Telefone</h4>
+                            <p class="text-xs text-slate-400 mt-1">{{ school_branding.phone_contact }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-16">
+                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">Redes Sociais</p>
+                <div class="flex gap-4">
+                    {% if school_branding.facebook_link %}
+                    <a href="{{ school_branding.facebook_link }}" target="_blank" class="w-10 h-10 rounded-full border border-slate-700 flex items-center justify-center hover:bg-brand hover:border-brand transition-all">
+                        <i data-feather="facebook" class="w-4 h-4"></i>
+                    </a>
+                    {% endif %}
+                    {% if school_branding.instagram_link %}
+                    <a href="{{ school_branding.instagram_link }}" target="_blank" class="w-10 h-10 rounded-full border border-slate-700 flex items-center justify-center hover:bg-brand hover:border-brand transition-all">
+                        <i data-feather="instagram" class="w-4 h-4"></i>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-slate-50 md:w-3/5 relative min-h-[400px] flex items-center justify-center">
+            <div class="text-center text-slate-400">
+                <div class="w-20 h-20 bg-slate-200 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+                    <i data-feather="map" class="w-10 h-10 opacity-50"></i>
+                </div>
+                <span class="text-sm font-bold uppercase tracking-widest">Mapa da Instituição</span>
+                <p class="text-xs mt-2">Integração Google Maps</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

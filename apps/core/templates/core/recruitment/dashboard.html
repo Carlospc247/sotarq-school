@@ -1,0 +1,294 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+<div class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8" 
+     x-data="{ 
+        vacanciesModalOpen: false, 
+        actionModalOpen: null, 
+        currentId: null, 
+        currentName: '',
+        
+        openAction(type, id, name) {
+            this.actionModalOpen = type;
+            this.currentId = id;
+            this.currentName = name;
+        },
+        closeAction() {
+            this.actionModalOpen = null;
+            this.currentId = null;
+            this.currentName = '';
+        }
+     }">
+    
+    <div class="md:flex md:items-center md:justify-between mb-8 gap-4">
+        <div class="flex-1 min-w-0">
+            <h2 class="text-2xl font-black leading-7 text-slate-900 sm:text-3xl sm:truncate">
+                Gestão de Recrutamento
+            </h2>
+            <p class="mt-1 text-sm text-slate-500">
+                Visualize candidaturas, entreviste e contrate novos talentos.
+            </p>
+        </div>
+        
+        <div class="mt-4 flex items-center gap-3 md:mt-0 md:ml-4">
+            <form action="{% url 'core:toggle_recruitment' %}" method="POST">
+                {% csrf_token %}
+                {% if config.is_recruitment_open %}
+                    <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 focus:outline-none transition-colors">
+                        <i data-feather="unlock" class="w-4 h-4 mr-2"></i> Aberto
+                    </button>
+                {% else %}
+                    <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-bold text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none transition-colors">
+                        <i data-feather="lock" class="w-4 h-4 mr-2"></i> Fechado
+                    </button>
+                {% endif %}
+            </form>
+
+            <button @click="vacanciesModalOpen = true" class="inline-flex items-center px-4 py-2 border border-slate-300 rounded-lg shadow-sm text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 focus:outline-none transition-colors">
+                <i data-feather="briefcase" class="w-4 h-4 mr-2"></i> Configurar Vagas
+            </button>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200">
+                <thead class="bg-slate-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Candidato</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Vaga / Área</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Contactos</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Documentos</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Ações</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-slate-200">
+                    {% for app in applications %}
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0 h-10 w-10">
+                                    <div class="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm">
+                                        {{ app.full_name|slice:":2"|upper }}
+                                    </div>
+                                </div>
+                                <div class="ml-4">
+                                    <div class="text-sm font-bold text-slate-900">{{ app.full_name }}</div>
+                                    <div class="text-xs text-slate-500">Data: {{ app.created_at|date:"d/m/Y" }}</div>
+                                </div>
+                            </div>
+                        </td>
+
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                {{ app.applied_area }}
+                            </span>
+                        </td>
+
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center gap-2">
+                                {% if app.phone %}
+                                <button @click="openAction('whatsapp', {{ app.id }}, '{{ app.full_name }}')" 
+                                        class="p-2 bg-green-50 text-green-600 rounded-full hover:bg-green-100 transition-colors tooltip" title="Enviar Mensagem">
+                                    <i data-feather="message-circle" class="w-4 h-4"></i>
+                                </button>
+                                {% endif %}
+                                
+                                <a href="mailto:{{ app.email }}" class="p-2 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition-colors tooltip" title="Email">
+                                    <i data-feather="mail" class="w-4 h-4"></i>
+                                </a>
+                                <a href="tel:{{ app.phone }}" class="p-2 bg-slate-100 text-slate-600 rounded-full hover:bg-slate-200 transition-colors tooltip" title="Ligar">
+                                    <i data-feather="phone" class="w-4 h-4"></i>
+                                </a>
+                            </div>
+                        </td>
+
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex flex-col space-y-1">
+                                {% if app.cv_file %}
+                                    <a href="{{ app.cv_file.url }}" target="_blank" class="text-xs font-medium text-indigo-600 hover:text-indigo-900 flex items-center hover:underline">
+                                        <i data-feather="file-text" class="w-3 h-3 mr-1"></i> Ver CV
+                                    </a>
+                                {% endif %}
+                                {% if app.bi_file %}
+                                    <a href="{{ app.bi_file.url }}" target="_blank" class="text-xs font-medium text-slate-600 hover:text-slate-900 flex items-center hover:underline">
+                                        <i data-feather="credit-card" class="w-3 h-3 mr-1"></i> Ver BI
+                                    </a>
+                                {% endif %}
+                                {% if app.academic_cert %}
+                                    <a href="{{ app.academic_cert.url }}" target="_blank" class="text-xs font-medium text-slate-600 hover:text-slate-900 flex items-center hover:underline">
+                                        <i data-feather="award" class="w-3 h-3 mr-1"></i> Ver Cert.
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </td>
+
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <div class="flex items-center justify-end gap-2">
+                                <button @click="openAction('hire', {{ app.id }}, '{{ app.full_name }}')" 
+                                        class="inline-flex items-center px-3 py-1.5 border border-transparent rounded-lg shadow-sm text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none transition-all">
+                                    <i data-feather="user-plus" class="w-3 h-3 mr-1"></i> ADMITIR
+                                </button>
+
+                                <button @click="openAction('delete', {{ app.id }}, '{{ app.full_name }}')" 
+                                        class="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 hover:text-red-800 transition-colors" title="Eliminar">
+                                    <i data-feather="trash-2" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="px-6 py-12 text-center">
+                            <div class="mx-auto h-12 w-12 text-slate-300">
+                                <i data-feather="inbox" class="w-12 h-12"></i>
+                            </div>
+                            <h3 class="mt-2 text-sm font-medium text-slate-900">Sem candidaturas pendentes</h3>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div x-show="vacanciesModalOpen" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" @click="vacanciesModalOpen = false">
+                <div class="absolute inset-0 bg-slate-900 opacity-75"></div>
+            </div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-indigo-900 px-6 py-4 flex justify-between items-center">
+                    <h3 class="text-lg leading-6 font-bold text-white">Definir Vagas</h3>
+                    <button @click="vacanciesModalOpen = false" class="text-indigo-200 hover:text-white"><i data-feather="x" class="w-6 h-6"></i></button>
+                </div>
+                <form action="{% url 'core:update_job_areas' %}" method="POST" class="p-6">
+                    {% csrf_token %}
+                    <label class="block text-sm font-bold text-slate-700 mb-2">Áreas Abertas (Separadas por vírgula)</label>
+                    <textarea name="available_job_areas" rows="5" class="w-full p-3 border border-slate-300 rounded-lg text-sm">{{ config.available_job_areas }}</textarea>
+                    <div class="mt-6 flex justify-end gap-3">
+                        <button type="button" @click="vacanciesModalOpen = false" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 text-sm font-bold">Cancelar</button>
+                        <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700">Salvar Vagas</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="actionModalOpen === 'hire'" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" @click="closeAction()">
+                <div class="absolute inset-0 bg-emerald-900/50 backdrop-blur-sm"></div>
+            </div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="p-6">
+                    <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-emerald-100 mb-4">
+                        <i data-feather="user-check" class="h-6 w-6 text-emerald-600"></i>
+                    </div>
+                    <div class="text-center">
+                        <h3 class="text-lg leading-6 font-bold text-slate-900">Admitir Funcionário</h3>
+                        <p class="text-sm text-slate-500 mt-2">
+                            Deseja contratar <b><span x-text="currentName"></span></b>?
+                        </p>
+                        <p class="text-xs text-slate-400 mt-2">
+                            Isto criará um utilizador no sistema e enviará as credenciais automaticamente.
+                        </p>
+                    </div>
+                </div>
+                <div class="bg-slate-50 px-6 py-4 flex justify-center gap-3">
+                    <button @click="closeAction()" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 font-bold text-sm bg-white hover:bg-slate-50">Cancelar</button>
+                    <form method="POST" :action="'/management/recruitment/hire/' + currentId + '/'">
+                        {% csrf_token %}
+                        <button type="submit" class="px-4 py-2 bg-emerald-600 text-white rounded-lg font-bold text-sm hover:bg-emerald-700 shadow-lg">
+                            Confirmar Admissão
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="actionModalOpen === 'delete'" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" @click="closeAction()">
+                <div class="absolute inset-0 bg-red-900/50 backdrop-blur-sm"></div>
+            </div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="p-6">
+                    <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                        <i data-feather="trash-2" class="h-6 w-6 text-red-600"></i>
+                    </div>
+                    <div class="text-center">
+                        <h3 class="text-lg leading-6 font-bold text-slate-900">Eliminar Candidatura</h3>
+                        <p class="text-sm text-slate-500 mt-2">
+                            Tem a certeza que deseja eliminar <b><span x-text="currentName"></span></b>?
+                        </p>
+                        <p class="text-xs text-red-500 mt-2 font-bold">Esta ação é irreversível.</p>
+                    </div>
+                </div>
+                <div class="bg-slate-50 px-6 py-4 flex justify-center gap-3">
+                    <button @click="closeAction()" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 font-bold text-sm bg-white hover:bg-slate-50">Cancelar</button>
+                    <form method="POST" :action="'/management/recruitment/delete/' + currentId + '/'">
+                        {% csrf_token %}
+                        <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-lg font-bold text-sm hover:bg-red-700 shadow-lg">
+                            Sim, Eliminar
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="actionModalOpen === 'whatsapp'" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" @click="closeAction()">
+                <div class="absolute inset-0 bg-slate-900/75 backdrop-blur-sm"></div>
+            </div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-green-600 px-6 py-4 flex justify-between items-center">
+                    <h3 class="text-lg leading-6 font-bold text-white flex items-center">
+                        <i data-feather="message-circle" class="w-5 h-5 mr-2"></i> Mensagem WhatsApp
+                    </h3>
+                    <button @click="closeAction()" class="text-green-100 hover:text-white"><i data-feather="x" class="w-6 h-6"></i></button>
+                </div>
+                
+                <form action="{% url 'core:send_candidate_whatsapp' %}" method="POST" class="p-6">
+                    {% csrf_token %}
+                    <input type="hidden" name="candidate_id" :value="currentId">
+                    
+                    <div class="space-y-4">
+                        <p class="text-sm text-slate-600">
+                            Enviar mensagem para: <b><span x-text="currentName"></span></b>
+                        </p>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Mensagem</label>
+                            <textarea name="message_text" rows="4" class="w-full p-3 border border-slate-300 rounded-lg text-sm focus:ring-green-500 focus:border-green-500" placeholder="Escreva a mensagem aqui..."></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-6 flex justify-end gap-3 pt-4 border-t border-slate-100">
+                        <button type="button" @click="closeAction()" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 font-bold text-sm hover:bg-slate-50">Cancelar</button>
+                        <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg font-bold text-sm hover:bg-green-700 shadow-lg flex items-center">
+                            <i data-feather="send" class="w-4 h-4 mr-2"></i> Enviar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        feather.replace();
+    });
+</script>
+{% endblock %}

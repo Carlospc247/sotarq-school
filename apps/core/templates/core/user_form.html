@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mx-auto max-w-3xl">
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-black text-slate-800">{{ title }}</h1>
+        <a href="{% url 'core:user_management_list' %}" class="text-sm font-bold text-slate-500 hover:text-slate-800">
+            &larr; Voltar
+        </a>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
+        <form method="POST" class="p-8 space-y-6">
+            {% csrf_token %}
+            
+            {% if form.errors %}
+            <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <i data-feather="alert-circle" class="h-5 w-5 text-red-500"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm text-red-700 font-bold">Por favor, corrija os erros abaixo:</p>
+                        {{ form.non_field_errors }}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1">Nome de Usuário (Login)</label>
+                    <input type="text" name="username" value="{{ form.username.value|default:'' }}" required
+                           class="w-full rounded-lg border-slate-300 focus:ring-brand-500 focus:border-brand-500">
+                    {% if form.username.errors %}<p class="text-xs text-red-500 mt-1">{{ form.username.errors.0 }}</p>{% endif %}
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1">Perfil de Acesso</label>
+                    <select name="current_role" class="w-full rounded-lg border-slate-300 focus:ring-brand-500 focus:border-brand-500">
+                        {% for value, label in form.fields.current_role.choices %}
+                        <option value="{{ value }}" {% if form.current_role.value == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1">Nome</label>
+                    <input type="text" name="first_name" value="{{ form.first_name.value|default:'' }}" required
+                           class="w-full rounded-lg border-slate-300 focus:ring-brand-500 focus:border-brand-500">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1">Sobrenome</label>
+                    <input type="text" name="last_name" value="{{ form.last_name.value|default:'' }}" required
+                           class="w-full rounded-lg border-slate-300 focus:ring-brand-500 focus:border-brand-500">
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-bold text-slate-700 mb-1">E-mail Institucional</label>
+                    <input type="email" name="email" value="{{ form.email.value|default:'' }}" required
+                           class="w-full rounded-lg border-slate-300 focus:ring-brand-500 focus:border-brand-500">
+                    {% if form.email.errors %}<p class="text-xs text-red-500 mt-1">{{ form.email.errors.0 }}</p>{% endif %}
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-bold text-slate-700 mb-1">Senha</label>
+                    <input type="password" name="password" placeholder="******"
+                           class="w-full rounded-lg border-slate-300 focus:ring-brand-500 focus:border-brand-500">
+                    <p class="text-xs text-slate-400 mt-1">{{ form.fields.password.help_text }}</p>
+                </div>
+
+                <div class="md:col-span-2 flex items-center">
+                    <input type="checkbox" name="is_active" id="id_is_active" {% if form.is_active.value %}checked{% endif %}
+                           class="h-4 w-4 text-brand-600 focus:ring-brand-500 border-gray-300 rounded">
+                    <label for="id_is_active" class="ml-2 block text-sm font-bold text-slate-700">
+                        Usuário Ativo (Pode fazer login)
+                    </label>
+                </div>
+            </div>
+
+            <div class="mt-8 p-6 bg-slate-50 rounded-xl border border-slate-200">
+                <h3 class="text-sm font-black text-slate-800 mb-4 flex items-center">
+                    <i data-feather="shield" class="w-4 h-4 mr-2"></i> PERMISSÕES ESPECÍFICAS (DELEGAÇÃO)
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="flex items-center gap-3">
+                        {{ form.pode_acessar_academic_page }} <label class="text-sm text-slate-600 font-bold">Aceder Página Académica</label>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        {{ form.pode_ver_pautas_boletins }} <label class="text-sm text-slate-600 font-bold">Ver Pautas/Boletins</label>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        {{ form.pode_baixar_pautas }} <label class="text-sm text-slate-600 font-bold">Baixar Pautas (Excel/PDF)</label>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        {{ form.pode_ver_documentos_academics }} <label class="text-sm text-slate-600 font-bold">Ver Documentos Internos</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pt-6 border-t border-slate-100 flex justify-end space-x-3">
+                <a href="{% url 'core:user_management_list' %}" class="px-6 py-2 border border-slate-300 rounded-lg text-slate-600 font-bold hover:bg-slate-50 transition-colors">
+                    Cancelar
+                </a>
+                <button type="submit" class="px-6 py-2 bg-brand-600 text-white rounded-lg font-bold hover:bg-brand-700 shadow-md transition-all">
+                    Salvar Funcionário
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

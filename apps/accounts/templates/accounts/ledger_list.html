@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="space-y-8">
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div>
+            <h1 class="text-3xl font-black text-slate-900 uppercase tracking-tighter">Plano de Contas</h1>
+            <p class="text-slate-500 font-medium italic">Visão consolidada do Razão Financeiro - {{ request.tenant.name }}</p>
+        </div>
+        
+        <div class="bg-slate-900 p-6 rounded-2xl shadow-xl border-t-4 border-brand-500 min-w-[280px]">
+            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Saldo Total em Conta</p>
+            <div class="flex items-baseline justify-between">
+                <span class="text-2xl font-black text-white leading-none">
+                    {{ total_balance|floatformat:2 }} <span class="text-xs text-brand-400">AOA</span>
+                </span>
+                <i data-feather="trending-up" class="text-emerald-400 w-5 h-5"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead class="bg-slate-50/80 border-b border-slate-200">
+                    <tr>
+                        <th class="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">Código</th>
+                        <th class="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">Nome da Conta</th>
+                        <th class="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">Natureza</th>
+                        <th class="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Saldo Atual</th>
+                        <th class="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for account in accounts %}
+                    <tr class="hover:bg-slate-50/50 transition-all group">
+                        <td class="px-8 py-5">
+                            <span class="px-3 py-1 bg-slate-100 rounded-full text-xs font-mono font-bold text-slate-600 border border-slate-200">
+                                {{ account.code }}
+                            </span>
+                        </td>
+                        <td class="px-8 py-5">
+                            <div class="text-sm font-bold text-slate-800 group-hover:text-brand-600 transition-colors">
+                                {{ account.name }}
+                            </div>
+                            <div class="text-[10px] text-slate-400 font-medium italic">ID de Sistema: {{ account.id }}</div>
+                        </td>
+                        <td class="px-8 py-5 text-center">
+                            <span class="px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest
+                                {% if account.account_type == 'asset' %} bg-emerald-100 text-emerald-700
+                                {% elif account.account_type == 'liability' %} bg-rose-100 text-rose-700
+                                {% elif account.account_type == 'income' %} bg-blue-100 text-blue-700
+                                {% else %} bg-slate-100 text-slate-600 {% endif %}">
+                                {{ account.get_account_type_display }}
+                            </span>
+                        </td>
+                        <td class="px-8 py-5 text-right">
+                            <span class="text-sm font-black {% if account.balance < 0 %}text-rose-600{% else %}text-slate-900{% endif %}">
+                                {{ account.balance|floatformat:2 }} <span class="text-[10px] text-slate-400 font-normal ml-1">Kz</span>
+                            </span>
+                        </td>
+                        <td class="px-8 py-5 text-center">
+                            <div class="flex items-center justify-center space-x-3">
+                                <a href="#" class="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-all" title="Ver Extrato">
+                                    <i data-feather="list" class="w-4 h-4"></i>
+                                </a>
+                                <button class="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="Ajuste de Saldo">
+                                    <i data-feather="edit-2" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="px-8 py-20 text-center">
+                            <div class="flex flex-col items-center">
+                                <div class="bg-slate-50 p-4 rounded-full mb-4">
+                                    <i data-feather="alert-circle" class="text-slate-300 w-12 h-12"></i>
+                                </div>
+                                <p class="text-slate-400 font-medium italic">Nenhuma conta financeira parametrizada para esta instituição.</p>
+                                <button class="mt-4 text-xs font-black text-brand-600 uppercase tracking-widest hover:underline">+ Criar Primeira Conta</button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!--Modal-->
+    <button @click="transferModal = true" class="bg-brand-600 text-white px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-brand-700 transition-all shadow-lg flex items-center">
+        <i data-feather="repeat" class="mr-2 w-4 h-4"></i> Transferir Fundos
+    </button>
+
+    <div x-show="transferModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <div @click.away="transferModal = false" class="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden">
+            <form action="{% url 'accounts:transfer_funds' %}" method="POST" class="p-8 space-y-6">
+                {% csrf_token %}
+                <h3 class="text-xl font-black text-slate-800 uppercase tracking-tighter">Movimentação Interna</h3>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 uppercase">Origem (Sair dinheiro)</label>
+                        <select name="from_account" class="w-full mt-1 border-slate-200 rounded-xl text-sm font-bold">
+                            {% for acc in accounts %}
+                            <option value="{{ acc.id }}">{{ acc.name }} ({{ acc.balance }} Kz)</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="flex justify-center -my-2">
+                        <div class="bg-slate-100 p-2 rounded-full border-2 border-white shadow-sm">
+                            <i data-feather="arrow-down" class="w-4 h-4 text-slate-400"></i>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 uppercase">Destino (Entrar dinheiro)</label>
+                        <select name="to_account" class="w-full mt-1 border-slate-200 rounded-xl text-sm font-bold">
+                            {% for acc in accounts %}
+                            <option value="{{ acc.id }}">{{ acc.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 uppercase">Valor da Transferência (AOA)</label>
+                        <input type="number" step="0.01" name="amount" required
+                            class="w-full mt-1 border-slate-200 rounded-xl text-lg font-black text-brand-600 focus:ring-brand-500">
+                    </div>
+                </div>
+
+                <div class="flex gap-3 pt-4">
+                    <button type="button" @click="transferModal = false" class="flex-1 px-6 py-3 border border-slate-200 rounded-xl text-xs font-bold uppercase text-slate-500 hover:bg-slate-50">Cancelar</button>
+                    <button type="submit" class="flex-1 px-6 py-3 bg-slate-900 text-white rounded-xl text-xs font-bold uppercase hover:bg-brand-600">Confirmar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
