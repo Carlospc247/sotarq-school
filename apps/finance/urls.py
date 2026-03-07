@@ -65,6 +65,8 @@ urlpatterns = [
     path('invoices/', views.invoice_list, name='invoice_list'),
     path('invoice/<int:invoice_id>/', views.invoice_detail, name='invoice_detail'),
 
+    path('processar-pagamento-manual/', views.process_manual_payment, name='process_manual_payment'),
+
     # Checkout e Upload de Comprovativo (Portal do Aluno)
     path('upload-proof/<int:invoice_id>/', views_portal.upload_proof, name='upload_proof'),
 ]

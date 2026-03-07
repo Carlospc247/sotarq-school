@@ -29,6 +29,8 @@ class Student(BaseModel):
     current_class = models.ForeignKey('academic.Class', on_delete=models.SET_NULL, null=True, blank=True, related_name='current_students')
     is_active = models.BooleanField(default=True)
 
+    merit_points = models.IntegerField(default=0, verbose_name="Pontos de Mérito Académico")
+    
     is_suspended = models.BooleanField(default=False, help_text="Bloqueia acesso por falta de pagamento")
     
     # ADIÇÃO DE RIGOR PARA FRAUDE:
@@ -83,6 +85,8 @@ class Student(BaseModel):
 
     def __str__(self):
         return f"{self.full_name} ({self.registration_number})"
+
+
 
 class Guardian(BaseModel):
     full_name = models.CharField(max_length=255)

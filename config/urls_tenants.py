@@ -32,7 +32,6 @@ urlpatterns = [
     path('finance/', include('apps.finance.urls')),
     path('saft/', include('apps.saft.urls')),
     path('library/', include('apps.library.urls')),
-    path('cafeteria/', include('apps.cafeteria.urls')),
     path('inventory/', include('apps.inventory.urls')),
     path('reports/', include('apps.reports.urls')),
     path('audit/', include('apps.audit.urls')),

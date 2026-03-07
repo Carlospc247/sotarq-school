@@ -4,7 +4,12 @@
     <div class="mb-10">
         <h1 class="text-3xl font-black text-slate-800 uppercase italic leading-none">Alçada de Orçamentos</h1>
         <p class="text-sm text-slate-500 font-bold uppercase tracking-widest mt-2">Validação Fiscal e Comercial de Proformas (FP)</p>
+        
     </div>
+
+        <a href="{% url 'finance:daily_cash_flow' %}" class="text-sm font-bold text-slate-500 hover:text-slate-800">
+            &larr; Voltar
+        </a>
 
     <div class="grid grid-cols-1 gap-6">
         {% for fp in proformas %}

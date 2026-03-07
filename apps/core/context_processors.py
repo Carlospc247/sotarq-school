@@ -84,3 +84,11 @@ def school_branding(request):
         pass
 
     return context
+
+
+def school_theme(request):
+    # Obtém a configuração (cache amigável para performance)
+    config = SchoolConfiguration.objects.first()
+    return {
+        'school_config': config
+    }

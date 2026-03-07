@@ -4,26 +4,35 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import user_passes_test
 from django.contrib import messages
 from django.db.models import Count, Case, When, IntegerField
+from apps.academic.views import is_manager_check, is_secretary_directors, is_teacher_pedagogic
 from apps.reports.services.kpi_engine import AcademicKPIEngine
+from django.http import JsonResponse
 
+from apps.teachers.models import TeacherSubject
 from .models import ReportDefinition, ReportExecution, ReportCategory
 from apps.academic.models import AcademicYear, Class, StudentGrade
 from django.contrib.admin.views.decorators import staff_member_required
 
 
 # Acesso apenas para Administradores da Escola ou Diretores
-@user_passes_test(lambda u: u.is_staff)
+@user_passes_test(is_manager_check)
 def report_list(request):
     """Lista todos os tipos de relatórios e KPIs disponíveis."""
     categories = ReportCategory.objects.all().prefetch_related('reportdefinition_set')
-    classes = Class.objects.filter(is_active=True)
+    
+    # RIGOR SOTARQ: Busca turmas que não foram deletadas (soft delete) 
+    # e que pertencem ao ano letivo ativo no momento.
+    classes = Class.objects.filter(
+        deleted_at__isnull=True, 
+        academic_year__is_active=True
+    ).order_by('name')
     
     return render(request, 'reports/report_catalog.html', {
         'categories': categories,
         'classes': classes
     })
 
-@user_passes_test(lambda u: u.is_staff)
+@user_passes_test(is_manager_check)
 def execution_history(request):
     """Logs de auditoria de quem gerou o quê e quando."""
     executions = ReportExecution.objects.all().order_by('-started_at')[:50]
@@ -31,7 +40,7 @@ def execution_history(request):
         'executions': executions
     })
 
-@user_passes_test(lambda u: u.is_staff)
+@user_passes_test(is_secretary_directors)
 def trigger_bulk_bulletins(request, class_id):
     """Dispara a tarefa Celery para gerar boletins da turma inteira."""
     klass = get_object_or_404(Class, id=class_id)
@@ -60,30 +69,8 @@ def trigger_bulk_bulletins(request, class_id):
     messages.success(request, f"O processamento para a turma {klass.name} foi iniciado. Pode acompanhar o progresso no histórico.")
     return redirect('reports:execution_history')
 
-@staff_member_required
-def trigger_bulk_bulletins(request, class_id):
-    # 1. Cria o registro de execução para auditoria
-    from .models import ReportDefinition
-    definition = ReportDefinition.objects.get(code='BULK_BULLETIN')
-    
-    execution = ReportExecution.objects.create(
-        report_definition=definition,
-        executed_by=request.user,
-        parameters={'class_id': class_id},
-        status='pending'
-    )
 
-    # 2. Dispara o Celery passando o schema do tenant atual
-    task_bulk_generate_bulletins.delay(
-        request.tenant.schema_name, 
-        execution.id, 
-        class_id
-    )
-
-    messages.success(request, "A geração de 500+ boletins foi iniciada em segundo plano. Poderá consultar os ficheiros no Módulo de Documentos em breve.")
-    return redirect('reports:execution_list')
-
-@staff_member_required
+@user_passes_test(is_teacher_pedagogic)
 def pedagogical_quality_dashboard(request):
     """Dashboard de BI para análise de aproveitamento escolar."""
     current_year = AcademicYear.objects.filter(is_active=True).first()
@@ -116,4 +103,35 @@ def pedagogical_quality_dashboard(request):
         'year': current_year,
         'chart_data': chart_data
     })
+
+
+def search_allocation_ajax(request):
+    class_id = request.GET.get('class_id')
+    if not class_id:
+        return JsonResponse({'error': 'ID da turma não fornecido'}, status=400)
+
+    # Rigor de Segurança: Filtramos pela turma e pelo Tenant do usuário logado
+    query = TeacherSubject.objects.filter(
+        class_room_id=class_id,
+        class_room__academic_year__is_active=True
+    )
+
+    # Se não for gestor/diretor, filtra apenas as disciplinas do próprio professor
+    if not (is_manager_check(request.user) or is_secretary_directors(request.user)):
+        query = query.filter(teacher__user=request.user)
+
+    allocations = query.select_related('subject').values(
+        'id', 
+        'subject__name', 
+        'subject__code'
+    )
+
+    data = [
+        {
+            'id': a['id'], 
+            'name': f"{a['subject__name']} ({a['subject__code']})"
+        } for a in allocations
+    ]
+    
+    return JsonResponse(data, safe=False)
 

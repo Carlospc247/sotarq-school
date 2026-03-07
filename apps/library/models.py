@@ -1,5 +1,6 @@
 # apps/library/models.py
-from datetime import timedelta, timezone
+from datetime import timedelta
+from django.utils import timezone
 from django.db import models
 from apps.core.models import BaseModel, User
 from decimal import Decimal
@@ -49,7 +50,7 @@ class Loan(BaseModel):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.book.title} -> {self.student.full_name}"
+        return f"{self.book.title} -> {self.borrower.get_full_name() or self.borrower.username}"
 
 
 

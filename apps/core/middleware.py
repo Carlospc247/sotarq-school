@@ -3,13 +3,22 @@
 from django.utils import timezone
 from django.shortcuts import redirect, render
 from django.conf import settings
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 from django_tenants.utils import schema_context
+from apps.academic.models import AcademicYear
+from apps.academic.views import is_manager_check
+from apps.finance.apps import FinanceConfig
 from apps.licenses.models import License
 from django.shortcuts import redirect
 from django.http import HttpResponse
 from django_tenants.middleware.main import TenantMainMiddleware
 from django.db import connection
+from django.contrib import messages
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required, user_passes_test
+from apps.academic.models import AcademicYear
+from apps.finance.models import FinanceConfig # Certifique-se que o modelo existe
+from django.urls import reverse
 
 
 
@@ -147,3 +156,44 @@ class SotarqTenantMiddleware(TenantMainMiddleware):
                 "<p>O endereço digitado não corresponde a nenhuma escola ativa em nossa rede.</p>", 
                 status=404
             )
+
+
+class CriticalConfigCheckMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        # 1. Filtro de Elite: Só verifica Staff/Admin logados
+        if request.user.is_authenticated and request.user.is_staff:
+            
+            # 2. Definição de Caminhos Isentos (Prevenção de Loop Infinito)
+            try:
+                wizard_url = reverse('core:setup_wizard')
+            except NoReverseMatch:
+                wizard_url = '/settings/setup/' # Fallback manual
+
+            exempt_paths = [
+                '/admin/',
+                '/logout/',
+                '/static/',
+                '/media/',
+                wizard_url,
+            ]
+
+            # Se o utilizador estiver a navegar em caminhos isentos, deixa passar
+            if any(request.path.startswith(path) for path in exempt_paths):
+                return self.get_response(request)
+
+            # 3. Verificação Rigorosa (Base de Dados)
+            has_year = AcademicYear.objects.filter(is_active=True).exists()
+            has_finance = FinanceConfig.objects.exists()
+
+            # 4. Bloqueio e Redirecionamento
+            if not has_year or not has_finance:
+                # Mensagem de alerta apenas se ainda não estiver no Wizard
+                if request.path != wizard_url:
+                    messages.error(request, "BLOQUEIO DE SEGURANÇA: Configure um Ano Letivo Ativo e as Regras de Multas.")
+                return redirect(wizard_url)
+
+        return self.get_response(request)
+

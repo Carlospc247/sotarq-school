@@ -1,8 +1,7 @@
 # apps/compras/views_story.py
 from django.db import transaction
-from apps.cafeteria.services import WalletService
-from django.shortcuts import get_object_or_404
-from django.http import HttpResponse
+from django.shortcuts import get_object_or_404, redirect
+from django.http import HttpResponse, JsonResponse
 from django.contrib.auth.decorators import login_required
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A6 # Recibos de loja costumam ser menores

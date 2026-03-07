@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto animate-fade-in" x-data="{ 
+    totalDebt: {{ total_debt|stringformat:'.2f' }},
+    discount: 0,
+    installments: 1,
+    get finalValue() { return (this.totalDebt - this.discount).toFixed(2) },
+    get installmentValue() { return (this.finalValue / this.installments).toFixed(2) }
+}">
+    <div class="mb-8">
+        <h1 class="text-3xl font-black text-slate-900 tracking-tight uppercase">Novo Acordo de Dívida</h1>
+        <p class="text-slate-500">Negociação para o aluno: <span class="font-bold text-indigo-600">{{ student.full_name }}</span></p>
+    </div>
+
+    
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div class="lg:col-span-2 space-y-6">
+            <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+                <form method="POST" class="space-y-6">
+                    {% csrf_token %}
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-xs font-black text-slate-400 uppercase mb-2">Desconto (Kz)</label>
+                            <input type="number" name="discount" x-model="discount" 
+                                   class="w-full px-5 py-3 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-black text-slate-400 uppercase mb-2">Nº de Prestações</label>
+                            <select name="installments" x-model="installments" 
+                                    class="w-full px-5 py-3 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700">
+                                <option value="1">Pagamento Único</option>
+                                <option value="2">2 Vezes</option>
+                                <option value="3">3 Vezes</option>
+                                <option value="6">6 Vezes</option>
+                                <option value="10">10 Vezes</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="pt-6 border-t border-slate-100">
+                        <button type="submit" class="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all">
+                            Confirmar Acordo e Gerar Faturas
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="space-y-6">
+            <div class="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl">
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">Resumo do Acordo</p>
+                
+                <div class="space-y-4">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-400 font-medium">Dívida Original:</span>
+                        <span class="font-bold">{{ total_debt|floatformat:2 }} Kz</span>
+                    </div>
+                    <div class="flex justify-between text-sm text-emerald-400">
+                        <span class="font-medium">Desconto:</span>
+                        <span class="font-bold">- <span x-text="discount"></span> Kz</span>
+                    </div>
+                    <div class="pt-4 border-t border-slate-800 flex justify-between items-end">
+                        <span class="text-xs font-black uppercase">Valor Final:</span>
+                        <span class="text-2xl font-black text-indigo-400"><span x-text="finalValue"></span> Kz</span>
+                    </div>
+                </div>
+
+                <div class="mt-8 p-4 bg-white/5 rounded-2xl border border-white/10">
+                    <p class="text-[10px] font-black text-indigo-300 uppercase mb-1">Valor por Prestação</p>
+                    <p class="text-xl font-black text-white"><span x-text="installmentValue"></span> Kz</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

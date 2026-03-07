@@ -7,7 +7,7 @@
     
     <div class="flex flex-col md:flex-row justify-between items-end bg-slate-900 p-8 rounded-[3rem] text-white shadow-2xl gap-6">
         <div>
-            <h1 class="text-3xl font-black uppercase italic leading-none">Sotarq Library</h1>
+            <h1 class="text-3xl font-black uppercase italic leading-none">Biblioteca</h1>
             <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">Gestão Universal (Alunos, Professores & Staff)</p>
         </div>
         <div class="flex flex-wrap gap-3">
@@ -22,6 +22,10 @@
             </button>
             <a href="{% url 'library:export_overdue' %}" class="px-5 py-3 bg-red-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-red-500/20 hover:scale-105 transition-all">
                 <i data-feather="download" class="inline w-3 h-3 mr-1"></i> Relatório Atrasos
+            </a>
+
+            <a href="{% url 'library:book_list' %}" class="px-5 py-3 bg-indigo-900 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-red-500/20 hover:scale-105 transition-all">
+                <i data-feather="book" class="inline w-3 h-3 mr-1"></i> Lista de livros
             </a>
         </div>
     </div>
@@ -39,18 +43,12 @@
             <p class="text-[9px] font-black text-red-400 uppercase tracking-widest">Livros em Atraso</p>
             <h3 class="text-2xl font-black text-red-600">{{ overdue_loans }}</h3>
         </div>
-        <div class="bg-slate-50 p-6 rounded-[2.5rem] border border-slate-200">
-            <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Multas (Mês)</p>
-            <h3 class="text-2xl font-black text-slate-800">{{ monthly_fine_revenue|default:"0.00"|intcomma }} <span class="text-xs text-slate-400">Kz</span></h3>
-        </div>
-    </div>
-
-    <div>
-        <label class="text-[10px] font-black text-slate-400 uppercase italic">Prazo de Empréstimo (Dias)</label>
-        <div class="flex items-center gap-4 mt-2">
-            <input type="number" name="loan_duration" value="7" min="1" 
-                class="w-24 p-4 bg-slate-50 border-none rounded-2xl font-black text-indigo-600">
-            <span class="text-[10px] font-bold text-slate-400 uppercase italic">O sistema calculará o vencimento automaticamente.</span>
+        <div class="bg-emerald-50 p-6 rounded-[2.5rem] border border-emerald-100">
+            <p class="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Mérito Gerado (Mês)</p>
+            <h3 class="text-2xl font-black text-emerald-700">
+                +{{ total_merit_points|default:"0" }} 
+                <span class="text-xs text-emerald-400 uppercase">Pts</span>
+            </h3>
         </div>
     </div>
 
@@ -59,8 +57,8 @@
             <thead class="bg-slate-50 border-b border-slate-100">
                 <tr class="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                     <th class="px-8 py-5 text-indigo-600">Detalhes do Livro</th>
-                    <th class="px-8 py-5">Requisitante (Aluno/Staff)</th>
-                    <th class="px-8 py-5">Cronograma de Entrega</th>
+                    <th class="px-8 py-5">Requisitante (Universal)</th>
+                    <th class="px-8 py-5">Cronograma</th>
                     <th class="px-8 py-5 text-center">Status</th>
                     <th class="px-8 py-5 text-right">Acção</th>
                 </tr>
@@ -75,10 +73,10 @@
                         </div>
                     </td>
                     <td class="px-8 py-5">
-                        <span class="text-xs font-bold text-slate-700 block">{{ loan.borrower.full_name }}</span>
+                        <span class="text-xs font-bold text-slate-700 block">{{ loan.borrower.get_full_name }}</span>
                         <div class="flex items-center gap-2 mt-1">
                             <span class="text-[8px] bg-slate-100 px-2 py-0.5 rounded font-black text-slate-500 uppercase tracking-tighter">
-                                {{ loan.borrower.current_role|default:"UTENTE" }}
+                                {% if loan.borrower.is_staff %}FUNCIONÁRIO{% else %}ALUNO: {{ loan.borrower.username }}{% endif %}
                             </span>
                         </div>
                     </td>
@@ -100,76 +98,199 @@
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="5" class="px-8 py-10 text-center text-slate-400 italic text-sm">Nenhum empréstimo ativo no momento.</td></tr>
+                <tr><td colspan="5" class="px-8 py-10 text-center text-slate-400 italic text-sm">Nenhum empréstimo ativo.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
 
-<div id="bookModal" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-[3rem] w-full max-w-xl overflow-hidden shadow-2xl animate-zoom-in">
-        <div class="bg-slate-900 p-8 text-white flex justify-between items-center">
-            <h3 class="text-xl font-black uppercase italic">Novo Item no Acervo</h3>
-            <button onclick="closeModal('bookModal')"><i data-feather="x" class="w-5 h-5"></i></button>
-        </div>
-        <form method="POST" action="{% url 'library:book_add' %}" class="p-8 space-y-4">
-            {% csrf_token %}
-            <div class="grid grid-cols-2 gap-4">
-                <div class="col-span-2"><input type="text" name="title" placeholder="Título do Livro" class="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold"></div>
-                <input type="text" name="author" placeholder="Autor" class="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold">
-                <input type="text" name="barcode" placeholder="Código de Barras (Scan)" class="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold">
-                <input type="text" name="category" placeholder="Categoria" class="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold">
-                <input type="number" name="total_copies" placeholder="Qtd. Cópias" class="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold">
-            </div>
-            <button type="submit" class="w-full py-5 bg-indigo-600 text-white rounded-3xl font-black uppercase tracking-widest shadow-xl shadow-indigo-100 transition-all hover:bg-indigo-700">Adicionar ao Sistema</button>
-        </form>
-    </div>
-</div>
-
 <div id="loanModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-[3rem] shadow-2xl w-full max-w-lg overflow-hidden animate-zoom-in">
-        <div class="bg-indigo-600 p-8 text-white flex justify-between items-center">
-            <h3 class="text-xl font-black uppercase italic">Scan de Saída</h3>
+        <div class="bg-emerald-600 p-8 text-white flex justify-between items-center">
+            <div>
+                <h3 class="text-xl font-black uppercase italic">Scan de Saída</h3>
+                <p class="text-[9px] font-bold uppercase opacity-70">Rigor SOTARQ: Pesquisa Universal de Utentes</p>
+            </div>
             <button onclick="closeModal('loanModal')"><i data-feather="x" class="w-5 h-5"></i></button>
         </div>
         <form method="POST" action="{% url 'library:register_loan' %}" class="p-8 space-y-6">
             {% csrf_token %}
             <div>
-                <label class="text-[10px] font-black text-slate-400 uppercase italic tracking-widest">Requisitante (Aluno/Staff)</label>
-                <select name="user_id" class="w-full mt-2 p-4 bg-slate-50 border-none rounded-2xl font-bold text-slate-700">
-                    {% for user in utentes_list %}
-                    <option value="{{ user.id }}">{{ user.full_name }} ({{ user.current_role }})</option>
+                <label class="text-[10px] font-black text-slate-400 uppercase italic tracking-widest">Pesquisar Utente (Nome, Processo ou Username)</label>
+                <input type="text" id="userSearchInput" list="utentesList" placeholder="Comece a digitar..." 
+                    class="w-full mt-2 p-4 bg-slate-50 border-none rounded-2xl font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500">
+                
+                <input type="hidden" name="student_id" id="selectedUserId" required>
+                
+                <datalist id="utentesList">
+                    {% for utente in utentes_list %}
+                    <option data-id="{{ utente.id }}" value="{{ utente.get_full_name }} | {% if utente.is_staff %}STAFF{% else %}ID: {{ utente.username }}{% endif %}">
                     {% endfor %}
-                </select>
+                </datalist>
+                <p id="userFeedback" class="text-[9px] font-bold text-slate-400 mt-2 italic uppercase tracking-tighter">Aguardando seleção válida...</p>
             </div>
+
             <div>
                 <label class="text-[10px] font-black text-slate-400 uppercase italic tracking-widest">Código do Livro (Barcode)</label>
-                <input type="text" name="barcode" id="barcodeInput" class="w-full mt-2 p-4 bg-slate-50 border-none rounded-2xl font-bold text-indigo-600" placeholder="Passe o leitor de código de barras...">
+                <input type="text" name="barcode" id="barcodeInput" required
+                    class="w-full mt-2 p-4 bg-slate-50 border-none rounded-2xl font-bold text-emerald-600" 
+                    placeholder="Passe o scanner aqui...">
+                <p id="scanFeedback" class="text-[9px] font-bold text-slate-400 mt-2 italic uppercase">Aguardando leitura do exemplar...</p>
             </div>
-            <button type="submit" class="w-full py-5 bg-slate-900 text-white rounded-3xl font-black uppercase tracking-widest shadow-xl hover:bg-black transition-all">Confirmar Empréstimo</button>
+
+            <button type="submit" class="w-full py-5 bg-slate-900 text-white rounded-3xl font-black uppercase tracking-widest shadow-xl hover:bg-black transition-all">
+                Finalizar Requisição
+            </button>
+        </form>
+    </div>
+</div>
+<div id="bookModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-[3rem] shadow-2xl w-full max-w-lg overflow-hidden animate-zoom-in">
+        <div class="bg-slate-900 p-8 text-white flex justify-between items-center">
+            <div>
+                <h3 class="text-xl font-black uppercase italic">Novo Item no Acervo</h3>
+                <p class="text-[9px] font-bold uppercase opacity-70">Rigor SOTARQ: Registo de Património Escolar</p>
+            </div>
+            <button onclick="closeModal('bookModal')"><i data-feather="x" class="w-5 h-5"></i></button>
+        </div>
+        <form method="POST" action="{% url 'library:book_add' %}" class="p-8 space-y-4">
+            {% csrf_token %}
+            <div class="grid grid-cols-1 gap-4">
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Título do Livro</label>
+                    <input type="text" name="title" required class="w-full mt-1 p-3 bg-slate-50 border-none rounded-xl font-bold">
+                </div>
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Autor/Editora</label>
+                    <input type="text" name="author" required class="w-full mt-1 p-3 bg-slate-50 border-none rounded-xl font-bold">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Código (Barcode)</label>
+                        <input type="text" name="barcode" required class="w-full mt-1 p-3 bg-slate-50 border-none rounded-xl font-bold text-indigo-600">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Quantidade</label>
+                        <input type="number" name="total_copies" value="1" min="1" required class="w-full mt-1 p-3 bg-slate-50 border-none rounded-xl font-bold">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Categoria</label>
+                    <select name="category" class="w-full mt-1 p-3 bg-slate-50 border-none rounded-xl font-bold">
+                        <option value="Didático">Didático</option>
+                        <option value="Literatura">Literatura</option>
+                        <option value="Técnico">Técnico</option>
+                        <option value="Outros">Outros</option>
+                    </select>
+                </div>
+            </div>
+            <button type="submit" class="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg hover:bg-indigo-700 transition-all mt-4">
+                Confirmar Cadastro
+            </button>
+        </form>
+    </div>
+</div>
+
+<div id="importModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-[3rem] shadow-2xl w-full max-w-md overflow-hidden">
+        <div class="bg-indigo-600 p-8 text-white flex justify-between items-center">
+            <h3 class="text-xl font-black uppercase italic">Carga de Dados</h3>
+            <button onclick="closeModal('importModal')"><i data-feather="x" class="w-5 h-5"></i></button>
+        </div>
+        <form method="POST" action="{% url 'library:import_books' %}" enctype="multipart/form-data" class="p-8 space-y-6 text-center">
+            {% csrf_token %}
+            <div class="border-2 border-dashed border-slate-200 rounded-2xl p-8">
+                <i data-feather="file-text" class="w-12 h-12 mx-auto text-slate-300 mb-4"></i>
+                <input type="file" name="excel_file" class="hidden" id="excelInput" required>
+                <label for="excelInput" class="cursor-pointer text-indigo-600 font-bold hover:underline">Clique para selecionar o Excel</label>
+            </div>
+            <a href="{% url 'library:download_template' %}" class="text-[10px] font-black text-slate-400 uppercase hover:text-indigo-600">Download do Modelo SOTARQ</a>
+            <button type="submit" class="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest">Processar Arquivo</button>
         </form>
     </div>
 </div>
 
 <script>
+    function openModal(id) {
+        document.getElementById(id).classList.remove('hidden');
+        // Melhoria de Fluxo SOTARQ
+        if(id === 'loanModal') {
+            setTimeout(() => { document.getElementById('userSearchInput').focus(); }, 200);
+        } else if(id === 'bookModal') {
+            setTimeout(() => { document.getElementsByName('title')[0].focus(); }, 200);
+        }
+    }
+
+    // Listener para feedback visual no Importar Excel
+    document.getElementById('excelInput')?.addEventListener('change', function() {
+        const fileName = this.files[0]?.name;
+        if(fileName) {
+            const label = this.nextElementSibling;
+            label.innerText = "✓ ARQUIVO: " + fileName;
+            label.classList.add('text-emerald-600');
+        }
+    });
+
+    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+    // LÓGICA DE AUTOCOMPLETE UNIVERSAL
+    const userInput = document.getElementById('userSearchInput');
+    const hiddenIdInput = document.getElementById('selectedUserId');
+    const userFeedback = document.getElementById('userFeedback');
+    const dataList = document.getElementById('utentesList');
+
+    userInput.addEventListener('input', function() {
+        const val = this.value;
+        const options = dataList.options;
+        let found = false;
+
+        for (let i = 0; i < options.length; i++) {
+            if (options[i].value === val) {
+                const userId = options[i].getAttribute('data-id');
+                hiddenIdInput.value = userId;
+                userFeedback.innerText = "✓ UTENTE IDENTIFICADO COM SUCESSO";
+                userFeedback.className = "text-[9px] font-bold text-emerald-500 mt-2 italic uppercase";
+                document.getElementById('barcodeInput').focus();
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            hiddenIdInput.value = "";
+            userFeedback.innerText = "Pesquisando na base de dados universal...";
+            userFeedback.className = "text-[9px] font-bold text-slate-400 mt-2 italic uppercase";
+        }
+    });
+
+    // Feedback do Scanner
+    const barcodeInput = document.getElementById('barcodeInput');
+    const scanFeedback = document.getElementById('scanFeedback');
+    barcodeInput.addEventListener('input', function() {
+        if(this.value.length > 5) {
+            scanFeedback.innerText = "✓ LIVRO DETECTADO: " + this.value;
+            scanFeedback.className = "text-[9px] font-bold text-emerald-500 mt-2 italic uppercase";
+        }
+    });
+
     function confirmReturn(id, title) {
-        if(confirm(`🛡️ SOTARQ AUDIT: Confirmar a devolução física do livro: ${title}?`)) {
+        if(confirm(`🛡️ AUDITORIA SOTARQ: Confirmar recepção de "${title}"?`)) {
             window.location.href = `/library/return/${id}/`;
         }
     }
-    
-    function openModal(id) {
-        document.getElementById(id).classList.remove('hidden');
-        if(id === 'loanModal') {
-            setTimeout(() => document.getElementById('barcodeInput').focus(), 150);
-        }
-    }
-
-    function closeModal(id) {
-        document.getElementById(id).classList.add('hidden');
-    }
 
     document.addEventListener('DOMContentLoaded', () => { feather.replace(); });
+
+    // Adicione isto dentro do seu <script> para travar envios inválidos
+    document.querySelector('form[action*="register_loan"]').addEventListener('submit', function(e) {
+        const userId = document.getElementById('selectedUserId').value;
+        const barcode = document.getElementById('barcodeInput').value;
+
+        if (!userId || !barcode) {
+            e.preventDefault(); // Bloqueia o envio
+            alert("⚠️ RIGOR SOTARQ: Seleção de Utente ou Livro inválida. Verifique os campos.");
+            if(!userId) document.getElementById('userSearchInput').focus();
+        }
+    });
 </script>
 {% endblock %}

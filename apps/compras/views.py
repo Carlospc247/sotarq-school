@@ -1,7 +1,7 @@
 # apps/compras/views.py
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.db import transaction
+from django.db import models, transaction
 from django.contrib import messages
 from .models import Product, Purchase
 from .forms import PurchaseForm, PurchaseItemFormSet

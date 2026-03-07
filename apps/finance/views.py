@@ -7,8 +7,8 @@ from django.utils import timezone
 from django.http import HttpResponse, HttpResponseForbidden # CORREÇÃO AQUI
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
 
-#from apps.finance.utils import SOTARQExporter
 from apps.finance.utils.pdf_generator import SOTARQExporter
 from apps.fiscal.models import DocumentoFiscal
 
@@ -27,22 +27,29 @@ from django.utils import timezone
 from datetime import timedelta
 from .models import Payment, Invoice # Assumindo que você registrará despesas também
 
+from django.shortcuts import render
+from django.utils import timezone
+from django.db.models import Sum
+from django.db.models.functions import TruncDay
+from datetime import timedelta
+from django.contrib.auth.decorators import login_required
+from .models import Payment, Invoice, FeeType, CashSession, Student
+
+
+@login_required
 def finance_dashboard(request):
-    """Gera os dados para o gráfico de barras e indicadores de saúde financeira."""
+    """Dash principal: Gráficos de 30 dias + Operações de Caixa + Produtos Rápidos."""
     today = timezone.now().date()
     thirty_days_ago = today - timedelta(days=30)
 
-    # 1. Dados de Entradas (Pagamentos validados)
+    # --- 1. Lógica Analítica (Chart.js) ---
     income_data = Payment.objects.filter(
         validation_status='validated',
         confirmed_at__date__gte=thirty_days_ago
     ).annotate(day=TruncDay('confirmed_at')).values('day').annotate(total=Sum('amount')).order_by('day')
 
-    # 2. Preparação para o Chart.js (Labels e Valores)
     labels = []
     income_values = []
-    
-    # Criamos um dicionário para mapear datas e evitar buracos no gráfico
     income_dict = {item['day'].date(): float(item['total']) for item in income_data}
     
     for i in range(30):
@@ -50,14 +57,90 @@ def finance_dashboard(request):
         labels.append(current_day.strftime('%d/%m'))
         income_values.append(income_dict.get(current_day, 0))
 
+    # --- 2. Lógica Operacional (Caixa e PDV) ---
+    # Busca sessão ativa do usuário atual (Multi-tenant)
+    active_session = CashSession.objects.filter(operator=request.user, status='open').first()
+    
+    # Produtos rápidos para o balcão
+    #quick_products = FeeType.objects.filter(
+    #    category__in=[FeeCategory.PRODUCT, FeeCategory.SERVICE]
+    #).order_by('name')[:5]
+
+    # Todos os produtos para o select do modal
+    all_products = FeeType.objects.all()
+    all_students = Student.objects.filter(is_active=True)
+
     context = {
+        # Analítico
         'labels': labels,
         'income_values': income_values,
         'total_income_month': sum(income_values),
         'pending_invoices_count': Invoice.objects.filter(status='pending').count(),
+        
+        # Operacional
+        'active_cash_session': active_session,
+        #'quick_products': quick_products,
+        'products': all_products,
+        'students': all_students,
+        'pending_validations': Payment.objects.filter(validation_status='pending'),
+        'cash_total': active_session.current_balance if active_session else 0,
     }
     return render(request, 'finance/dashboard.html', context)
 
+
+
+@login_required
+@transaction.atomic
+def process_manual_payment(request):
+    """
+    Processo Atómico SOTARQ: Cria Fatura + Regista Pagamento + Valida na Sessão.
+    Elimina 3 passos manuais do operador.
+    """
+    if request.method != "POST":
+        return redirect('finance:secretary_dashboard')
+
+    student_id = request.POST.get('student_id')
+    fee_type_id = request.POST.get('fee_type_id')
+    method_type = request.POST.get('payment_method') # CASH ou TPA
+
+    # Verificação de Segurança: Existe caixa aberto?
+    session = CashSession.objects.filter(user=request.user, status='open').last()
+    if not session:
+        messages.error(request, "ERRO CRÍTICO: Não pode receber valores sem uma Sessão de Caixa aberta.")
+        return redirect('finance:secretary_dashboard')
+
+    try:
+        # 1. Recuperar o tipo de taxa (Preço definido pelo Diretor/Admin)
+        fee = FeeType.objects.get(id=fee_type_id)
+        
+        # 2. Gerar a Invoice (Fatura) - Estado 'paid' diretamente
+        invoice = Invoice.objects.create(
+            student_id=student_id,
+            fee_type=fee,
+            amount=fee.amount,
+            status='paid', # Já nasce paga por ser presencial
+            created_by=request.user
+        )
+
+        # 3. Gerar o Payment (O registro financeiro)
+        # O rigor aqui é o validation_status='validated' imediato
+        payment = Payment.objects.create(
+            invoice=invoice,
+            amount=fee.amount,
+            method_type=method_type,
+            validation_status='validated',
+            confirmed_by=request.user,
+            confirmed_at=timezone.now(),
+            cash_session=session # Vinculamos ao turno atual para o saldo bater
+        )
+
+        messages.success(request, f"Recebimento de {fee.name} (KZ {fee.amount}) processado com sucesso!")
+        
+    except Exception as e:
+        messages.error(request, f"Falha na operação: {str(e)}")
+        # O transaction.atomic fará o rollback de tudo se algo falhar aqui
+
+    return redirect('finance:secretary_dashboard')
 
 
 def checkout_invoice(request, invoice_id):
@@ -172,7 +255,6 @@ def imprimir_documento_fiscal(request, doc_id):
     return response
 
 
-# apps/finance/views.py
 
 @login_required
 def invoice_list(request):

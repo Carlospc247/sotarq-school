@@ -127,7 +127,7 @@
                     </button>
                 </div>
                 
-                <input type="hidden" name="site_info_cards" :value="JSON.stringify(cards)">
+                <input type="hidden" name="site_info_cards" id="id_site_info_cards" :value="JSON.stringify(cards)">
 
                 <div class="grid grid-cols-1 gap-4">
                     <template x-for="(card, index) in cards" :key="index">
@@ -225,6 +225,8 @@
             <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center border-b pb-2">
                 <i data-feather="briefcase" class="w-5 h-5 mr-2 text-brand-600"></i> Informações Legais & Financeiras
             </h3>
+
+            
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <label class="block text-xs font-bold text-slate-500 uppercase mb-2">NIF</label>
@@ -239,6 +241,11 @@
                     {{ form.iban_primary }}
                 </div>
             </div>
+        </div>
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-emerald-500">
+            <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center border-b pb-2">
+                <i data-feather="file-text" class="w-5 h-5 mr-2 text-emerald-600"></i> Gestão de Contabilidade (SAF-T)
+            </h3>
         </div>
 
         <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
@@ -374,28 +381,32 @@
     </form>
 </div>
 
+
+<input type="hidden" name="site_info_cards" id="id_site_info_cards" :value="JSON.stringify(cards)">
+
 <script>
     document.addEventListener('alpine:init', () => {
         Alpine.data('schoolSettings', () => ({
-            // Carrega o JSON do backend ou inicia array vazio
-            cards: {{ form.instance.site_info_cards|default:"[]"|safe }},
+            // 1. Rigor na carga inicial: evita erro de parse se o campo vier vazio
+            cards: {% if form.instance.site_info_cards %}{{ form.instance.site_info_cards|safe }}{% else %}[]{% endif %},
             
             addCard() {
                 this.cards.push({ title: '', icon: 'star', content: '' });
-                // Re-renderiza ícones após adicionar elemento ao DOM
                 this.$nextTick(() => feather.replace());
             },
             removeCard(index) {
                 this.cards.splice(index, 1);
             },
-            prepareSubmit() {
-                // Alpine atualiza automaticamente o input hidden vinculado
-                // através do atributo :value="JSON.stringify(cards)"
+            prepareSubmit(e) {
+                // Força a atualização do valor antes do Django receber o POST
+                const hiddenInput = document.getElementById('id_site_info_cards');
+                hiddenInput.value = JSON.stringify(this.cards);
+                console.log("SOTARQ LOG: Dados dos cards serializados com sucesso.");
             }
         }))
     });
-    
-    // Inicialização dos ícones ao carregar a página
-    feather.replace();
+
+   // Inicialização dos ícones ao carregar a página
+    feather.replace(); 
 </script>
 {% endblock %}

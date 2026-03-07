@@ -6,7 +6,7 @@ from django.db import transaction, models
 from apps.academic.views import is_manager_check
 from apps.core.models import Role
 from apps.finance.services import RiskAnalysisService
-from .models import Invoice, InvoiceItem, Payment, ServiceProvider
+from .models import Invoice, InvoiceItem, Payment
 from django.db.models import Sum, Count, F
 from django.utils import timezone
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
@@ -17,6 +17,10 @@ from django.contrib.auth.decorators import login_required, user_passes_test, per
 
 
 
+
+# Certifique-se de que a função is_manager_check esteja definida ou importada
+def is_manager_check(user):
+    return user.is_authenticated and (user.is_staff or hasattr(user, 'role'))
 
 
 @login_required
@@ -63,46 +67,60 @@ def mass_whatsapp_promotion_alert(request):
 
 
 
+# Função de verificação de permissão (Manager/Admin)
+def is_manager_check(user):
+    return user.is_authenticated and (user.is_staff or hasattr(user, 'role'))
+
 @login_required
 @user_passes_test(is_manager_check)
 def finance_bi_monthly_data(request):
     """
-    Motor de Inteligência de Negócio SOTARQ.
-    Gera indicadores de performance financeira (KPIs) para o mês corrente.
+    Motor de BI SOTARQ corrigido e isolado por Tenant.
+    Alimenta o gráfico de rosca (Distribuição por Curso).
     """
+    tenant = request.user.tenant # RIGOR: Filtro de segurança primário
     hoje = timezone.now()
-    inicio_mes = hoje.replace(day=1, hour=0, minute=0, second=0)
+    inicio_mes = hoje.replace(day=1)
     
-    # 1. Filtro Base (Rigor Tenant e Tipos Fiscais Reais)
+    # 1. Filtro Base (Somente dados desta Escola e deste Mês)
+    # Filtramos por FT (Fatura) e FR (Fatura-Recibo) conforme padrão AGT
     invoices_reais = Invoice.objects.filter(
-        student__user__tenant=request.user.tenant,
-        created_at__gte=inicio_mes,
-        doc_type__in=['FT', 'FR'] # Exclui FP (Proformas)
-    )
+        student__user__tenant=tenant,
+        issue_date__gte=inicio_mes.date(),
+        doc_type__in=['FT', 'FR']
+    ).exclude(status='cancelled') # Rigor: Faturas canceladas não entram no BI
 
     # 2. KPIs de Topo
-    faturamento_total = invoices_reais.aggregate(total=Sum('total_amount'))['total'] or 0
-    recebido = invoices_reais.filter(status='paid').aggregate(total=Sum('total_amount'))['total'] or 0
+    # Usamos aggregate direto no queryset filtrado por tenant
+    faturamento_total = invoices_reais.aggregate(res=Sum('total'))['res'] or Decimal('0.00')
+    recebido = invoices_reais.filter(status='paid').aggregate(res=Sum('total'))['res'] or Decimal('0.00')
     pendente = faturamento_total - recebido
 
-    # 3. Distribuição por Curso (Dados para o Gráfico de Pizza)
-    # Agrupamos por curso através da matrícula do aluno
+    # 3. Distribuição por Curso (Rigor: Evitando duplicados via Distinct)
+    # Agrupamos pelo nome do curso associado à matrícula do aluno
     distribuicao_cursos = (
         invoices_reais.values('student__enrollments__course__name')
-        .annotate(valor=Sum('total_amount'))
+        .annotate(valor=Sum('total'))
         .order_by('-valor')
     )
 
+    # 4. Construção do JSON de Resposta
     data = {
         'kpis': {
             'faturamento': float(faturamento_total),
             'recebido': float(recebido),
             'pendente': float(pendente),
-            'taxa_cobratória': round((recebido / faturamento_total * 100), 2) if faturamento_total > 0 else 0
+            'taxa_cobratória': round((float(recebido) / float(faturamento_total) * 100), 2) if faturamento_total > 0 else 0
         },
         'chart_data': {
-            'labels': [item['student__enrollments__course__name'] for item in distribuicao_cursos if item['student__enrollments__course__name']],
-            'values': [float(item['valor']) for item in distribuicao_cursos if item['student__enrollments__course__name']]
+            'labels': [
+                item['student__enrollments__course__name'] or "Sem Curso" 
+                for item in distribuicao_cursos
+            ],
+            'values': [
+                float(item['valor']) 
+                for item in distribuicao_cursos
+            ]
         }
     }
 
@@ -125,7 +143,7 @@ def financial_overview(request):
     # 4. TOP 10 DEVEDORES (Ranking Crítico)
     top_debtors = Student.objects.filter(invoices__status='overdue') \
         .annotate(debt=Sum('invoices__total')) \
-        .order_by('-debt')[:10]
+        .order_by('-debt')[:100]
 
     return render(request, 'finance/admin/overview.html', {
         'prevista': prevista,
@@ -259,39 +277,46 @@ def apply_budget_discount(request, proforma_id):
     return redirect('finance:budget_approval_list')
 
 
-# apps/finance/views_admin.py
-from django.db.models import Sum
-from .models import Payment, PaymentMethod
+
 
 @login_required
 @user_passes_test(is_manager_check)
 def finance_bi_payment_methods(request):
     """
     Motor SOTARQ BI: Análise de Canais de Recebimento.
-    Compara o volume financeiro entre Cash, Multicaixa, Transferência, etc.
+    Unificado: Compara volume financeiro por método (Cash, TPA, etc) com rigor de Tenant.
     """
+    tenant = request.user.tenant
     hoje = timezone.now()
     
-    # 1. Agrupamento por Modalidade (Apenas pagamentos validados no mês)
+    # 1. Agrupamento por Modalidade (Rigor: Filtro de Mês, Ano e Tenant)
+    # Nota: Usamos 'method__name' assumindo que Payment tem uma ForeignKey para PaymentMethod
     stats_metodos = (
         Payment.objects.filter(
-            invoice__student__user__tenant=request.user.tenant,
+            invoice__student__user__tenant=tenant,
             validation_status='validated',
             confirmed_at__month=hoje.month,
             confirmed_at__year=hoje.year
         )
-        .values('method__name')
+        .values('method__name') # Acessa o nome legível (ex: "Multicaixa")
         .annotate(total=Sum('amount'))
         .order_by('-total')
     )
 
+    # 2. Formatação dos dados para o Chart.js
+    # Se o método for nulo, usamos "Outros" para evitar que o gráfico quebre
     data = {
-        'labels': [item['method__name'] for item in stats_metodos],
-        'values': [float(item['total']) for item in stats_metodos],
+        'labels': [
+            (item['method__name'] or "OUTROS").upper() 
+            for item in stats_metodos
+        ],
+        'values': [
+            float(item['total']) 
+            for item in stats_metodos
+        ],
     }
 
     return JsonResponse(data)
-
 
 
 @login_required

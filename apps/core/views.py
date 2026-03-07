@@ -8,7 +8,7 @@ from django.db import connections
 from django.db import transaction
 from django.contrib.auth.views import LoginView
 from django.shortcuts import resolve_url
-from apps.cafeteria.services import CafeteriaInventoryService
+
 from apps.core.views_admin import is_manager_check
 from apps.academic.models import Course
 from apps.fiscal.models import DocumentoCanceladoAudit, DocumentoFiscal
@@ -78,7 +78,6 @@ def check_new_notifications(request):
         'latest': latest
     })
 
-
 ########################################
 # Área do site institucional
 ########################################
@@ -115,31 +114,52 @@ def public_contact(request):
 
 
 
+
+
 @login_required
 def school_configuration_update(request):
     """
     Painel onde o Diretor edita a aparência e configurações da escola.
     """
-    # Apenas Diretor/Admin
+    # 1. Rigor de Acesso: Apenas Diretor/Admin
     if request.user.current_role not in [Role.Type.ADMIN, Role.Type.DIRECTOR]:
         return redirect('core:dashboard')
 
-    # Garante que existe uma configuração
-    config, created = SchoolConfiguration.objects.get_or_create(id=1) # Assume single-tenant logic per schema
+    # 2. Multi-tenant Check (Importante para SOTARQ SCHOOL)
+    # Nota: Usei filter().first() para evitar 500 se o DB estiver vazio
+    config = SchoolConfiguration.objects.first() 
+    if not config:
+        config = SchoolConfiguration.objects.create(school_name="Minha Escola")
 
     if request.method == 'POST':
         form = SchoolSettingsForm(request.POST, request.FILES, instance=config)
+        
         if form.is_valid():
+            # --- PROCESSAMENTO DOS CARDS (AlpineJS JSON) ---
+            # Pegamos o valor do campo hidden preenchido pelo AlpineJS
+            cards_json = request.POST.get('site_info_cards')
+            
+            if cards_json:
+                try:
+                    # Validamos e convertemos para lista Python antes de salvar
+                    config.site_info_cards = json.loads(cards_json)
+                except json.JSONDecodeError:
+                    messages.error(request, "Erro ao processar os cards informativos.")
+            
+            # Salvamos a instância e o formulário
             form.save()
-            # Feedback visual de sucesso
-            from django.contrib import messages
-            messages.success(request, "Configurações da escola atualizadas com sucesso!")
+            
+            messages.success(request, "Configurações da SOTARQ SCHOOL atualizadas com sucesso!")
             return redirect('core:school_settings')
+        else:
+            messages.error(request, "Erro na validação. Verifique os campos vermelhos.")
     else:
         form = SchoolSettingsForm(instance=config)
 
-    return render(request, 'core/settings/school_settings.html', {'form': form})
-
+    return render(request, 'core/settings/school_settings.html', {
+        'form': form,
+        'config': config # Passamos o config para facilitar acesso a imagens no template
+    })
 
 
 
@@ -183,9 +203,6 @@ def dashboard(request):
 
     valuation = AssetManager.get_patrimony_valuation() 
     
-    # Busca dados da App Cafeteria
-    total_inventory_cost = CafeteriaInventoryService.get_total_cost()
-    critical_items_count = CafeteriaInventoryService.check_stock_alerts().count()
 
     context = {
         'page_title': 'Análise Executiva SOTARQ',
@@ -202,8 +219,6 @@ def dashboard(request):
             int(Invoice.objects.filter(status='pending').count()),
         ]),
         'valuation': valuation, # Dicionário com purchase_value e total_depreciation
-        'total_inventory_cost': total_inventory_cost,
-        'critical_items_count': critical_items_count,
     }
     return render(request, 'core/dashboard.html', context)
 
@@ -301,7 +316,7 @@ def user_management_list(request):
     Filtra para mostrar apenas staff relevante (Admin, Diretor, Professor, Secretaria).
     """
     # Roles que devem aparecer na lista (exclui alunos/encarregados para limpeza visual)
-    staff_roles = ['ADMIN', 'DIRECTOR', 'TEACHER', 'SECRETARY']
+    staff_roles = ['ADMIN', 'DIRECTOR', 'TEACHER', 'SECRETARY', 'ACCOUNTANT', 'RH']
     
     # Captura filtros da URL (Query Params)
     search_query = request.GET.get('q', '')
@@ -379,6 +394,7 @@ def user_add(request):
         'title': 'Novo Funcionário'
     })
 
+
 @login_required
 @user_passes_test(is_manager_check, login_url='/', redirect_field_name=None)
 def user_edit(request, user_id):
@@ -423,27 +439,27 @@ def user_edit(request, user_id):
 @user_passes_test(is_manager_check, login_url='/')
 def user_export_excel(request):
     """
-    Exporta lista de usuários em formato Excel Nativo (.xlsx) com formatação Enterprise.
+    Exporta lista de usuários SOTARQ com suporte a TODOS os Roles definidos.
     """
-    # 1. Configuração do Workbook e Worksheet
     response = HttpResponse(
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )
-    response['Content-Disposition'] = 'attachment; filename="Relatorio_Staff_SOTARQ.xlsx"'
+    response['Content-Disposition'] = f'attachment; filename="Staff_SOTARQ_{timezone.now().strftime("%Y%m%d")}.xlsx"'
 
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Funcionários"
 
-    # 2. Reaplica os filtros (Mesma lógica segura do CSV)
-    staff_roles = ['ADMIN', 'DIRECTOR', 'TEACHER', 'SECRETARY']
+    # Captura todos os códigos de Role definidos no seu TextChoices para garantir abrangência total
+    all_staff_roles = [choice[0] for choice in Role.Type.choices]
+    
     search_query = request.GET.get('q', '')
     role_filter = request.GET.get('role', '')
 
     users = User.objects.filter(
         tenant=request.user.tenant,
-        current_role__in=staff_roles
-    ).select_related('teacher_profile').order_by('-date_joined')
+        current_role__in=all_staff_roles # Agora inclui de ADMIN a CUSTOM
+    ).select_related('teacher_profile').order_by('current_role', '-date_joined')
 
     if search_query:
         users = users.filter(
@@ -456,63 +472,50 @@ def user_export_excel(request):
     if role_filter:
         users = users.filter(current_role=role_filter)
 
-    # 3. Definição do Cabeçalho e Estilos
     headers = [
         'ID', 'Username', 'Nome Completo', 'Email Institucional', 
         'Função (Role)', 'Nº Funcionário', 'Grau Académico', 
         'Status', 'Data Cadastro'
     ]
     
-    # Estilo do Cabeçalho: Fundo Azul (Brand Color), Texto Branco, Negrito
+    # Estilo SOTARQ (Primary Blue: 4F46E5)
+    header_fill = PatternFill("solid", fgColor="4F46E5")
     header_font = Font(bold=True, color="FFFFFF")
-    header_fill = PatternFill("solid", fgColor="4F46E5") # Cor Primary do seu CSS
-    alignment_center = Alignment(horizontal="center", vertical="center")
     
     ws.append(headers)
-
     for col_num, header in enumerate(headers, 1):
         cell = ws.cell(row=1, column=col_num)
         cell.font = header_font
         cell.fill = header_fill
-        cell.alignment = alignment_center
 
-    # 4. Preenchimento dos Dados
     for user in users:
-        # Recupera dados do professor de forma segura
         emp_num = "N/A"
         degree = "N/A"
         
-        # Verifica se é professor e tem perfil
-        if user.current_role == 'TEACHER' and hasattr(user, 'teacher_profile'):
+        # Rigor: Apenas se o perfil de professor existir de fato
+        if hasattr(user, 'teacher_profile') and user.teacher_profile:
             emp_num = user.teacher_profile.employee_number
             degree = user.teacher_profile.academic_degree
         
-        status = "Ativo" if user.is_active else "Inativo"
-        date_joined = user.date_joined.strftime('%d/%m/%Y') if user.date_joined else ""
-
-        row = [
+        ws.append([
             user.id,
             user.username,
             user.get_full_name(),
             user.email,
-            user.get_current_role_display(),
+            user.get_current_role_display(), # Usa o label amigável (ex: 'Diretor Geral')
             emp_num,
             degree,
-            status,
-            date_joined
-        ]
-        ws.append(row)
+            "Ativo" if user.is_active else "Inativo",
+            user.date_joined.strftime('%d/%m/%Y') if user.date_joined else ""
+        ])
 
-    # 5. Ajuste Automático da Largura das Colunas
+    # Auto-ajuste de colunas
     for column_cells in ws.columns:
         length = max(len(str(cell.value) or "") for cell in column_cells)
-        col_letter = get_column_letter(column_cells[0].column)
-        ws.column_dimensions[col_letter].width = length + 4 # +4 para respiro visual
+        ws.column_dimensions[get_column_letter(column_cells[0].column)].width = length + 2
 
-    # Salva o arquivo na resposta HTTP
     wb.save(response)
     return response
-
 
 
 
@@ -588,140 +591,99 @@ def user_download_import_template(request):
 @login_required
 @user_passes_test(is_manager_check, login_url='/')
 def user_import_bulk(request):
-    """
-    Importação em massa de usuários via Excel (.xlsx).
-    Utiliza transações atômicas para garantir a integridade dos dados relacionais.
-    """
     if request.method == 'POST':
         form = UserImportForm(request.POST, request.FILES)
         if form.is_valid():
             excel_file = request.FILES['file']
-            
             try:
-                # Carrega o workbook. data_only=True garante que pegamos o valor e não fórmulas.
                 wb = openpyxl.load_workbook(excel_file, data_only=True)
-                ws = wb.active # Pega a primeira aba
-                
-                # Conversão das linhas para lista para facilitar manipulação
+                ws = wb.active
                 rows = list(ws.iter_rows(values_only=True))
                 
-                if not rows:
-                    messages.error(request, "O arquivo está vazio.")
+                if len(rows) < 2:
+                    messages.error(request, "O arquivo não contém dados para importação.")
                     return redirect('core:user_import')
 
-                # Cabeçalho (Primeira linha) - Normaliza para lower case para mapeamento seguro
                 header_row = [str(cell).strip().lower() for cell in rows[0] if cell is not None]
-                
-                # Mapa de colunas obrigatórias
-                required_cols = ['username', 'email', 'role']
-                
-                # Validação de Cabeçalho
-                missing_cols = [col for col in required_cols if col not in header_row]
-                if missing_cols:
-                    messages.error(request, f"Colunas obrigatórias ausentes: {', '.join(missing_cols)}")
-                    return redirect('core:user_import')
-
-                # Mapeia o índice de cada coluna (ex: 'email' está na coluna 3)
                 col_map = {name: index for index, name in enumerate(header_row)}
-
-                # Limite de segurança enterprise (excluindo cabeçalho)
-                # Limite de importação simultânea
-                data_rows = rows[1:]
-                if len(data_rows) > 500:
-                    messages.error(request, "O arquivo excede o limite de 500 registros por vez.")
-                    return redirect('core:user_import')
-
+                
+                # Validação dinâmica de Roles baseada no seu TextChoices
+                allowed_roles = Role.Type.values # Pega ['ADMIN', 'DIRECTOR', 'TEACHER', ...]
+                
                 success_count = 0
                 errors = []
 
-                for row_idx, row in enumerate(data_rows, start=2): # start=2 pois linha 1 é cabeçalho
-                    # Função auxiliar segura para pegar valor da célula pelo nome da coluna
-                    def get_val(col_name):
-                        if col_name in col_map and col_map[col_name] < len(row):
-                            val = row[col_map[col_name]]
-                            return str(val).strip() if val is not None else ''
-                        return ''
+                with transaction.atomic():
+                    for row_idx, row in enumerate(rows[1:], start=2):
+                        def get_val(col_name):
+                            idx = col_map.get(col_name)
+                            if idx is not None and idx < len(row):
+                                val = row[idx]
+                                return str(val).strip() if val is not None else ''
+                            return ''
 
-                    try:
-                        # Extração de dados usando o mapa
-                        username = get_val('username')
-                        email = get_val('email')
-                        role_code = get_val('role').upper()
-                        first_name = get_val('first_name')
-                        last_name = get_val('last_name')
-                        
-                        # Pula linhas vazias (comum em Excel)
-                        if not username and not email:
-                            continue
+                        try:
+                            username = get_val('username')
+                            email = get_val('email')
+                            role_code = get_val('role').upper()
 
-                        # Validação de Dados Básicos
-                        if not username or not email or role_code not in ['TEACHER', 'SECRETARY']:
-                            raise ValueError(f"Dados obrigatórios ausentes ou Role inválido (Use TEACHER ou SECRETARY).")
+                            if not username: continue
 
-                        with transaction.atomic():
-                            # 1. Cria ou Verifica Usuário
+                            # Validação rigorosa de Role
+                            if role_code not in allowed_roles:
+                                raise ValueError(f"Papel (Role) '{role_code}' não é reconhecido pelo sistema SOTARQ.")
+
                             if User.objects.filter(username=username).exists():
-                                raise IntegrityError(f"Username '{username}' já existe.")
-                            
+                                raise IntegrityError(f"O utilizador '{username}' já está cadastrado.")
+
                             user = User.objects.create_user(
                                 username=username,
                                 email=email,
-                                password='Sotarq.ChangeMe', # Senha padrão
-                                first_name=first_name,
-                                last_name=last_name,
+                                password='Sotarq.ChangeMe', # Força troca no primeiro login (ideal)
+                                first_name=get_val('first_name'),
+                                last_name=get_val('last_name'),
                                 tenant=request.user.tenant,
                                 current_role=role_code,
                                 is_active=True
                             )
 
-                            # 2. Atribui Role e Cria Vínculo M2M
-                            role_obj, _ = Role.objects.get_or_create(code=role_code, defaults={'name': role_code})
+                            # Sincronização automática com a tabela Role M2M
+                            role_obj, _ = Role.objects.get_or_create(
+                                code=role_code, 
+                                defaults={'name': role_code.replace('_', ' ').title()}
+                            )
                             UserRole.objects.create(user=user, role=role_obj)
 
-                            # 3. Lógica específica para Professores
+                            # Se for professor, exige número de funcionário
                             if role_code == 'TEACHER':
-                                emp_number = get_val('employee_number')
-                                degree = get_val('academic_degree')
-                                
-                                if not emp_number:
-                                    raise ValueError("Nº Funcionário é obrigatório para Professores.")
-                                    
+                                emp_num = get_val('employee_number')
+                                if not emp_num:
+                                    raise ValueError("Professores exigem 'employee_number'.")
                                 Teacher.objects.create(
                                     user=user,
-                                    employee_number=emp_number,
-                                    academic_degree=degree or 'N/A'
+                                    employee_number=emp_num,
+                                    academic_degree=get_val('academic_degree') or 'N/A'
                                 )
-
-                            success_count += 1
                             
-                    except Exception as e:
-                        errors.append(f"Linha {row_idx} ({get_val('username') or 'Desconhecido'}): {str(e)}")
+                            success_count += 1
 
-                # Feedback ao usuário
+                        except Exception as e:
+                            errors.append(f"Linha {row_idx}: {str(e)}")
+                            # Em caso de erro em um registro, o transaction.atomic cancela TUDO ou 
+                            # podemos remover o atomic de fora e colocar dentro se quisermos importação parcial.
+                            # Para sistemas financeiros (SOTARQ), recomendo falhar tudo se houver erro crítico.
+
                 if success_count > 0:
-                    messages.success(request, f"{success_count} funcionários importados com sucesso.")
-                
+                    messages.success(request, f"Sucesso: {success_count} usuários importados.")
                 if errors:
-                    for err in errors[:5]:
-                        messages.error(request, err)
-                    if len(errors) > 5:
-                        messages.warning(request, f"E mais {len(errors) - 5} erros não listados.")
+                    for err in errors[:10]: messages.error(request, err)
                 
-                if success_count > 0 and not errors:
-                     return redirect('core:user_management_list')
+                return redirect('core:user_management_list')
 
             except Exception as e:
-                # Erro genérico ao abrir o arquivo (formato inválido, corrompido, etc)
-                messages.error(request, f"Erro crítico ao ler arquivo Excel: {str(e)}")
-                return redirect('core:user_import')
-
-    else:
-        form = UserImportForm()
-
-    return render(request, 'core/user_import_form.html', {
-        'form': form
-    })
-
+                messages.error(request, f"Falha crítica na leitura do ficheiro: {str(e)}")
+    
+    return render(request, 'core/user_import_form.html', {'form': UserImportForm()})
 
 
 from django.shortcuts import render

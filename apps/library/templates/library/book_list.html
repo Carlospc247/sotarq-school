@@ -1,0 +1,332 @@
+{% extends "base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Biblioteca | Gestão de Acervo{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-8 p-4 md:p-6">
+
+<!-- HEADER -->
+
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700">
+
+<div>
+
+<nav class="text-sm text-slate-400 mb-2">
+<a href="{% url 'library:library_dashboard' %}" class="hover:text-indigo-600">Dashboard</a>
+<span class="mx-2">/</span>
+<span>Biblioteca</span>
+<span class="mx-2">/</span>
+<span class="font-semibold text-slate-600 dark:text-slate-300">Acervo</span>
+</nav>
+
+<h1 class="text-3xl font-black text-slate-900 dark:text-white leading-none tracking-tight">
+Gestão de Acervo
+</h1>
+
+<p class="text-slate-500 dark:text-slate-400 mt-2 font-medium italic">
+Biblioteca Escolar • Sistema SOTARQ
+</p>
+
+</div>
+
+<div class="flex space-x-3">
+
+<button class="flex items-center px-5 py-2.5 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm font-bold shadow-sm hover:bg-slate-50 dark:hover:bg-slate-600 transition">
+
+<i data-feather="download" class="w-4 h-4 mr-2 text-red-500"></i>
+Exportar
+
+</button>
+
+<button data-bs-toggle="modal"
+data-bs-target="#addBookModal"
+class="flex items-center px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg hover:bg-indigo-700 transition">
+
+<i data-feather="plus" class="w-4 h-4 mr-2"></i>
+Novo Livro
+
+</button>
+
+</div>
+
+</div>
+
+
+<!-- KPI CARDS -->
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+
+<div class="rounded-3xl bg-gradient-to-br from-indigo-500 to-purple-600 p-6 shadow-xl text-white">
+
+<div class="flex justify-between items-center">
+<i data-feather="book" class="w-7 h-7"></i>
+<span class="text-[10px] uppercase font-black tracking-widest opacity-80">
+Total
+</span>
+</div>
+
+<h3 class="text-4xl font-black mt-6">
+{{ books.count }}
+</h3>
+
+<p class="text-xs font-bold uppercase mt-1 opacity-80">
+Livros registados
+</p>
+
+</div>
+
+
+<div class="rounded-3xl bg-gradient-to-br from-emerald-400 to-teal-600 p-6 shadow-xl text-white">
+
+<div class="flex justify-between">
+<i data-feather="check-circle" class="w-7 h-7"></i>
+
+<span class="text-[10px] uppercase font-black tracking-widest opacity-80">
+Disponível
+</span>
+</div>
+
+<h3 class="text-4xl font-black mt-6">
+{{ available_books }}
+</h3>
+
+<p class="text-xs font-bold uppercase mt-1 opacity-80">
+Em prateleira
+</p>
+
+</div>
+
+
+<div class="rounded-3xl bg-gradient-to-br from-amber-400 to-orange-500 p-6 shadow-xl text-white">
+
+<div class="flex justify-between">
+<i data-feather="repeat" class="w-7 h-7"></i>
+
+<span class="text-[10px] uppercase font-black tracking-widest opacity-80">
+Emprestados
+</span>
+
+</div>
+
+<h3 class="text-4xl font-black mt-6">
+{{ borrowed_books }}
+</h3>
+
+<p class="text-xs font-bold uppercase mt-1 opacity-80">
+Em circulação
+</p>
+
+</div>
+
+
+<div class="rounded-3xl bg-gradient-to-br from-rose-500 to-red-600 p-6 shadow-xl text-white">
+
+<div class="flex justify-between">
+<i data-feather="alert-circle" class="w-7 h-7"></i>
+
+<span class="text-[10px] uppercase font-black tracking-widest opacity-80">
+Stock
+</span>
+
+</div>
+
+<h3 class="text-4xl font-black mt-6">
+{{ empty_stock }}
+</h3>
+
+<p class="text-xs font-bold uppercase mt-1 opacity-80">
+Esgotados
+</p>
+
+</div>
+
+</div>
+
+
+
+<!-- TABLE -->
+
+<div class="bg-white dark:bg-slate-800 p-8 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700">
+
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+
+<h4 class="text-sm font-black uppercase tracking-widest text-slate-700 dark:text-white">
+Acervo Bibliográfico ({{ books.count }})
+</h4>
+
+<form method="GET" class="relative">
+
+<input
+type="text"
+name="q"
+value="{{ request.GET.q }}"
+placeholder="Procurar título, autor ou código..."
+class="pl-10 pr-4 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm focus:ring-2 focus:ring-indigo-500">
+
+<i data-feather="search"
+class="w-4 h-4 absolute left-3 top-2.5 text-slate-400"></i>
+
+</form>
+
+</div>
+
+
+<div class="overflow-x-auto">
+
+<table class="w-full text-sm">
+
+<thead>
+
+<tr class="text-left text-slate-400 text-xs uppercase tracking-widest border-b">
+
+<th class="py-3">Código</th>
+<th class="py-3">Livro</th>
+<th class="py-3">Autor</th>
+<th class="py-3">Stock</th>
+<th class="py-3 text-right">Ações</th>
+
+</tr>
+
+</thead>
+
+<tbody>
+
+{% for book in books %}
+
+<tr class="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition">
+
+<td class="py-4">
+
+<div class="font-bold text-indigo-600">
+#{{ book.barcode }}
+</div>
+
+<button
+onclick="copyBarcode('{{ book.barcode }}')"
+class="text-xs text-slate-400 hover:text-indigo-600">
+Copiar
+</button>
+
+</td>
+
+<td class="py-4 font-semibold text-slate-800 dark:text-white">
+{{ book.title }}
+</td>
+
+<td class="py-4 text-slate-500">
+{{ book.author }}
+</td>
+
+<td class="py-4">
+
+<div class="flex items-center space-x-2">
+
+<span class="text-xs font-bold">
+{{ book.available_copies }}/{{ book.total_copies }}
+</span>
+
+<div class="w-24 h-2 bg-slate-200 rounded-full overflow-hidden">
+
+<div class="
+h-full
+{% if book.available_copies == 0 %}
+bg-red-500
+{% elif book.available_copies < 3 %}
+bg-amber-500
+{% else %}
+bg-indigo-600
+{% endif %}
+"
+style="width:{% widthratio book.available_copies book.total_copies 100 %}%">
+</div>
+
+</div>
+
+</div>
+
+</td>
+
+<td class="py-4 text-right">
+
+<div class="flex justify-end space-x-2">
+
+<button class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
+<i data-feather="edit" class="w-4 h-4"></i>
+</button>
+
+<button class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
+<i data-feather="clock" class="w-4 h-4"></i>
+</button>
+
+<button class="p-2 rounded-lg hover:bg-red-100 text-red-600">
+<i data-feather="trash-2" class="w-4 h-4"></i>
+</button>
+
+</div>
+
+</td>
+
+</tr>
+
+{% empty %}
+
+<tr>
+
+<td colspan="5" class="text-center py-12 text-slate-400">
+
+<i data-feather="book-open" class="w-10 h-10 mx-auto mb-3"></i>
+
+<p class="font-semibold">
+Nenhum livro encontrado
+</p>
+
+</td>
+
+</tr>
+
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+
+
+<!-- PAGINAÇÃO -->
+
+<div class="flex justify-between items-center mt-6 text-sm text-slate-500">
+
+<span>A mostrar {{ books.count }} resultados</span>
+
+<div class="flex space-x-2">
+
+<button class="px-3 py-1 border rounded-lg text-xs">Anterior</button>
+<button class="px-3 py-1 bg-indigo-600 text-white rounded-lg text-xs">1</button>
+<button class="px-3 py-1 border rounded-lg text-xs">Próxima</button>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+
+<script>
+
+function copyBarcode(code){
+navigator.clipboard.writeText(code);
+alert("Código copiado: " + code);
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+feather.replace();
+});
+
+</script>
+
+{% endblock %}

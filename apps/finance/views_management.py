@@ -21,3 +21,4 @@ def staff_performance_dashboard(request):
         'perf': perf,
         'critical_debtors': Invoice.objects.filter(status='overdue').order_by('-total')[:10]
     })
+

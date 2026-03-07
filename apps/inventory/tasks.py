@@ -1,6 +1,5 @@
 # apps/inventory/tasks.py
 from celery import shared_task
-from apps.cafeteria.services import NutritionalService
 from apps.core.services import WhatsAppService
 from apps.library.models import LibraryConfig
 from apps.students.models import Student

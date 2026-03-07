@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Turmas | SOTARQ SCHOOL{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-8 p-4 md:p-6">
+    
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700">
+        <div>
+            <h1 class="text-3xl font-black text-slate-900 dark:text-white flex items-center">
+                <i data-feather="users" class="w-8 h-8 mr-3 text-emerald-600"></i>
+                Turmas Ativas
+            </h1>
+            <p class="text-slate-500 dark:text-slate-400 mt-1 font-medium italic">Monitoramento de lotação e gestão pedagógica</p>
+        </div>
+        <a href="{% url 'academic:class_create' %}" class="flex items-center px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold shadow-lg hover:bg-emerald-700 transition transform hover:-translate-y-1">
+            <i data-feather="plus" class="w-5 h-5 mr-2"></i>
+            Criar Turma
+        </a>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for class in classes %}
+        <div class="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm p-6 hover:shadow-xl transition-all border-t-4 border-t-emerald-500">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h2 class="text-2xl font-black text-slate-900 dark:text-white">{{ class.name }}</h2>
+                    <p class="text-sm font-bold text-emerald-500 uppercase">{{ class.grade_level.name }}</p>
+                </div>
+                <span class="px-3 py-1 bg-slate-100 dark:bg-slate-700 rounded-lg text-[10px] font-black text-slate-500">
+                    {{ class.academic_year.name }}
+                </span>
+            </div>
+
+            <div class="space-y-3 mb-6">
+                <div class="flex items-center text-sm text-slate-600 dark:text-slate-400">
+                    <i data-feather="user" class="w-4 h-4 mr-3 text-slate-400"></i>
+                    DT: <span class="ml-1 font-bold">{{ class.main_teacher.user.get_full_name|default:"A definir" }}</span>
+                </div>
+                <div class="flex items-center text-sm text-slate-600 dark:text-slate-400">
+                    <i data-feather="clock" class="w-4 h-4 mr-3 text-slate-400"></i>
+                    Período: <span class="ml-1 font-bold">{{ class.get_period_display }}</span>
+                </div>
+                <div class="flex items-center text-sm text-slate-600 dark:text-slate-400">
+                    <i data-feather="map-pin" class="w-4 h-4 mr-3 text-slate-400"></i>
+                    Sala: <span class="ml-1 font-bold">{{ class.room_number }}</span>
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                <div class="flex justify-between text-xs font-bold">
+                    <span class="text-slate-400">Ocupação</span>
+                    <span class="{% if not class.has_vacancy %}text-red-500{% else %}text-emerald-500{% endif %}">
+                        {{ class.current_occupancy }}/{{ class.capacity }}
+                    </span>
+                </div>
+                <div class="w-full bg-slate-100 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                    <div class="bg-emerald-500 h-full transition-all duration-500" 
+                         style="width: {% widthratio class.current_occupancy class.capacity 100 %}%"></div>
+                </div>
+            </div>
+
+            <div class="mt-6 flex gap-2">
+                <a href="{% url 'academic:class_grading_sheet' class.id 0 %}" class="flex-1 text-center py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-white rounded-xl text-xs font-black hover:bg-indigo-600 hover:text-white transition">
+                    PAUTAS
+                </a>
+                <button class="p-2 bg-slate-50 dark:bg-slate-700/50 text-slate-400 rounded-xl hover:text-emerald-500 transition">
+                    <i data-feather="settings" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-span-full py-20 bg-white dark:bg-slate-800 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center">
+            <i data-feather="frown" class="w-12 h-12 text-slate-300 mb-4"></i>
+            <p class="text-slate-400 font-bold">Nenhuma turma registrada para este ano lectivo.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

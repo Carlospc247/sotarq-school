@@ -25,17 +25,19 @@ class PaymentType(models.TextChoices):
     DEPOSIT = 'DP', _('Depósito Bancário')
 
 
-
 class FeeType(models.Model):
     """
-    Catalog of fees (Ex: Tuition, Registration, Certificate).
+    Catálogo Estrito: Apenas Propinas, Matrículas e Reconfirmações.
+    O valor é definido pelo Diretor no Admin.
     """
-    name = models.CharField(max_length=100, help_text="Ex: Mensalidade, Documento")
+    name = models.CharField(max_length=100, help_text="Ex: Mensalidade, Matrícula, Reconfirmação")
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    recurring = models.BooleanField(default=False)
+    recurring = models.BooleanField(default=False, help_text="Marcar True para Propinas mensais")
+    
     
     def __str__(self):
-        return f"{self.name} ({self.amount})"
+        return f"{self.name} - {self.amount} Kz"
+
 
 class Invoice(models.Model):
     STATUS_CHOICES = (
@@ -173,18 +175,6 @@ class Invoice(models.Model):
     
     def __str__(self):
         return f"Inv #{self.number} - {self.student} [{self.get_status_display()}]"
-
-
-class ServiceProvider(BaseModel):
-    """Cadastro de prestadores informais para Autofacturação."""
-    full_name = models.CharField(max_length=255)
-    bi_number = models.CharField(max_length=20, unique=True, verbose_name="Número do BI")
-    address = models.TextField(blank=True)
-    phone = models.CharField(max_length=20)
-    category = models.CharField(max_length=100, help_text="Ex: Eletricista, Manutenção")
-
-    def __str__(self):
-        return f"{self.full_name} ({self.bi_number})"
 
 
 class InvoiceItem(models.Model):
@@ -638,4 +628,5 @@ class CashOutflow(BaseModel):
 
     def __str__(self):
         return f"-{self.amount} Kz ({self.description})"
+
 

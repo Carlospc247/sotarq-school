@@ -6,7 +6,6 @@ from apps.academic.models import TimetableSlot, StudentGrade
 from apps.library.models import Loan
 from apps.students.models import Enrollment
 from apps.finance.models import Invoice, Payment
-from apps.cafeteria.models import Product, Wallet
 from apps.academic.models import AcademicEvent
 from django.db.models import Q, Sum
 from django.shortcuts import render, redirect, get_object_or_404

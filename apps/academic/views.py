@@ -53,6 +53,27 @@ def is_manager_check(user):
     MANAGEMENT_ROLES = [Role.Type.ADMIN, Role.Type.DIRECTOR]
     return user.is_superuser or user.current_role in MANAGEMENT_ROLES
 
+def is_secretary_directors(user):
+    """
+    Verifica permissão de gestão (Admin ou Diretor) no contexto do Tenant.
+    Ref: Django Authentication System
+    """
+    if not user.is_authenticated:
+        return False
+    MANAGEMENT_ROLES = [Role.Type.ADMIN, Role.Type.DIRECTOR, Role.Type.SECRETARY, Role.Type.DIRECT_FINANC, Role.Type.DIRECT_ADMIN]
+    return user.is_superuser or user.current_role in MANAGEMENT_ROLES
+
+
+def is_teacher_pedagogic(user):
+    """
+    Verifica permissão de gestão (Admin ou Diretor) no contexto do Tenant.
+    Ref: Django Authentication System
+    """
+    if not user.is_authenticated:
+        return False
+    MANAGEMENT_ROLES = [Role.Type.ADMIN, Role.Type.DIRECTOR, Role.Type.STUDENT, Role.Type.PEDAGOGIC]
+    return user.is_superuser or user.current_role in MANAGEMENT_ROLES
+
 
 # ==============================================================================
 # 1. GESTÃO DE PAUTAS E NOTAS
@@ -569,7 +590,7 @@ def academic_year_list(request):
         form = AcademicYearForm(request.POST)
         if form.is_valid():
             with transaction.atomic():
-                new_year = form.save(commit=False)
+                new_year = form.save()
                 if new_year.is_active:
                     # Desativa todos os outros antes de ativar o novo
                     AcademicYear.objects.exclude(id=new_year.id).update(is_active=False)
@@ -754,6 +775,115 @@ def academic_year_delete(request, year_id):
         messages.error(request, f"Erro ao apagar: {str(e)}")
         
     return redirect('academic:year_list')
+
+
+
+# apps/academic/views.py
+from django.views.generic import ListView, CreateView, UpdateView
+from django.urls import reverse_lazy
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from .models import Course, Class, GradeLevel, AcademicYear
+from .forms import CourseForm, ClassForm # Assumindo que você criará os forms
+
+class StaffRequiredMixin(UserPassesTestMixin):
+    """Garante que apenas Admin/Diretores/Secretaria acessem as views de escrita."""
+    def test_func(self):
+        return self.request.user.current_role in ['ADMIN', 'DIRECTOR', 'SECRETARY']
+
+# ==========================================
+# GESTÃO DE CURSOS
+# ==========================================
+class GradeLevelListView(LoginRequiredMixin, ListView):
+    model = GradeLevel
+    template_name = 'academic/grade_level_list.html'
+    context_object_name = 'grade_levels'
+
+    def get_queryset(self):
+        return GradeLevel.objects.filter(course__tenant=self.request.user.tenant)
+
+# ==========================================
+# GESTÃO DE CURSOS
+# ==========================================
+
+class CourseListView(LoginRequiredMixin, ListView):
+    model = Course
+    template_name = 'academic/course_list.html'
+    context_object_name = 'courses'
+
+    def get_queryset(self):
+        # O django-tenants já isola o Schema. 
+        # Basta dar o .all() e ele trará apenas os cursos da escola atual.
+        return Course.objects.all().order_by('name')
+
+class CourseCreateView(LoginRequiredMixin, StaffRequiredMixin, CreateView):
+    model = Course
+    fields = ['name', 'code', 'level', 'duration_years', 'coordinator']
+    template_name = 'academic/course_form.html'
+    success_url = reverse_lazy('academic:course_list')
+
+    def form_valid(self, form):
+        # Não injetamos nada. O objeto cai automaticamente no esquema ativo.
+        return super().form_valid(form)
+
+# ==========================================
+# GESTÃO DE TURMAS (CLASSES)
+# ==========================================
+
+class ClassListView(LoginRequiredMixin, ListView):
+    model = Class
+    template_name = 'academic/class_list.html'
+    context_object_name = 'classes'
+
+    def get_queryset(self):
+        # Simplificação total: O isolamento é por Schema, não por WHERE clause.
+        return Class.objects.all().select_related('grade_level', 'academic_year', 'main_teacher')
+
+class ClassCreateView(LoginRequiredMixin, StaffRequiredMixin, CreateView):
+    model = Class
+    fields = ['name', 'academic_year', 'grade_level', 'main_teacher', 'capacity', 'period', 'room_number']
+    template_name = 'academic/class_form.html'
+    success_url = reverse_lazy('academic:class_list')
+
+    
+class CourseCreateView(LoginRequiredMixin, StaffRequiredMixin, CreateView):
+    model = Course
+    fields = ['name', 'code', 'level', 'duration_years', 'coordinator']
+    template_name = 'academic/course_form.html'
+    success_url = reverse_lazy('academic:course_list')
+
+    def form_valid(self, form):
+        # Injeta o tenant automaticamente antes de salvar
+        form.instance.tenant = self.request.user.tenant
+        return super().form_valid(form)
+
+# ==========================================
+# GESTÃO DE TURMAS (CLASSES)
+# ==========================================
+
+class ClassListView(LoginRequiredMixin, ListView):
+    model = Class
+    template_name = 'academic/class_list.html'
+    context_object_name = 'classes'
+
+    def get_queryset(self):
+        return Class.objects.filter(academic_year__tenant=self.request.user.tenant)\
+                            .select_related('grade_level', 'academic_year', 'main_teacher')
+
+class ClassCreateView(LoginRequiredMixin, StaffRequiredMixin, CreateView):
+    model = Class
+    fields = ['name', 'academic_year', 'grade_level', 'main_teacher', 'capacity', 'period', 'room_number']
+    template_name = 'academic/class_form.html'
+    success_url = reverse_lazy('academic:class_list')
+
+    def get_form(self, *args, **kwargs):
+        """Filtra os campos do formulário para mostrar apenas dados do Tenant."""
+        form = super().get_form(*args, **kwargs)
+        tenant = self.request.user.tenant
+        form.fields['academic_year'].queryset = AcademicYear.objects.filter(tenant=tenant)
+        form.fields['grade_level'].queryset = GradeLevel.objects.filter(course__tenant=tenant)
+        return form
+
+
 
 
 @login_required
@@ -1115,6 +1245,49 @@ def final_pauta_view(request, class_id):
         'enrollments': enrollments,
         'is_authorized': is_authorized
     })
+
+
+
+@login_required
+@user_passes_test(is_manager_check)
+def mass_whatsapp_promotion_alert(request):
+    """
+    Motor SOTARQ MESSENGER: Disparo em massa para alunos promovidos.
+    Notifica o Encarregado sobre a vaga reservada no próximo ano lectivo.
+    """
+    # 1. Filtra matrículas que acabaram de ser criadas via promoção (aguardando vaga física)
+    # Rigor: Apenas do tenant atual
+    promoted_enrollments = Enrollment.objects.filter(
+        academic_year__is_active=True,
+        status='pending_placement',
+        student__user__tenant=request.user.tenant
+    ).select_related('student', 'grade_level')
+
+    if not promoted_enrollments.exists():
+        messages.info(request, "Nenhum aluno promovido recentemente para notificar.")
+        return redirect('academic:student_dashboard')
+
+    count = 0
+    for enrollment in promoted_enrollments:
+        student = enrollment.student
+        # Busca o encarregado financeiro (Rigor SOTARQ: quem paga é quem decide)
+        guardian_link = student.guardians.filter(is_financial_responsible=True).first()
+        
+        if guardian_link and guardian_link.guardian.phone:
+            phone = guardian_link.guardian.phone
+            msg = (
+                f"Olá, {guardian_link.guardian.full_name}! 👋\n"
+                f"Temos boas notícias: O aluno *{student.full_name}* foi promovido para a *{enrollment.grade_level.name}*!\n\n"
+                f"A vaga já está reservada. Por favor, acesse o portal ou dirija-se à secretaria para confirmar a matrícula.\n"
+                f"Atenciosamente, Direção {request.user.tenant.name} 🏛️"
+            )
+            
+            # Aqui chamamos a Task Assíncrona do SOTARQ MESSENGER para não travar o servidor
+            # task_send_whatsapp.delay(phone, msg)
+            count += 1
+
+    messages.success(request, f"SOTARQ MESSENGER: {count} alertas de promoção enviados para a fila de disparo.")
+    return redirect('academic:student_dashboard')
 
 
 

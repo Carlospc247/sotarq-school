@@ -11,7 +11,7 @@
     </div>
     
     <nav class="flex-1 space-y-3">
-        <a href="{% url 'cafeteria:pos_checkout' %}" 
+        <a href="{% url 'cafeteria:library_dashboard' %}" 
            class="flex items-center gap-4 p-4 rounded-2xl hover:bg-slate-800 hover:text-white transition-all group {% if request.resolver_match.url_name == 'pos_checkout' %}bg-indigo-600 text-white shadow-lg shadow-indigo-500/20{% endif %}">
             <i data-feather="monitor" class="w-5 h-5 group-hover:scale-110 transition-transform"></i> 
             <span class="text-[11px] font-black uppercase tracking-wider">Ponto de Venda</span>

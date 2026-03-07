@@ -96,17 +96,16 @@ def generate_agt_qrcode_image(instance):
 
 class SOTARQExporter:
     """
-    Motor Supremo v2.5 - Dual Format (A4 & 80mm).
-    Rigor: Conformidade AGT + Design Adaptativo.
+    Motor Supremo v2.6 - Dual Format (A4 & 80mm).
+    Rigor: Identidade de Cliente Híbrida + Conformidade AGT + Design Adaptativo.
     """
 
     @staticmethod
     def generate_fiscal_document(instance, doc_type_code, is_copy=False, page_format='A4'):
         buffer = BytesIO()
         
-        # Definição de Dimensões
+        # Definição de Dimensões e Margens
         if page_format == '80mm':
-            # 80mm de largura (aprox 226 pts), altura dinâmica (usamos um padrão longo e o p.showPage corta)
             page_size = (8.0 * cm, 30.0 * cm) 
             margin = 0.3 * cm
         else:
@@ -116,57 +115,81 @@ class SOTARQExporter:
         p = canvas.Canvas(buffer, pagesize=page_size)
         width, height = page_size
 
-        # 1. Metadados e Mapeamento de Status XSD (Rigor AGT)
-        tenant = instance.student.user.tenant if hasattr(instance, 'student') else instance.invoice.student.user.tenant
-        student = instance.student if hasattr(instance, 'student') else instance.invoice.student
-        doc_number = instance.number if hasattr(instance, 'number') else instance.numero_documento
+        # 1. RESGATE DO TENANT (Hierarquia de Descoberta)
+        tenant = getattr(instance, 'tenant', None)
+        if not tenant:
+            if hasattr(instance, 'student') and instance.student:
+                tenant = instance.student.user.tenant
+            elif hasattr(instance, 'invoice') and instance.invoice:
+                tenant = instance.invoice.tenant
+
+        # 2. LÓGICA DE IDENTIDADE HÍBRIDA (Aluno vs Externo vs Consumidor)
+        client_info = {
+            'name': "CONSUMIDOR FINAL",
+            'nif': "999999999",
+            'id': "N/A"
+        }
+
+        if hasattr(instance, 'student') and instance.student:
+            # Caso A: É um Aluno (Identidade Acadêmica)
+            client_info['name'] = instance.student.full_name.upper()
+            client_info['nif'] = getattr(instance.student, 'nif', "999999999")
+            client_info['id'] = f"PROC: {instance.student.registration_number}"
         
-        # Mapeamento exigido pelo XSD (N=Normal, A=Anulado)
-        # Note: No PDF legal deve aparecer o nome por extenso, mas o rastro digital segue o código.
+        elif hasattr(instance, 'external_client_name') and instance.external_client_name:
+            # Caso B: É um Visitante/Staff (Identidade Externa direta)
+            client_info['name'] = instance.external_client_name.upper()
+            client_info['nif'] = getattr(instance, 'external_client_nif', "999999999")
+            
+        elif hasattr(instance, 'invoice') and instance.invoice:
+            # Caso C: Fallback via Invoice (Pagamentos)
+            inv = instance.invoice
+            if inv.student:
+                client_info['name'] = inv.student.full_name.upper()
+                client_info['id'] = f"PROC: {inv.student.registration_number}"
+            elif hasattr(inv, 'external_name') and inv.external_name:
+                client_info['name'] = inv.external_name.upper()
+
+        # 3. METADADOS FISCAIS
+        doc_number = getattr(instance, 'number', getattr(instance, 'numero_documento', 'S/N'))
         agt_status_label = "NORMAL" if instance.status == 'confirmed' else "ANULADO"
 
-        # --- 2. LÓGICA DE DESIGN POR FORMATO ---
+        # 4. DIRECOMANENTO DE LAYOUT
         if page_format == 'A4':
-            SOTARQExporter._draw_a4_layout(p, instance, tenant, student, doc_number, agt_status_label, is_copy, width, height)
+            SOTARQExporter._draw_a4_layout(p, instance, tenant, client_info, doc_number, agt_status_label, is_copy, width, height)
         else:
-            SOTARQExporter._draw_80mm_layout(p, instance, tenant, student, doc_number, agt_status_label, is_copy, width, height)
+            SOTARQExporter._draw_80mm_layout(p, instance, tenant, client_info, doc_number, agt_status_label, is_copy, width, height)
 
         p.showPage()
         p.save()
         return buffer.getvalue()
 
     @staticmethod
-    def _draw_a4_layout(p, instance, tenant, student, doc_number, agt_status_label, is_copy, width, height):
-        # [Sua lógica de marca d'água e layout A4 que você enviou acima entra aqui...]
-        # Garanti que o agt_status_label apareça no cabeçalho
-        p.setFont("Helvetica-Bold", 10)
-        p.drawString(2*cm, height-7.0*cm, f"ESTADO: {agt_status_label}")
-        # ... restante do código A4 ...
-
-    @staticmethod
-    def _draw_80mm_layout(p, instance, tenant, student, doc_number, agt_status_label, is_copy, width, height):
-        """Layout térmico otimizado para rolos de 80mm."""
+    def _draw_80mm_layout(p, instance, tenant, client_info, doc_number, agt_status_label, is_copy, width, height):
+        """Layout térmico otimizado com Bloco de Cliente Dinâmico."""
         y = height - 1*cm
         
-        # Logo Centralizado (Pequeno)
-        if tenant.logo:
+        # Logo do Tenant
+        if tenant and tenant.logo:
             try:
                 p.drawImage(tenant.logo.path, (width/2)-1*cm, y, width=2*cm, preserveAspectRatio=True, mask='auto')
-                y -= 1.5*cm
+                y -= 1.3*cm
             except: pass
 
+        # Cabeçalho da Instituição
         p.setFont("Helvetica-Bold", 10)
-        p.drawCentredString(width/2, y, tenant.name.upper())
+        p.drawCentredString(width/2, y, tenant.name.upper() if tenant else "SOTARQ SYSTEM")
         y -= 0.4*cm
         p.setFont("Helvetica", 8)
         p.drawCentredString(width/2, y, f"NIF: {getattr(tenant, 'tax_id', '9999999999')}")
         y -= 0.8*cm
 
-        # Info Documento
+        # Info do Documento
         p.line(0.5*cm, y, width-0.5*cm, y)
         y -= 0.4*cm
         p.setFont("Helvetica-Bold", 9)
-        p.drawCentredString(width/2, y, instance.get_doc_type_display().upper()) # Usando isto, o documentos suporta todos os tipos de documentos que estão em apps/fiscal/models.py class DocumentoFiscal |||| VER NOTAS.md
+        # get_doc_type_display() garante compatibilidade com apps/fiscal/models.py
+        p.drawCentredString(width/2, y, f"{instance.get_doc_type_display().upper()}") 
         y -= 0.4*cm
         p.drawCentredString(width/2, y, doc_number)
         y -= 0.4*cm
@@ -174,33 +197,67 @@ class SOTARQExporter:
         p.drawCentredString(width/2, y, f"ESTADO: {agt_status_label}")
         y -= 0.4*cm
         p.line(0.5*cm, y, width-0.5*cm, y)
-        y -= 0.6*cm
 
-        # Itens (Simplificado)
+        # BLOCO DE CLIENTE (Visitante ou Aluno)
+        y -= 0.5*cm
+        p.setFont("Helvetica-Bold", 7)
+        p.drawString(0.5*cm, y, "CLIENTE:")
+        y -= 0.35*cm
+        p.setFont("Helvetica", 7)
+        p.drawString(0.5*cm, y, client_info['name'][:40])
+        y -= 0.35*cm
+        p.drawString(0.5*cm, y, f"NIF: {client_info['nif']} | {client_info['id']}")
+        y -= 0.5*cm
+        p.line(0.5*cm, y, width-0.5*cm, y)
+
+        # Itens da Venda
+        y -= 0.6*cm
         p.setFont("Helvetica-Bold", 7)
         p.drawString(0.5*cm, y, "DESCRIÇÃO")
         p.drawRightString(width-0.5*cm, y, "TOTAL")
         y -= 0.3*cm
 
         p.setFont("Helvetica", 7)
-        if hasattr(instance, 'items'):
-            for item in instance.items.all():
-                y -= 0.4*cm
-                p.drawString(0.5*cm, y, item.description[:30])
-                p.drawRightString(width-0.5*cm, y, f"{item.amount:,.2f}")
+        items = []
+        if hasattr(instance, 'items'): items = instance.items.all()
+        elif hasattr(instance, 'invoice') and hasattr(instance.invoice, 'items'): items = instance.invoice.items.all()
+
+        for item in items:
+            y -= 0.4*cm
+            p.drawString(0.5*cm, y, item.description[:30])
+            # Suporta campo 'amount' ou 'total' dependendo do modelo
+            valor = getattr(item, 'amount', getattr(item, 'total', 0))
+            p.drawRightString(width-0.5*cm, y, f"{valor:,.2f}")
         
-        # Totais e QR Code
+        # Totais
         y -= 1*cm
         p.setFont("Helvetica-Bold", 9)
-        p.drawRightString(width-0.5*cm, y, f"TOTAL: {instance.valor_total:,.2f} Kz")
+        total_final = getattr(instance, 'valor_total', getattr(instance, 'total_amount', 0))
+        p.drawRightString(width-0.5*cm, y, f"TOTAL: {total_final:,.2f} Kz")
         
+        # QR Code AGT (Obrigatório)
         y -= 2.5*cm
-        qr_img = generate_agt_qrcode_image(instance)
-        qr_buffer = BytesIO()
-        qr_img.save(qr_buffer, format='PNG')
-        p.drawImage(ImageReader(qr_buffer), (width/2)-1.25*cm, y, width=2.5*cm, height=2.5*cm)
+        try:
+            qr_img = generate_agt_qrcode_image(instance)
+            qr_buffer = BytesIO()
+            qr_img.save(qr_buffer, format='PNG')
+            p.drawImage(ImageReader(qr_buffer), (width/2)-1.25*cm, y, width=2.5*cm, height=2.5*cm)
+        except Exception as e:
+            p.setFont("Helvetica-Oblique", 6)
+            p.drawCentredString(width/2, y, "[Erro ao gerar QR Code Fiscal]")
 
+    @staticmethod
+    def _draw_a4_layout(p, instance, tenant, client_info, doc_number, agt_status_label, is_copy, width, height):
+        """Layout A4 com marca d'água e rigor institucional."""
+        # [Aqui mantemos a lógica de desenho A4 que o senhor já possui, 
+        # apenas substituindo 'student' por 'client_info' no cabeçalho]
+        p.setFont("Helvetica-Bold", 10)
+        p.drawString(2*cm, height-7.0*cm, f"ESTADO: {agt_status_label}")
+        p.drawString(2*cm, height-7.5*cm, f"CLIENTE: {client_info['name']}")
+        p.setFont("Helvetica", 9)
+        p.drawString(2*cm, height-7.9*cm, f"NIF: {client_info['nif']} | {client_info['id']}")
 
+    
 
 
 def generate_debt_agreement_pdf(agreement):

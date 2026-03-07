@@ -25,6 +25,8 @@ urlpatterns = [
     # O nome 'manage_vacancy_request' é o que usamos no botão do academic_page.html
     path('vacancy/manage/<int:vacancy_id>/', views.manage_vacancy_request, name='manage_vacancy_request'),
 
+    path('messenger/mass-promotion-alert/', views.mass_whatsapp_promotion_alert, name='mass_whatsapp_promotion_alert'),
+    
     # --- 4. ANALYTICS E BLOQUEIO (Corrigido: URLs únicas) ---
     path('analytics/efficiency/', views.academic_efficiency_dashboard, name='efficiency_dashboard'),
     path('analytics/efficiency/export-pdf/', views.export_efficiency_report_pdf, name='export_efficiency_pdf'),
@@ -35,6 +37,14 @@ urlpatterns = [
     path('years/activate/<int:year_id>/', views.academic_year_activate, name='year_activate'),
     path('years/deactivate/<int:year_id>/', views.academic_year_deactivate, name='year_deactivate'),
     path('years/delete/<int:year_id>/', views.academic_year_delete, name='year_delete'),
+
+    path('courses/', views.CourseListView.as_view(), name='course_list'),
+    path('courses/add/', views.CourseCreateView.as_view(), name='course_create'),
+    
+    path('grade-levels/', views.GradeLevelListView.as_view(), name='grade_level_list'),
+    
+    path('classes/', views.ClassListView.as_view(), name='class_list'),
+    path('classes/add/', views.ClassCreateView.as_view(), name='class_create'),
 
     # --- 6. EXPORTAÇÕES (Sincronizadas com Rigor) ---
     path('class/<int:class_id>/pauta/excel/', views.export_class_pauta_excel, name='export_class_pauta_excel'),

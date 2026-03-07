@@ -1,6 +1,6 @@
 # apps/academic/forms.py
 from django import forms
-from .models import AcademicGlobal, AcademicYear, AcademicEvent
+from .models import AcademicGlobal, AcademicYear, AcademicEvent, Course, Class
 from apps.teachers.models import Teacher
 
 
@@ -70,5 +70,58 @@ class AcademicEventEmailsForm(forms.ModelForm):
                 'placeholder': 'direcao@escola.ao, bi@escola.ao'
             }),
         }
+
+
+
+class CourseForm(forms.ModelForm):
+    class Meta:
+        model = Course
+        fields = ['name', 'code', 'level', 'duration_years', 'coordinator']
+        widgets = {
+            'name': forms.TextInput(attrs={
+                'class': 'form-control rounded-xl border-slate-200 focus:border-indigo-500',
+                'placeholder': 'Ex: Informática de Gestão'
+            }),
+            'code': forms.TextInput(attrs={
+                'class': 'form-control rounded-xl border-slate-200 font-mono uppercase',
+                'placeholder': 'INF-GEST'
+            }),
+            'level': forms.Select(attrs={'class': 'form-select rounded-xl border-slate-200'}),
+            'duration_years': forms.NumberInput(attrs={'class': 'form-control rounded-xl border-slate-200', 'min': '1'}),
+            'coordinator': forms.Select(attrs={'class': 'form-select rounded-xl border-slate-200'}),
+        }
+
+    def clean_code(self):
+        code = self.cleaned_data.get('code').upper()
+        # Validação de unicidade no Rigor SOTARQ
+        if Course.objects.filter(code=code).exists():
+            raise forms.ValidationError("Este código de curso já está em uso.")
+        return code
+
+
+class ClassForm(forms.ModelForm):
+    class Meta:
+        model = Class
+        fields = ['name', 'academic_year', 'grade_level', 'main_teacher', 'capacity', 'period', 'room_number']
+        widgets = {
+            'name': forms.TextInput(attrs={
+                'class': 'form-control rounded-xl border-slate-200',
+                'placeholder': 'Ex: 10ª A'
+            }),
+            'academic_year': forms.Select(attrs={'class': 'form-select rounded-xl border-slate-200'}),
+            'grade_level': forms.Select(attrs={'class': 'form-select rounded-xl border-slate-200'}),
+            'main_teacher': forms.Select(attrs={'class': 'form-select rounded-xl border-slate-200'}),
+            'capacity': forms.NumberInput(attrs={'class': 'form-control rounded-xl border-slate-200'}),
+            'period': forms.Select(attrs={'class': 'form-select rounded-xl border-slate-200'}),
+            'room_number': forms.TextInput(attrs={'class': 'form-control rounded-xl border-slate-200', 'placeholder': 'Sala 04'}),
+        }
+
+    def clean_capacity(self):
+        capacity = self.cleaned_data.get('capacity')
+        if capacity < 5:
+            raise forms.ValidationError("A capacidade mínima permitida é de 5 alunos.")
+        if capacity > 60:
+             raise forms.ValidationError("Alerta: Capacidade acima de 60 alunos viola as normas de conforto SOTARQ.")
+        return capacity
 
 

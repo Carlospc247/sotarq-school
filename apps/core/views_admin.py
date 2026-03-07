@@ -33,7 +33,7 @@ def is_manager_check(user):
 
 
 @login_required
-@user_passes_test(is_manager_check, login_url='/', redirect_field_name=None)
+@user_passes_test(is_manager_check)
 def final_audit_report(request):
     """
     Relatório de Auditoria Final (DRE Simplificado).

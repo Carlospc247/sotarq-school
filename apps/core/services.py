@@ -9,6 +9,10 @@ from datetime import timedelta
 import requests
 import os
 import logging
+import requests
+from django.conf import settings
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -100,65 +104,104 @@ class DebtRefinancingService:
 
 
 
-import logging
-import requests
-from django.conf import settings
 
-logger = logging.getLogger(__name__)
 
 class WhatsAppService:
     """
-    Serviço Enterprise para encapsular a comunicação com APIs de Mensagens.
-    Inclui modo de DEBUG para testes locais sem API.
+    Serviço Enterprise SOTARQ para Mensageria.
+    Unifica o envio de texto e documentos (PDF) com suporte a modo simulação.
     """
-    
+
+    @staticmethod
+    def _get_api_credentials():
+        """Helper interno para obter credenciais de forma limpa."""
+        return (
+            getattr(settings, 'WHATSAPP_API_URL', None),
+            getattr(settings, 'WHATSAPP_API_TOKEN', None)
+        )
+
+    @staticmethod
+    def _sanitize_number(phone):
+        """Padroniza o número de telefone para o formato exigido pelas APIs."""
+        return "".join(filter(str.isdigit, str(phone)))
+
     @staticmethod
     def send_message(phone_number, message_text):
+        """Envia mensagens de texto simples."""
         if not phone_number:
-            logger.warning("WhatsAppService: Tentativa de envio sem número de telefone.")
+            logger.warning("WhatsAppService: Tentativa de envio sem número.")
             return False
 
-        # Sanitização do número (Remove espaços, traços, parênteses)
-        clean_number = "".join(filter(str.isdigit, str(phone_number)))
-        
-        # Obter credenciais do settings.py
-        api_url = getattr(settings, 'WHATSAPP_API_URL', None)
-        token = getattr(settings, 'WHATSAPP_API_TOKEN', None)
+        clean_number = WhatsAppService._sanitize_number(phone_number)
+        api_url, token = WhatsAppService._get_api_credentials()
 
-        # --- MODO SIMULAÇÃO (CS50W DEBUGGING) ---
-        # Se não houver URL ou Token configurado, ou se estivermos em DEBUG,
-        # apenas imprimimos no terminal para confirmar que a lógica funcionou.
-        if not api_url or not token or settings.DEBUG:
+        # --- MODO SIMULAÇÃO (DEBUG) ---
+        if settings.DEBUG or not api_url or not token:
             print("\n" + "="*50)
-            print("🚀 [WHATSAPP SIMULATION MODE] 🚀")
+            print("🚀 [WHATSAPP TEXT SIMULATION] 🚀")
             print(f"📞 Para: {clean_number}")
-            print(f"💬 Mensagem:\n{message_text}")
+            print(f"💬 Conteúdo: {message_text[:100]}...")
             print("="*50 + "\n")
-            
-            # Retorna True para o controller achar que funcionou
-            logger.info(f"Simulação: Mensagem enviada para {clean_number}")
             return True
 
-        # --- MODO PRODUÇÃO (ENVIO REAL) ---
+        # --- MODO PRODUÇÃO ---
         try:
-            # Exemplo de payload genérico (pode variar conforme o provedor: Meta, Twilio, Z-API)
             payload = {
                 "phone": clean_number,
                 "message": message_text,
                 "token": token
             }
-            
-            # O timeout é crucial para não travar o servidor se a API cair
-            response = requests.post(api_url, json=payload, timeout=10)
+            # Endpoint padrão para texto (ajuste conforme seu provedor: /send-message)
+            response = requests.post(f"{api_url}/send-text", json=payload, timeout=10)
             response.raise_for_status()
-            
-            logger.info(f"WhatsApp enviado com sucesso para {clean_number[-4:]} (mascarado).")
+            logger.info(f"WhatsApp (Texto) enviado para {clean_number[-4:]}")
             return True
-
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Erro de conexão com Gateway WhatsApp: {str(e)}")
+        except Exception as e:
+            logger.error(f"Erro no Gateway WhatsApp (Texto): {str(e)}")
             return False
 
+    @staticmethod
+    def send_invoice_pdf(phone, pdf_data, filename, caption):
+        """Envia PDFs (Faturas, Recibos) com legenda."""
+        if not phone:
+            return False
+
+        clean_number = WhatsAppService._sanitize_number(phone)
+        api_url, token = WhatsAppService._get_api_credentials()
+
+        # --- MODO SIMULAÇÃO (DEBUG) ---
+        if settings.DEBUG or not api_url or not token:
+            debug_path = os.path.join(settings.MEDIA_ROOT, 'debug_whatsapp_pdfs')
+            os.makedirs(debug_path, exist_ok=True)
+            full_path = os.path.join(debug_path, filename)
+            with open(full_path, 'wb') as f:
+                f.write(pdf_data)
+            
+            print("\n" + "="*50)
+            print("🚀 [WHATSAPP PDF SIMULATION] 🚀")
+            print(f"📞 Para: {clean_number}")
+            print(f"📄 Arquivo Salvo: {full_path}")
+            print(f"📝 Legenda: {caption}")
+            print("="*50 + "\n")
+            return True
+
+        # --- MODO PRODUÇÃO ---
+        try:
+            files = {'file': (filename, pdf_data, 'application/pdf')}
+            payload = {
+                'phone': clean_number, 
+                'caption': caption, 
+                'token': token
+            }
+            
+            # Endpoint para documentos
+            response = requests.post(f"{api_url}/send-document", data=payload, files=files, timeout=15)
+            response.raise_for_status()
+            logger.info(f"WhatsApp (PDF) enviado para {clean_number[-4:]}")
+            return True
+        except Exception as e:
+            logger.error(f"Erro no Gateway WhatsApp (PDF): {str(e)}")
+            return False
 
 
 # --- A FUNÇÃO QUE VOCÊ PEDIU ---

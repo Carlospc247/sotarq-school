@@ -1,55 +1,289 @@
-{% extends 'base_staff.html' %}
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Relatórios | SOTARQ Intelligence{% endblock %}
 
 {% block content %}
-<div class="p-8">
-    <h1 class="text-2xl font-black text-slate-800 mb-6 uppercase tracking-tighter">Centro de Relatórios & Inteligência</h1>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
-            <div class="flex items-center space-x-3 mb-4">
-                <div class="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                </div>
-                <h3 class="text-lg font-bold text-slate-800">Boletins de Notas (Trimestral)</h3>
-            </div>
-            
-            <p class="text-sm text-slate-500 mb-6">Selecione a turma para gerar todos os boletins com QR Code de autenticação.</p>
+<div class="max-w-7xl mx-auto space-y-8 p-4 md:p-6">
 
-            <form id="bulletinForm" class="space-y-4">
-                <select id="classSelect" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm">
-                    <option value="">Escolher Turma...</option>
-                    {% for klass in classes %}
-                        <option value="{{ klass.id }}">{{ klass.name }} ({{ klass.grade_level }})</option>
-                    {% endfor %}
-                </select>
-                
-                <button type="button" onclick="triggerBulletins()" class="w-full py-3 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all">
-                    Iniciar Geração em Massa
-                </button>
-            </form>
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700">
+        <div>
+            <nav class="text-sm text-slate-400 mb-2">
+                <a href="/" class="hover:text-indigo-600">Dashboard</a>
+                <span class="mx-2">/</span>
+                <span>Relatórios</span>
+                <span class="mx-2">/</span>
+                <span class="font-semibold text-slate-600 dark:text-slate-300">Analytics</span>
+            </nav>
+            <h1 class="text-3xl font-black text-slate-900 dark:text-white">
+                Analytics & Intelligence Center
+            </h1>
+            <p class="text-slate-500 dark:text-slate-400 mt-2 font-medium italic">
+                Monitoramento analítico do ecossistema SOTARQ SCHOOL
+            </p>
         </div>
 
-        <div class="bg-slate-900 p-6 rounded-3xl text-white">
-            <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Métricas de Performance</h3>
-            <div class="space-y-4">
-                <div class="flex justify-between items-center border-b border-white/10 pb-2">
-                    <span class="text-sm">Média Global da Escola</span>
-                    <span class="text-xl font-black text-emerald-400">14.2</span>
-                </div>
-                <div class="flex justify-between items-center">
-                    <span class="text-sm">Taxa de Aproveitamento</span>
-                    <span class="text-xl font-black text-blue-400">88%</span>
-                </div>
+        <div class="flex gap-3">
+            <a href="{% url 'reports:execution_history' %}"
+               class="flex items-center px-4 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm font-bold shadow-sm hover:bg-slate-50 dark:hover:bg-slate-600 transition">
+                <i data-feather="clock" class="w-4 h-4 mr-2 text-indigo-600"></i>
+                Histórico
+            </a>
+            <a href="{% url 'reports:pedagogical_dashboard' %}"
+               class="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg hover:bg-indigo-700 transition">
+                <i data-feather="bar-chart-2" class="w-4 h-4 mr-2"></i>
+                BI Pedagógico
+            </a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+
+        {% for category in categories %}
+        <div class="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden">
+            <div class="p-5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                <h3 class="font-bold text-slate-800 dark:text-white flex items-center">
+                    <i data-feather="folder" class="w-5 h-5 mr-2 text-indigo-600"></i>
+                    {{ category.name }}
+                </h3>
+                <span class="text-xs font-bold bg-indigo-100 text-indigo-700 px-2 py-1 rounded-lg">
+                    {{ category.reportdefinition_set.count }}
+                </span>
+            </div>
+
+            <div class="divide-y divide-slate-100 dark:divide-slate-700">
+                {% for report in category.reportdefinition_set.all %}
+                <button onclick="openReportModal('{{ report.code }}','{{ report.name }}')"
+                        class="w-full text-left p-4 hover:bg-slate-50 dark:hover:bg-slate-700/40 transition flex items-center justify-between">
+                    <div>
+                        <p class="font-semibold text-slate-700 dark:text-white">{{ report.name }}</p>
+                        <p class="text-xs text-slate-400 mt-1">{{ report.description|default:"Relatório analítico do sistema." }}</p>
+                    </div>
+                    <i data-feather="chevron-right" class="w-4 h-4 text-slate-300"></i>
+                </button>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+
+        <div class="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden border-t-4 border-t-amber-500">
+            <div class="p-5 border-b border-slate-100 dark:border-slate-700">
+                <h3 class="font-bold text-slate-800 dark:text-white flex items-center">
+                    <i data-feather="award" class="w-5 h-5 mr-2 text-amber-500"></i>
+                    Rigor Documental
+                </h3>
+            </div>
+            <div class="divide-y divide-slate-100 dark:divide-slate-700">
+                <button onclick="openActionModal('PAUTA_FINAL')"
+                        class="p-4 hover:bg-slate-50 dark:hover:bg-slate-700/40 w-full text-left flex items-center justify-between">
+                    <div>
+                        <p class="font-semibold text-slate-800 dark:text-white">Pauta Final</p>
+                        <p class="text-xs text-slate-400">Consolidado anual oficial</p>
+                    </div>
+                    <i data-feather="file-text" class="w-4 h-4 text-red-500"></i>
+                </button>
+
+                <button onclick="openActionModal('MINIPAUTA')"
+                        class="p-4 hover:bg-slate-50 dark:hover:bg-slate-700/40 w-full text-left flex items-center justify-between">
+                    <div>
+                        <p class="font-semibold text-slate-800 dark:text-white">Minipauta por Disciplina</p>
+                        <p class="text-xs text-slate-400">Exportação para Excel</p>
+                    </div>
+                    <i data-feather="file" class="w-4 h-4 text-green-600"></i>
+                </button>
+
+                <button onclick="openReportModal('BULK_BULLETIN','Emissão de Boletins')"
+                        class="p-4 hover:bg-slate-50 dark:hover:bg-slate-700/40 w-full text-left flex items-center justify-between">
+                    <div>
+                        <p class="font-semibold text-slate-800 dark:text-white">Boletins em Massa</p>
+                        <p class="text-xs text-slate-400">Gerar boletins de turma</p>
+                    </div>
+                    <i data-feather="printer" class="w-4 h-4 text-indigo-600"></i>
+                </button>
             </div>
         </div>
     </div>
 </div>
 
+<div class="modal fade" id="modalClassBased" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-3xl border-0 shadow-lg overflow-hidden">
+            <form id="formClassBased" method="GET">
+                <div class="modal-header bg-slate-50 dark:bg-slate-700/50 border-0 p-6">
+                    <h5 class="modal-title font-bold text-slate-800 dark:text-white" id="modalTitle">
+                        Configurar Parâmetros
+                    </h5>
+                    <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body p-6">
+                    <div class="mb-4">
+                        <label class="text-xs font-bold uppercase text-slate-400 tracking-wider">Turma de Referência</label>
+                        <select name="class_id" id="selectClass" class="form-select mt-2 rounded-xl border-slate-200 focus:border-indigo-500 focus:ring-indigo-500" required>
+                            <option value="">Selecionar Turma Ativa</option>
+                            {% for klass in classes %}
+                                <option value="{{ klass.id }}">{{ klass.name }} | {{ klass.grade_level.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div id="additionalFields" class="space-y-4"></div>
+                </div>
+
+                <div class="modal-footer bg-slate-50 dark:bg-slate-700/50 border-0 p-6">
+                    <button type="button" class="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700 transition" data-bs-dismiss="modal">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-6 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-md hover:bg-indigo-700 transition flex items-center">
+                        <i data-feather="play" class="w-3 h-3 mr-2"></i> Executar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
-function triggerBulletins() {
-    const classId = document.getElementById('classSelect').value;
-    if (!classId) return alert('Selecione uma turma');
-    window.location.href = `/reports/trigger/bulletin/${classId}/`;
+document.addEventListener("DOMContentLoaded", () => {
+    if (typeof feather !== 'undefined') {
+        feather.replace();
+    }
+});
+
+/**
+ * MOTOR DE ROTEAMENTO SOTARQ COM TRATAMENTO DE ERROS RESILIENTE
+ * Implementa validação de rede e feedback visual em caso de falha no fetch.
+ */
+function openReportModal(code, name) {
+    const modalElement = document.getElementById('modalClassBased');
+    const modal = new bootstrap.Modal(modalElement);
+    const form = document.getElementById('formClassBased');
+    const extra = document.getElementById('additionalFields');
+    const selectClass = document.getElementById('selectClass');
+    const title = document.getElementById('modalTitle');
+
+    // Reset de Estado e UI
+    title.innerText = name;
+    extra.innerHTML = '';
+    selectClass.value = '';
+    selectClass.classList.remove('is-invalid');
+    selectClass.onchange = null;
+    form.onsubmit = null;
+
+    switch(code) {
+        case 'MINIPAUTA':
+            extra.innerHTML = `
+                <div class="animate__animated animate__fadeIn" id="containerAllocation">
+                    <label class="text-xs font-bold uppercase text-slate-400 tracking-wider flex justify-between">
+                        Disciplina (Alocação)
+                        <span id="loaderAlloc" class="hidden animate-spin h-3 w-3 border-2 border-indigo-600 border-t-transparent rounded-full"></span>
+                    </label>
+                    <select id="selectAllocation" class="form-select mt-2 rounded-xl border-slate-200" required disabled>
+                        <option value="">Aguardando turma...</option>
+                    </select>
+                    <div id="errorAlloc" class="hidden mt-2 text-xs font-bold text-red-500 italic">
+                        <i data-feather="alert-circle" class="w-3 h-3 inline mr-1"></i> 
+                        Falha na conexão. Tente selecionar a turma novamente.
+                    </div>
+                </div>
+                <div class="animate__animated animate__fadeIn">
+                    <label class="text-xs font-bold uppercase text-slate-400 tracking-wider">Trimestre</label>
+                    <div class="flex gap-2 mt-2">
+                        <input type="radio" class="btn-check" name="term" id="t1" value="1" checked>
+                        <label class="btn btn-outline-primary flex-1 font-bold rounded-xl" for="t1">1º</label>
+                        <input type="radio" class="btn-check" name="term" id="t2" value="2">
+                        <label class="btn btn-outline-primary flex-1 font-bold rounded-xl" for="t2">2º</label>
+                        <input type="radio" class="btn-check" name="term" id="t3" value="3">
+                        <label class="btn btn-outline-primary flex-1 font-bold rounded-xl" for="t3">3º</label>
+                    </div>
+                </div>
+            `;
+
+            selectClass.onchange = async function() {
+                const classId = this.value;
+                const selectAlloc = document.getElementById('selectAllocation');
+                const loader = document.getElementById('loaderAlloc');
+                const errorMsg = document.getElementById('errorAlloc');
+                
+                if (!classId) return;
+
+                // UI State: Carregando
+                selectAlloc.disabled = true;
+                selectAlloc.classList.remove('is-invalid');
+                loader.classList.remove('hidden');
+                errorMsg.classList.add('hidden');
+                selectAlloc.innerHTML = '<option value="">Carregando disciplinas...</option>';
+
+                try {
+                    const response = await fetch(`{% url 'reports:ajax_search_allocations' %}?class_id=${classId}`);
+                    
+                    if (!response.ok) throw new Error('Erro na resposta do servidor');
+
+                    const data = await response.json();
+                    
+                    selectAlloc.innerHTML = '<option value="">--- Selecionar Disciplina ---</option>';
+                    if (data.length === 0) {
+                        selectAlloc.innerHTML = '<option value="">Nenhuma disciplina encontrada</option>';
+                    } else {
+                        data.forEach(item => {
+                            selectAlloc.innerHTML += `<option value="${item.id}">${item.name}</option>`;
+                        });
+                        selectAlloc.disabled = false;
+                    }
+                } catch (err) {
+                    console.error("SOTARQ Error Handler:", err);
+                    selectAlloc.innerHTML = '<option value="">Erro ao carregar</option>';
+                    selectAlloc.classList.add('is-invalid');
+                    errorMsg.classList.remove('hidden');
+                    feather.replace(); // Atualiza ícone de erro
+                } finally {
+                    loader.classList.add('hidden');
+                }
+            };
+
+            form.onsubmit = (e) => {
+                e.preventDefault();
+                const allocId = document.getElementById('selectAllocation').value;
+                const term = document.querySelector('input[name="term"]:checked').value;
+                if (!allocId) return alert("Por favor, selecione uma disciplina válida.");
+                window.location.href = `/academic/export/minipauta/${allocId}/${term}/`;
+            };
+            break;
+
+        case 'PAUTA_FINAL':
+            form.onsubmit = (e) => {
+                e.preventDefault();
+                if (!selectClass.value) return;
+                window.location.href = `/academic/pauta-final/${selectClass.value}/`;
+            };
+            break;
+
+        case 'BULK_BULLETIN':
+            form.onsubmit = (e) => {
+                e.preventDefault();
+                if (!selectClass.value) return;
+                window.location.href = `/reports/trigger/bulletin/${selectClass.value}/`;
+            };
+            break;
+
+        default:
+            form.onsubmit = (e) => {
+                e.preventDefault();
+                console.warn("Relatório sem rota específica vinculada:", code);
+            };
+    }
+
+    modal.show();
+    setTimeout(() => feather.replace(), 200);
+}
+
+function openActionModal(action) {
+    const map = {
+        'PAUTA_FINAL': 'Pauta Final de Aproveitamento',
+        'MINIPAUTA': 'Exportação de Minipauta por Disciplina'
+    };
+    openReportModal(action, map[action]);
 }
 </script>
 {% endblock %}

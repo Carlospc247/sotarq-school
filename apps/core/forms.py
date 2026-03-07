@@ -11,7 +11,8 @@ User = get_user_model()
 
 class UserManagementForm(forms.ModelForm):
     """
-    Formulário Enterprise para Criação/Edição de Funcionários.
+    Formulário Enterprise SOTARQ.
+    Sincronizado com todos os Roles (Admin, Financeiro, RH, etc).
     """
     first_name = forms.CharField(required=True, label="Nome")
     last_name = forms.CharField(required=True, label="Sobrenome")
@@ -22,15 +23,11 @@ class UserManagementForm(forms.ModelForm):
         help_text="Deixe em branco para manter a senha atual na edição."
     )
     
-    # Filtra apenas Roles de Staff (exclui alunos/pais para segurança)
+    # Agora carrega todos os papéis definidos no modelo Role.Type
     current_role = forms.ChoiceField(
-        choices=[
-            (Role.Type.ADMIN, 'Administrador'),
-            (Role.Type.DIRECTOR, 'Diretor'),
-            (Role.Type.TEACHER, 'Professor'),
-            (Role.Type.SECRETARY, 'Secretaria'),
-        ],
-        label="Perfil de Acesso"
+        choices=Role.Type.choices,
+        label="Perfil de Acesso",
+        widget=forms.Select(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm bg-white'})
     )
 
     class Meta:
@@ -39,32 +36,41 @@ class UserManagementForm(forms.ModelForm):
             'username', 'first_name', 'last_name', 'email', 'current_role', 'is_active',
             'pode_acessar_academic_page', 'pode_ver_pautas_boletins', 
             'pode_ver_documentos_academics', 'pode_baixar_pautas', 'pode_baixar_boletins'
-            ]
+        ]
+        widgets = {
+            'username': forms.TextInput(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm'}),
+            'email': forms.EmailInput(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm'}),
+        }
 
     def clean_email(self):
-        # Validação Enterprise: Email único por Tenant ou Global
         email = self.cleaned_data.get('email')
+        # Rigor SOTARQ: Validação de email único
         qs = User.objects.filter(email=email)
         if self.instance.pk:
             qs = qs.exclude(pk=self.instance.pk)
         if qs.exists():
-            raise forms.ValidationError("Este e-mail já está em uso no sistema.")
+            raise forms.ValidationError("Este e-mail já está em uso no ecossistema SOTARQ.")
         return email
-
-
 
 
 
 class UserImportForm(forms.Form):
     """
-    Formulário para upload de arquivo Excel com validação de extensão.
+    Formulário de Importação em Lote.
+    Aceita todos os Roles: TEACHER, SECRETARY, ACCOUNTANT, RH, etc.
     """
     file = forms.FileField(
         label="Ficheiro Excel (.xlsx)",
-        help_text="O arquivo deve conter as colunas: username, first_name, last_name, email, role, employee_number, academic_degree",
+        help_text="Colunas obrigatórias: username, email, role. Roles aceitos: " + ", ".join(Role.Type.values),
         validators=[FileExtensionValidator(allowed_extensions=['xlsx', 'xls'])]
     )
 
+    def clean_file(self):
+        file = self.cleaned_data.get('file')
+        if file:
+            if file.size > 5 * 1024 * 1024: # Limite de 5MB
+                raise forms.ValidationError("O arquivo é muito grande. O limite é 5MB.")
+        return file
 
 
 
@@ -73,30 +79,28 @@ class SchoolSettingsForm(forms.ModelForm):
     # Campo auxiliar para passar o JSON de cards (AlpineJS -> Django)
     site_info_cards_json = forms.CharField(widget=forms.HiddenInput(), required=False)
 
-    #break_exceptions = forms.ModelMultipleChoiceField(queryset=Teacher.objects.filter(is_active=True), required=False, widget=forms.CheckboxSelectMultiple(attrs={'class': 'grid grid-cols-2 gap-2 text-sm'}))
-
     class Meta:
         model = SchoolConfiguration
         fields = [
             # 1. Identidade e Cores do Sistema
-            'school_name', 'logo', 'favicon', 'primary_color',
+            'school_name', 'tax_id', 'logo', 'favicon', 'primary_color',
             'secondary_color', 'weight_mac', 'weight_npp', 'weight_npt',
             
-            # 2. Personalização do Site Institucional (Cores e Layout)
+            # 2. Personalização do Site Institucional
             'site_header_bg', 'site_header_text', 'site_footer_bg', 'site_footer_text',
             'site_info_cards', 'hero_mode', 'hero_title', 'hero_subtitle', 
             'hero_image_1', 'hero_image_2', 'hero_image_3',
             'news_ticker', 'custom_html_content',
             
-            # 4. Contactos e Redes
+            # 3. Contactos, Redes e Financeiro
             'phone_contact', 'official_email', 'address', 'website_link',
             'facebook_link', 'instagram_link', 'linkedin_link',
             
-            # 5. Calendário Académico e Permissões (Matrículas/Reconfirmações)
+            # 4. Calendário Académico e Permissões
             'is_enrollment_open', 'enrollment_start_date', 'enrollment_end_date',
             'is_reconfirmation_open', 'reconfirmation_start_date', 'reconfirmation_end_date',
             
-            # 6. Permissões de Exportação
+            # 5. Permissões de Operação
             'allow_secretary_export', 'allow_secretary_import', 'allow_teacher_export',
         ]
         
@@ -122,8 +126,7 @@ class SchoolSettingsForm(forms.ModelForm):
             
             # --- INPUTS PADRÃO (Tailwind Styled) ---
             'school_name': forms.TextInput(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm'}),
-            'iban_primary': forms.TextInput(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm'}),
-            'bank_name': forms.TextInput(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm'}),
+            'tax_id': forms.TextInput(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm'}),
             'hero_title': forms.TextInput(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm'}),
             'news_ticker': forms.TextInput(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm'}),
             'phone_contact': forms.TextInput(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm'}),
@@ -133,23 +136,23 @@ class SchoolSettingsForm(forms.ModelForm):
             'instagram_link': forms.URLInput(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm'}),
             'linkedin_link': forms.URLInput(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm'}),
             
-            # Selects
             'hero_mode': forms.Select(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm bg-white'}),
         }
 
     def clean(self):
         cleaned_data = super().clean()
         
-        # Validação de Datas (Fim não pode ser antes do Início)
-        e_start = cleaned_data.get('enrollment_start_date')
-        e_end = cleaned_data.get('enrollment_end_date')
-        if e_start and e_end and e_end < e_start:
-            self.add_error('enrollment_end_date', "A data de fim deve ser posterior à data de início.")
+        # Validação de Janelas de Data (Rigor SOTARQ)
+        validations = [
+            ('enrollment_start_date', 'enrollment_end_date'),
+            ('reconfirmation_start_date', 'reconfirmation_end_date')
+        ]
 
-        r_start = cleaned_data.get('reconfirmation_start_date')
-        r_end = cleaned_data.get('reconfirmation_end_date')
-        if r_start and r_end and r_end < r_start:
-            self.add_error('reconfirmation_end_date', "A data de fim deve ser posterior à data de início.")
+        for start_field, end_field in validations:
+            start = cleaned_data.get(start_field)
+            end = cleaned_data.get(end_field)
+            if start and end and end < start:
+                self.add_error(end_field, "A data de fim não pode ser anterior à data de início.")
 
         return cleaned_data
 

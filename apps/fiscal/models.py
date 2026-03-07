@@ -75,11 +75,9 @@ class DocType(models.TextChoices):
         FP = 'FP', _('Fatura Proforma')
         ND = 'ND', _('Nota de Débito')
         NC = 'NC', _('Nota de Crédito')
-        AF = 'AF', _('Autofacturação')
-        AC = 'AC', _('Aviso de Cobrança')
         RC = 'RC', _('Recibo')
         NL = 'NL', _('Nota de Liquidação')
-        VD = 'VD', _('Venda a Dinheiro')
+
 
 
 # 5. Documento Fiscal (A Fatura Real)

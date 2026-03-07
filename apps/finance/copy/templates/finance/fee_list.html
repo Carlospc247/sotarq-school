@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="card-title">Tabela de Emolumentos e Serviços</h3>
+                    
+                    {% if user.is_manager_check %}
+                    <div class="actions">
+                        <a href="{% url 'finance:create_fee' %}" class="btn btn-primary btn-sm shadow-sm">
+                            <i class="fas fa-plus"></i> Novo Item (Decisão Administrativa)
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th>Serviço/Produto</th>
+                                    <th>Categoria</th>
+                                    <th>Preço (Kz)</th>
+                                    <th>Stock</th>
+                                    <th>Recorrente?</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for fee in fees %}
+                                <tr>
+                                    <td><strong>{{ fee.name }}</strong></td>
+                                    <td>{{ fee.get_category_display }}</td>
+                                    <td>{{ fee.amount }}</td>
+                                    <td>
+                                        {% if fee.stock_controlled %}
+                                            <span class="badge badge-info">{{ fee.current_stock }}</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{% if fee.recurring %}Sim{% else %}Não{% endif %}</td>
+                                    <td>
+                                        {% if user.is_manager_check %}
+                                            <a href="#" class="btn btn-sm btn-outline-secondary"><i class="fas fa-edit"></i></a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

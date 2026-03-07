@@ -11,7 +11,6 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib import messages
 
 # Imports da Aplicação
-from apps.finance.models import DebtAgreement, FeeType, Invoice, InvoiceItem
 from apps.students.models import Enrollment, Student
 
 # Imports para PDF
@@ -34,6 +33,7 @@ class DebtRefinancingService:
     @transaction.atomic
     def create_agreement(student, installments_count=3, discount=Decimal('0.00')):
         # 1. Somar todas as faturas vencidas ou pendentes
+        from apps.finance.models import DebtAgreement, Invoice
         overdue_invoices = Invoice.objects.filter(
             student=student, 
             status__in=['pending', 'overdue'],
@@ -73,23 +73,39 @@ class DebtRefinancingService:
 
 # --- Funções de BI e Certidões ---
 
-def get_revenue_projection():
-    """Projeção baseada em mensalidades de matrículas ativas."""
-    active_enrollments = Enrollment.objects.filter(
-        status='active',
-        academic_year__is_active=True
-    )
-    # Assumindo que o valor está no curso ou plano
-    projected_revenue = active_enrollments.aggregate(
-        total=Sum('course__monthly_fee') 
-    )['total'] or Decimal('0.00')
-    return projected_revenue
+def get_revenue_projection(tenant):
+    """
+    Projeção baseada no catálogo FeeType (Rigor SOTARQ).
+    Em vez de procurar no Curso, somamos as taxas recorrentes e multiplicamos pelos alunos.
+    """
+    from apps.finance.models import FeeType
+    from apps.students.models import Student
+    
+    # 1. Busca o valor total de todas as taxas marcadas como recorrentes (Mensalidades)
+    monthly_fees_sum = FeeType.objects.filter(
+        recurring=True
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+    
+    # 2. Conta os alunos ativos do Tenant (Escola)
+    active_students_count = Student.objects.filter(
+        user__tenant=tenant,
+        is_active=True
+    ).count()
+    
+    # Resultado: Soma das Propinas x Número de Alunos
+    return monthly_fees_sum * active_students_count
 
-def get_revenue_risk_ranking():
-    """Identifica alunos com risco de inadimplência (Churn)."""
+
+
+def get_revenue_risk_ranking(tenant): # ARGUMENTO OBRIGATÓRIO
+    """Identifica alunos com risco de inadimplência isolado por Escola."""
+    from apps.students.models import Student # Import local para evitar circularity
     churn_limit = timezone.now() - timedelta(days=30)
     
-    return Student.objects.filter(enrollments__status='active').annotate(
+    return Student.objects.filter(
+        user__tenant=tenant, # RIGOR DE SEGURANÇA
+        enrollments__status='active'
+    ).annotate(
         total_overdue=Sum('invoices__total', filter=Q(invoices__status='overdue')),
         last_access=F('user__last_login'),
         is_churn_risk=Case(
@@ -99,8 +115,11 @@ def get_revenue_risk_ranking():
         )
     ).filter(total_overdue__gt=0).order_by('-is_churn_risk', '-total_overdue')[:10]
 
+    
+
 def generate_clearance_certificate(student, academic_year):
     """Gera PDF de Quitação Anual."""
+    from apps.finance.models import Invoice
     pending_debt = Invoice.objects.filter(
         student=student,
         academic_year=academic_year,
@@ -148,6 +167,8 @@ def check_promotion_eligibility(student):
     Verifica se o aluno pode ser promovido financeiramente.
     Regra SOTARQ: Nenhuma fatura pending ou overdue.
     """
+    from apps.finance.models import Invoice
+
     return not Invoice.objects.filter(
         student=student, 
         status__in=['pending', 'overdue']
@@ -161,6 +182,8 @@ def generate_annual_budget_proforma(student, academic_year, include_kit=True):
     Gera Proforma (FP) baseada nos valores REAIS definidos pela Direção Financeira.
     Busca no catálogo FeeType.
     """
+    from apps.finance.models import Invoice, InvoiceItem, FeeType
+
     # 1. Cria a Proforma no Banco
     fp = Invoice.objects.create(
         student=student,
@@ -234,6 +257,7 @@ class PenaltyEngine:
         3. Aplica Carência (grace_period_days).
         4. Calcula Multa Fixa e Juros Diários Acumulados.
         """
+        from .models import FinanceConfig
         
         # 1. Verificação de Isenção ou Estado Inválido para Mora
         if invoice.waive_penalty or invoice.status == 'paid' or invoice.status == 'cancelled':
@@ -278,48 +302,51 @@ class PenaltyEngine:
 
 
 
+
 class RiskAnalysisService:
-    """
-    Motor SOTARQ de Predição de Risco.
-    Analisa o comportamento histórico para prever inadimplência futura.
-    """
-    
     @staticmethod
     def project_monthly_loss(tenant):
-        hoje = timezone.now().date()
-        proximo_mes = hoje.replace(day=1) + timedelta(days=32) # Próximo ciclo
+        """
+        Motor de Projeção SOTARQ:
+        Calcula o potencial de arrecadação baseado nos FeeTypes recorrentes.
+        """
+        from apps.finance.models import FeeType, Invoice
+
+        today = timezone.now().date()
         
-        # 1. Busca alunos ativos
-        from apps.students.models import Student
-        students = Student.objects.filter(user__tenant=tenant, is_active=True)
+        # 1. RECEITA PROJETADA (Baseada em FeeTypes Recorrentes)
+        # Somamos todos os FeeTypes marcados como recorrentes (mensalidades)
+        base_monthly_fee = FeeType.objects.filter(
+            recurring=True
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
         
-        total_projected_revenue = 0
-        total_high_risk_loss = 0 # Inadimplência provável
+        # Contamos alunos ativos no tenant
+        active_students_count = Student.objects.filter(
+            user__tenant=tenant,
+            is_active=True
+        ).count()
         
-        for student in students:
-            # Pega o valor da mensalidade padrão dele
-            fee = student.current_class.grade_level.course.monthly_fee if student.current_class else 0
-            total_projected_revenue += fee
-            
-            # Analisa histórico: Quantas faturas ele atrasou nos últimos 3 meses?
-            overdue_count = Invoice.objects.filter(
-                student=student,
-                status='overdue',
-                due_date__gte=hoje - timedelta(days=90)
-            ).count()
-            
-            # Se o aluno atrasou 2 ou mais vezes, risco é de 80% de perda
-            if overdue_count >= 2:
-                total_high_risk_loss += float(fee) * 0.8
-            # Se atrasou 1 vez, risco de 30%
-            elif overdue_count == 1:
-                total_high_risk_loss += float(fee) * 0.3
-                
+        # Previsão Bruta = Alunos Ativos * Soma das Propinas Recorrentes
+        projected_revenue = base_monthly_fee * active_students_count
+        
+        # 2. VALOR EM RISCO (Faturas Overdue no Tenant)
+        total_risk_value = Invoice.objects.filter(
+            student__user__tenant=tenant,
+            status='overdue'
+        ).aggregate(total=Sum('total'))['total'] or Decimal('0.00')
+        
+        # 3. RECEITA SEGURA (O que já foi pago este mês)
+        safe_revenue = Invoice.objects.filter(
+            student__user__tenant=tenant,
+            status='paid',
+            issue_date__month=today.month,
+            issue_date__year=today.year
+        ).aggregate(total=Sum('total'))['total'] or Decimal('0.00')
+
         return {
-            'expected': total_projected_revenue,
-            'projected_loss': total_high_risk_loss,
-            'safe_revenue': total_projected_revenue - total_high_risk_loss,
-            'risk_percentage': (total_high_risk_loss / total_projected_revenue * 100) if total_projected_revenue > 0 else 0
+            'projection_next_month': float(projected_revenue),
+            'total_risk_value': float(total_risk_value),
+            'safe_revenue': float(safe_revenue),
+            'risk_percentage': round(float((total_risk_value / projected_revenue) * 100), 2) if projected_revenue > 0 else 0
         }
-
-
+    

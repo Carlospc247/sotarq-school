@@ -24,7 +24,7 @@ def get_default_end_date():
     
 
 class AcademicYear(BaseModel):
-    tenant = models.ForeignKey('customers.Client', on_delete=models.CASCADE, related_name='academic_years')
+    #tenant = models.ForeignKey('customers.Client', on_delete=models.CASCADE, related_name='academic_years')
     name = models.CharField(max_length=20, help_text="Ex: 2025/2026")
     start_date = models.DateField()
     end_date = models.DateField()
@@ -271,7 +271,7 @@ class AcademicGlobal(BaseModel):
     """
     Configurações globais da escola/tenant.
     """
-    tenant = models.OneToOneField('customers.Client', on_delete=models.CASCADE, related_name='academic_config')
+    #tenant = models.OneToOneField('customers.Client', null=True, blank=True, on_delete=models.CASCADE, related_name='academic_config')
     is_pedagogical_break = models.BooleanField(
         default=False,
         verbose_name="Pausa Pedagógica (Bloquear Notas)"

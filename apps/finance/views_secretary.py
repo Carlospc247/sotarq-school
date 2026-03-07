@@ -1,5 +1,6 @@
 # apps/finance/views_secretary.py
 from decimal import Decimal
+from venv import logger
 from django.utils import timezone
 from django.db import transaction
 from django.db.models import Sum, Q
@@ -7,6 +8,18 @@ from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import user_passes_test
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.urls import reverse
+from apps.academic.models import AcademicYear
+from apps.academic.views import is_manager_check
+from apps.finance.models import FinanceConfig
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
+
+from .models import FeeType
 
 from apps.academic.models import AcademicYear
 from apps.reports.finance.utils_reports import CashClosingReport
@@ -14,62 +27,70 @@ from apps.students.models import Student
 from .models import CashInflow, CashOutflow, CashSession, Payment, Invoice, PaymentType
 from apps.compras.models import Product
 
+
+
+
+
+
 @login_required
 def secretary_finance_dashboard(request):
     """
-    Operação de Caixa Central SOTARQ: Controle total de liquidez.
-    Unifica: Saldo de Abertura + Recebimentos Dinheiro + Suprimentos - Sangrias.
+    Operação de Caixa Central SOTARQ: Controle total de liquidez académica.
+    Foco exclusivo em: Validação de Propinas, Matrículas e Reconfirmações.
     """
+    # Rigor de Acesso: Apenas quem opera o financeiro entra aqui
     if request.user.current_role not in ['SECRETARY', 'DIRECT_ADMIN', 'ADMIN']:
         return HttpResponseForbidden("Acesso restrito à Secretaria e Administração.")
 
     today = timezone.now().date()
     
-    # 1. Recuperação da Sessão de Caixa Ativa
+    # 1. Recuperação da Sessão de Caixa Ativa (Turno do Operador)
     session = CashSession.objects.filter(user=request.user, status='open').last()
     
-    # 2. Inteligência de Cálculo de Saldo (Rigor Financeiro)
+    # 2. Inteligência de Cálculo de Saldo (Rigor SOTARQ)
     cash_total = Decimal('0.00')
+    
     if session:
-        # A. Recebimentos em Dinheiro (Vendas POS e Propinas via Caixa)
-        cash_sales = Payment.objects.filter(
+        # A. Recebimentos em Dinheiro: Apenas Propinas/Taxas pagas em espécie na secretaria
+        # Filtramos por método CASH para saber o que deve estar fisicamente na gaveta
+        cash_payments = Payment.objects.filter(
             confirmed_by=request.user,
             confirmed_at__date=today,
             method__method_type=PaymentType.CASH,
             validation_status='validated'
         ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
 
-        # B. Movimentações Avulsas
+        # B. Movimentações Avulsas (Suprimentos de troco e Sangrias de despesa)
         total_inflow = session.inflows.aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
         total_outflow = session.outflows.aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
 
-        # C. Fórmula Mestra: (Início + Vendas + Reforços) - Retiradas
-        cash_total = (session.opening_balance + cash_sales + total_inflow) - total_outflow
+        # C. Fórmula Mestra de Caixa: (Fundo de Maneio + Propinas em Cash + Reforços) - Retiradas
+        cash_total = (session.opening_balance + cash_payments + total_inflow) - total_outflow
 
-    # 3. Métricas de Operação
+    # 3. Métricas de Operação Académica
+    # Fila de espera: Alunos que enviaram comprovativos pelo Portal (Matrículas/Propinas)
     pending_validations = Payment.objects.filter(
-        validation_status='pending',
-        proof_file__isnull=False
+        validation_status='pending'
     ).select_related('invoice', 'invoice__student').order_by('created_at')
 
-    saleable_products = Product.objects.filter(is_saleable=True, stock_quantity__gt=0)
+    # ELIMINADO: saleable_products (Não vendemos itens no SOTARQ SCHOOL)
     
-    # Histórico rápido das últimas 5 ações do operador no turno
-    recent_sales = Payment.objects.filter(
+    # Histórico das últimas 5 validações de propinas do turno
+    recent_actions = Payment.objects.filter(
         confirmed_by=request.user, 
         confirmed_at__date=today
-    ).order_by('-confirmed_at')[:5]
+    ).select_related('invoice__student').order_by('-confirmed_at')[:5]
 
     context = {
         'active_cash_session': session,
         'pending_validations': pending_validations,
-        'products': saleable_products,
         'cash_total': cash_total,
-        'recent_sales': recent_sales,
+        'recent_actions': recent_actions,
+        # Útil para o operador saber o que pode cobrar
+        'available_fees': FeeType.objects.all(), 
     }
     
     return render(request, 'finance/secretary/dashboard.html', context)
-
 
 
 @login_required
@@ -246,3 +267,80 @@ def process_suprimento(request):
             messages.success(request, f"Suprimento de {amount:,.2f} Kz registrado.")
             
     return redirect('finance:secretary_dashboard')
+
+
+
+
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import user_passes_test
+from django.core.exceptions import PermissionDenied
+from django.contrib import messages
+from decimal import Decimal, InvalidOperation
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+@login_required
+def caixa_central_view(request):
+    """
+    Dashboard de Rigor SOTARQ: Focado exclusivamente em Taxas Académicas.
+    Eliminada venda de itens, cantina e produtos.
+    """
+    # 1. Filtramos apenas as Taxas Académicas Oficiais (Propinas, Matrículas, etc.)
+    # Como não temos mais FeeCategory, listamos todos os FeeTypes ativos.
+    taxas_academicas = FeeType.objects.all()
+
+    # 2. Sessão de Caixa Ativa (Segurança de Operação)
+    active_session = CashSession.objects.filter(user=request.user, status='open').first()
+
+    # 3. Pagamentos Pendentes de Validação (Onde o operador valida o talão/comprovativo)
+    # Focado em Propinas, Matrículas e Reconfirmações vindas do Portal ou Secretaria.
+    pending_validations = Payment.objects.filter(
+        validation_status='pending'
+    ).select_related('invoice__student', 'method')
+
+    context = {
+        'taxas': taxas_academicas,
+        'active_cash_session': active_session,
+        # Saldo esperado em gaveta
+        'cash_total': active_session.expected_balance if active_session else 0,
+        'pending_validations': pending_validations,
+        # Lista de alunos para busca rápida de faturas
+        'students': Student.objects.filter(is_active=True).only('full_name', 'registration_number'),
+    }
+    
+    return render(request, 'finance/caixa_central.html', context)
+
+
+@login_required
+@user_passes_test(is_manager_check)
+def setup_wizard(request):
+    """
+    Painel de Ativação Crítica: Crucial para o funcionamento do SOTARQ SCHOOL.
+    Centraliza os requisitos mínimos para o Tenant operar.
+    """
+    checks = {
+        'academic_year': {
+            'status': AcademicYear.objects.filter(is_active=True).exists(),
+            'title': 'Ano Letivo Ativo',
+            'description': 'Necessário para matrículas, turmas e pautas.',
+            # No seu urls.py: name='year_list' dentro do namespace 'academic'
+            'link': reverse('academic:year_list'), 
+        },
+        'finance_config': {
+            'status': FinanceConfig.objects.exists(),
+            'title': 'Configurações de Multas/Juros',
+            'description': 'Define o rigor financeiro sobre as faturas vencidas.',
+            # Como o app finance não tem namespace no include, usamos 'finance:...'
+            # Nota: Você ainda não definiu a rota de "Settings" no seu finance/urls.py,
+            # então redirecionamos para o Dashboard de Secretária como fallback seguro.
+            'link': reverse('finance:secretary_dashboard'), 
+        },
+        'system_ready': False
+    }
+
+    # Verifica se tudo está OK
+    checks['system_ready'] = all(item['status'] for key, item in checks.items() if key != 'system_ready')
+
+    return render(request, 'core/setup_wizard.html', {'checks': checks})

@@ -9,11 +9,21 @@ class AcademicLockMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
+        # 0. RIGOR SOTARQ: Se estivermos no schema 'public', saímos imediatamente.
+        # Não existe lógica académica no nível de infraestrutura global.
+        if not hasattr(request, 'tenant') or request.tenant.schema_name == 'public':
+            return self.get_response(request)
+
         if not request.user.is_authenticated:
             return self.get_response(request)
 
         # 1. Identifica se a URL atual é de lançamento de notas
-        current_url_name = resolve(request.path_info).url_name
+        # Usamos try/except porque o resolve pode falhar em URLs de outros apps
+        try:
+            current_url_name = resolve(request.path_info).url_name
+        except:
+            current_url_name = None
+            
         protected_urls = ['grading_sheet', 'mass_grade_entry', 'update_grade_ajax']
 
         if current_url_name in protected_urls:
@@ -24,12 +34,11 @@ class AcademicLockMiddleware:
                 # 3. Verifica exceções
                 is_exception = False
                 try:
-                    if hasattr(request.user, 'teacher_profile'):
-                        is_exception = lock_event.break_exceptions.filter(id=request.user.teacher_profile.id).exists()
-                    
-                    # Diretores e Admins nunca são bloqueados
+                    # Diretores e Admins nunca são bloqueados (Cheque rápido de role)
                     if request.user.current_role in ['ADMIN', 'DIRECTOR']:
                         is_exception = True
+                    elif hasattr(request.user, 'teacher_profile'):
+                        is_exception = lock_event.break_exceptions.filter(id=request.user.teacher_profile.id).exists()
                 except:
                     pass
 

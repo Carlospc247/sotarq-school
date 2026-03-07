@@ -31,7 +31,7 @@ class SubAgent(BaseModel):
 
 class Client(TenantMixin):
     name = models.CharField(max_length=100)
-    sub_agent = models.ForeignKey(SubAgent, on_delete=models.SET_NULL, null=True, related_name='my_clients') # A Escola (Tenant) vinculada a um Subagente.
+    sub_agent = models.ForeignKey(SubAgent, on_delete=models.SET_NULL, null=True, blank=True, related_name='my_clients') # A Escola (Tenant) vinculada a um Subagente.
     name = models.CharField(max_length=100)
     logo = models.ImageField(upload_to='customer_logos/', blank=True, null=True)
     primary_color = models.CharField(max_length=7, default='#4338ca') 

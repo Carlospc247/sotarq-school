@@ -102,7 +102,6 @@ TENANT_APPS = [
     'apps.fiscal',
     'apps.compras',
     'apps.library',
-    'apps.cafeteria',
     'apps.transport',
     'apps.inventory',
 ]
@@ -125,7 +124,6 @@ MIDDLEWARE = [
     'apps.audit.middleware.AuditMiddleware',
     'apps.core.middleware.LicenseCheckMiddleware',
     'apps.core.middleware.SuspensionMiddleware',
-    'apps.core.middleware.SotarqTenantMiddleware',
     'apps.academic.middleware.AcademicLockMiddleware',
     
     'django.contrib.messages.middleware.MessageMiddleware',

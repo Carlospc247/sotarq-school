@@ -6,10 +6,20 @@
     <div class="flex justify-between items-end">
         <div>
             <h1 class="text-2xl font-black text-slate-800 tracking-tight uppercase">Fluxo de Caixa Diário</h1>
-            <p class="text-slate-500 text-sm font-medium">Monitorização em tempo real das operações certificadas</p>
+            <p class="text-slate-500 text-sm font-medium">Escola: {{ request.user.tenant.name }}</p>
         </div>
-        <div class="text-right">
-            <span class="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-widest">Sistema AGT Ativo</span>
+        <div class="flex gap-3">
+            <a href="{% url 'finance:invoice_list' %}" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-200 transition-all flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                Lista de Faturas
+            </a>
+            {% if docs_pending_agt > 0 %}
+                <span class="px-3 py-2 bg-red-100 text-red-700 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center">
+                    {{ docs_pending_agt }} Pendências AGT
+                </span>
+            {% else %}
+                <span class="px-3 py-2 bg-emerald-100 text-emerald-700 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center">Contas em Dia</span>
+            {% endif %}
         </div>
     </div>
 
@@ -30,79 +40,119 @@
         </div>
     </div>
 
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <a href="{% url 'finance:treasury_dashboard' %}" class="flex items-center gap-3 p-4 bg-white border border-slate-100 rounded-2xl hover:border-emerald-500 transition-all group shadow-sm">
+            <div class="p-2 bg-emerald-50 text-emerald-600 rounded-lg group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+            </div>
+            <span class="text-xs font-black uppercase text-slate-700 tracking-tight">Tesouraria</span>
+        </a>
+
+        <a href="{% url 'finance:secretary_dashboard' %}" class="flex items-center gap-3 p-4 bg-white border border-slate-100 rounded-2xl hover:border-blue-500 transition-all group shadow-sm">
+            <div class="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+            </div>
+            <span class="text-xs font-black uppercase text-slate-700 tracking-tight">Secretaria</span>
+        </a>
+
+        <a href="{% url 'finance:overview' %}" class="flex items-center gap-3 p-4 bg-white border border-slate-100 rounded-2xl hover:border-indigo-500 transition-all group shadow-sm">
+            <div class="p-2 bg-indigo-50 text-indigo-600 rounded-lg group-hover:bg-indigo-500 group-hover:text-white transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+            </div>
+            <span class="text-xs font-black uppercase text-slate-700 tracking-tight">Overview BI</span>
+        </a>
+
+        <a href="{% url 'finance:fraud_report' %}" class="flex items-center gap-3 p-4 bg-white border border-slate-100 rounded-2xl hover:border-red-500 transition-all group shadow-sm">
+            <div class="p-2 bg-red-50 text-red-600 rounded-lg group-hover:bg-red-500 group-hover:text-white transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            </div>
+            <span class="text-xs font-black uppercase text-slate-700 tracking-tight">Fraudes</span>
+        </a>
+    </div>
+
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="lg:col-span-1 bg-slate-900 rounded-3xl p-6 text-white shadow-xl flex flex-col justify-between">
-            <div>
-                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Previsão Próximo Mês</p>
-                <h2 class="text-4xl font-black mt-4 text-indigo-400">{{ projection_next_month|floatformat:2 }} {{ currency }}</h2>
-                <div class="mt-6 space-y-2">
-                    <div class="flex justify-between text-[10px] uppercase font-bold">
-                        <span class="text-emerald-400">Potencial Seguro:</span>
-                        <span>{{ safe_revenue|floatformat:2 }} {{ currency }}</span>
-                    </div>
-                    <div class="flex justify-between text-[10px] uppercase font-bold text-red-400">
-                        <span>Em Risco Crítico:</span>
-                        <span>{{ total_risk_value|floatformat:2 }} {{ currency }}</span>
-                    </div>
+        <div class="lg:col-span-1 bg-white rounded-3xl border border-slate-100 p-6 shadow-sm">
+            <h3 class="text-[10px] font-black text-slate-400 uppercase mb-4 tracking-widest">Fluxo de PDV (Caixa)</h3>
+            <div class="space-y-3">
+                <div class="flex gap-2">
+                    <a href="{% url 'finance:open_cash_daily' %}" class="flex-1 py-2 bg-emerald-600 text-white text-[10px] font-black uppercase rounded-xl text-center hover:bg-emerald-700 transition-all">Abrir</a>
+                    <a href="{% url 'finance:close_cash_daily' %}" class="flex-1 py-2 bg-slate-800 text-white text-[10px] font-black uppercase rounded-xl text-center hover:bg-slate-900 transition-all">Fechar</a>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <a href="{% url 'finance:process_sangria' %}" class="p-3 bg-slate-50 rounded-xl text-[9px] font-bold text-slate-600 hover:bg-red-50 hover:text-red-600 transition-all border border-transparent hover:border-red-100">▼ Sangria</a>
+                    <a href="{% url 'finance:process_suprimento' %}" class="p-3 bg-slate-50 rounded-xl text-[9px] font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 transition-all border border-transparent hover:border-emerald-100">▲ Suprimento</a>
                 </div>
             </div>
-            <p class="text-[9px] text-slate-500 mt-6 italic">*Cálculo baseado no histórico de inadimplência e faturas overdue.</p>
+            <hr class="my-4 border-slate-50">
+            <h3 class="text-[10px] font-black text-slate-400 uppercase mb-4 tracking-widest">Orçamentos e Descontos</h3>
+            <div class="space-y-2">
+                <a href="{% url 'finance:budget_approval_list' %}" class="block p-3 bg-indigo-50 text-indigo-700 rounded-xl text-[10px] font-black uppercase hover:bg-indigo-100 transition-all">Aprovações Pendentes</a>
+            </div>
         </div>
 
-        <div class="lg:col-span-1 bg-white rounded-3xl border border-slate-100 p-4 shadow-sm flex flex-col items-center justify-center">
-            <h3 class="text-[9px] font-black text-slate-400 uppercase mb-2">Fluxo Real vs Projetado</h3>
-            <img src="data:image/png;base64,{{ projection_graph }}" class="max-w-full h-auto">
+        <div class="lg:col-span-1 bg-white rounded-3xl border border-slate-100 p-6 shadow-sm flex flex-col">
+            <h3 class="text-[10px] font-black text-slate-400 uppercase mb-4 tracking-widest">Faturamento por Curso</h3>
+            <div class="relative flex-grow h-48">
+                <canvas id="courseDistributionChart"></canvas>
+            </div>
         </div>
 
-        <div class="lg:col-span-1 bg-white rounded-3xl border border-slate-100 p-4 shadow-sm flex flex-col items-center justify-center">
-            <h3 class="text-[9px] font-black text-slate-400 uppercase mb-2">Composição da Qualidade de Receita</h3>
-            <img src="data:image/png;base64,{{ risk_graph }}" class="max-w-full h-auto">
+        <div class="lg:col-span-1 bg-white rounded-3xl border border-slate-100 p-6 shadow-sm flex flex-col">
+            <h3 class="text-[10px] font-black text-slate-400 uppercase mb-4 tracking-widest">Projeção e Risco</h3>
+            <img src="data:image/png;base64,{{ risk_graph }}" class="w-full h-auto rounded-2xl">
         </div>
     </div>
 
-    <td class="px-6 py-4">
-    {% if student.is_churn_risk %}
-        <span class="flex items-center gap-1 text-red-600 font-black text-[10px] uppercase">
-            <span class="relative flex h-2 w-2">
-                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-            </span>
-            Risco de Abandono
-        </span>
-        <p class="text-[9px] text-slate-400">Último acesso: {{ student.last_access|date:"d/m/Y" }}</p>
-    {% else %}
-        <span class="text-emerald-500 font-bold text-[10px] uppercase">Ativo no Portal</span>
-    {% endif %}
-</td>
-
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div class="bg-indigo-900 rounded-3xl p-8 text-white relative overflow-hidden">
-            <h3 class="text-xs font-black text-indigo-300 uppercase tracking-widest mb-6">Auditoria e Cobrança Automática</h3>
-            <div class="grid grid-cols-2 gap-8">
-                <div>
-                    <span class="text-4xl font-black">{{ receipts_signed_24h }}</span>
-                    <p class="text-[10px] text-indigo-300 uppercase font-bold mt-2">Recibos RSA (24h)</p>
-                </div>
-                <div>
-                    <span class="text-4xl font-black">{{ notifications_sent_today }}</span>
-                    <p class="text-[10px] text-indigo-300 uppercase font-bold mt-2">WhatsApp de Cobrança (Hoje)</p>
-                </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 pb-12">
+        <div class="bg-slate-900 rounded-3xl p-8 text-white">
+            <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 italic">Relatórios Estratégicos</h3>
+            <div class="flex flex-wrap gap-4">
+                <a href="{% url 'finance:generate_monthly_map' %}" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 rounded-2xl text-xs font-black uppercase transition-all flex items-center gap-3">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    Mapa Financeiro Mensal (BI)
+                </a>
+                <a href="{% url 'finance:promotion_dashboard' %}" class="px-6 py-3 bg-slate-800 hover:bg-slate-700 rounded-2xl text-xs font-black uppercase transition-all">Campanhas e Promoções</a>
             </div>
         </div>
 
         <div class="bg-white rounded-3xl border border-slate-100 p-8 shadow-sm">
-             <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Ações Estratégicas</h3>
-             <div class="space-y-3">
-                 <a href="{% url 'finance:generate_monthly_map' %}" class="flex items-center justify-between p-4 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-all group">
-                     <span class="text-sm font-bold text-slate-700">Exportar Mapa Financeiro (BI)</span>
-                     <svg class="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                 </a>
-                 <a href="{% url 'admin:finance_invoice_changelist' %}" class="flex items-center justify-between p-4 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-all group">
-                    <span class="text-sm font-bold text-slate-700">Painel de Devedores e Acordos</span>
-                    <svg class="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                </a>
+             <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 uppercase">Status de Patrimônio</h3>
+             <div class="space-y-4">
+                 <div class="flex justify-between items-center text-sm">
+                     <span class="font-bold text-slate-500 italic">Projeção Líquida:</span>
+                     <span class="font-black text-emerald-600">{{ lucro_real_projetado|floatformat:2 }} {{ currency }}</span>
+                 </div>
+                 <p class="text-[9px] text-slate-400 italic">Descontando depreciação de {{ monthly_depreciation }} Kz calculada pelo motor do sistema.</p>
              </div>
         </div>
     </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const courseCtx = document.getElementById('courseDistributionChart').getContext('2d');
+    fetch("{% url 'finance:api_bi_monthly_stats' %}")
+        .then(res => res.json())
+        .then(data => {
+            new Chart(courseCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: data.chart_data.labels,
+                    datasets: [{
+                        data: data.chart_data.values,
+                        backgroundColor: ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'],
+                        borderWidth: 0
+                    }]
+                },
+                options: { 
+                    maintainAspectRatio: false, 
+                    plugins: { 
+                        legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9, weight: 'bold' } } }
+                    }
+                }
+            });
+        });
+});
+</script>
 {% endblock %}

@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mx-auto max-w-6xl py-10 px-4">
+    <div class="mb-10">
+        <h1 class="text-3xl font-black text-slate-800 uppercase italic leading-none">Alçada de Orçamentos</h1>
+        <p class="text-sm text-slate-500 font-bold uppercase tracking-widest mt-2">Validação Fiscal e Comercial de Proformas (FP)</p>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6">
+        {% for fp in proformas %}
+        <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all p-8 flex flex-col xl:flex-row justify-between items-center gap-6">
+            
+            <div class="flex items-center gap-6">
+                <div class="w-16 h-16 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-inner">
+                    <i data-feather="file-text" class="w-8 h-8"></i>
+                </div>
+                <div>
+                    <h3 class="text-xl font-black text-slate-800 uppercase leading-tight">{{ fp.student.full_name|default:"Candidato Externo" }}</h3>
+                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">{{ fp.number }} • Solicitado em: {{ fp.issue_date|date:"d/m/Y" }}</p>
+                    
+                    <div class="flex flex-wrap gap-2">
+                        {% for item in fp.items.all %}
+                        <span class="px-2 py-1 bg-slate-100 rounded-lg text-[9px] font-bold text-slate-500 uppercase border border-slate-200">
+                            {{ item.description|truncatechars:25 }}
+                        </span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-col items-end gap-3 min-w-[350px] w-full xl:w-auto">
+                <div class="text-right mb-2">
+                    <p class="text-[10px] font-black text-slate-400 uppercase italic">Subtotal Bruto</p>
+                    <p class="text-2xl font-black text-slate-900">{{ fp.total|floatformat:2 }} Kz</p>
+                </div>
+
+                <form action="{% url 'finance:apply_budget_discount' fp.id %}" method="POST" class="space-y-3 w-full bg-slate-50 p-5 rounded-3xl border border-slate-200 shadow-inner">
+                    {% csrf_token %}
+                    
+                    <div class="space-y-1">
+                        <label class="text-[9px] font-black text-slate-500 uppercase ml-2">Enquadramento de IVA</label>
+                        <select name="tax_type_id" class="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-xs font-bold focus:ring-2 focus:ring-indigo-500 appearance-none">
+                            {% for tax in active_taxes %}
+                                <option value="{{ tax.id }}" {% if fp.tax_type_id == tax.id %}selected{% endif %}>
+                                    {{ tax.nome }} ({{ tax.tax_percentage }}%)
+                                </option>
+                            {% empty %}
+                                <option disabled>Nenhuma taxa configurada</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="space-y-1">
+                        <label class="text-[9px] font-black text-slate-500 uppercase ml-2">Conceder Abatimento</label>
+                        <div class="flex gap-2">
+                            <div class="relative flex-1">
+                                <input type="number" step="0.01" name="discount_value" placeholder="0.00" 
+                                       class="w-full bg-white border border-slate-200 rounded-xl p-3 text-xs font-black focus:ring-2 focus:ring-emerald-500">
+                                
+                                <select name="discount_mode" class="absolute right-1 top-1 bottom-1 bg-slate-100 border-none rounded-lg text-[10px] font-black uppercase px-2 cursor-pointer hover:bg-slate-200 transition">
+                                    <option value="PCT">%</option>
+                                    <option value="FIXED">Kz</option>
+                                </select>
+                            </div>
+                            
+                            <button type="submit" class="px-6 py-3 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-lg active:scale-95 flex items-center gap-2">
+                                <i data-feather="check-circle" class="w-3 h-3"></i>
+                                Validar
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% empty %}
+        <div class="py-20 text-center bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-200">
+            <div class="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                <i data-feather="coffee" class="text-slate-300 w-10 h-10"></i>
+            </div>
+            <h3 class="text-sm font-black text-slate-400 uppercase tracking-widest">Sem pendências</h3>
+            <p class="text-xs text-slate-400 mt-1">Todos os orçamentos foram processados pela Direção.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
