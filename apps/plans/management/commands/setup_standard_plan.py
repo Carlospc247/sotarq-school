@@ -16,7 +16,7 @@ class Command(BaseCommand):
 
         # Definição dos Módulos por Nível (Escada de Valor)
         base_modules = ['core', 'academic', 'teachers', 'students','documents', 'finance', 'fiscal', 'saft']
-        pro_modules = base_modules + ['library', 'cafeteria', 'audit', 'site_institucional']
+        pro_modules = base_modules + ['library', 'audit', 'site_institucional']
         
         # DECISÃO ESTRATÉGICA: O Site Institucional entra apenas no Premium para justificar o preço maior
         premium_modules = pro_modules + ['reports', 'portal', 'transport', 'inventory', 'matriculas_online']

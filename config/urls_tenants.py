@@ -32,18 +32,13 @@ urlpatterns = [
     path('finance/', include('apps.finance.urls')),
     path('saft/', include('apps.saft.urls')),
     path('library/', include('apps.library.urls')),
-    path('inventory/', include('apps.inventory.urls')),
     path('reports/', include('apps.reports.urls')),
     path('audit/', include('apps.audit.urls')),
     path('fiscal/', include('apps.fiscal.urls')),
-    path('compras/', include('apps.compras.urls')),
     path('documents/', include('apps.documents.urls')),
     path('accounts/', include('apps.accounts.urls')),
 
     path('billing/webhook-gateway-secret-123/', billing_webhook, name='billing_webhook'),
-
-    #path('', include('apps.core.urls', namespace='core')), # ATENÇÃO: Mantenha sempre no final da lista porque contém a rota vazia ''.
-    #path('', include('apps.core.urls')),
 ]
 
 if settings.DEBUG:

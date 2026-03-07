@@ -19,11 +19,8 @@ class Command(BaseCommand):
             {'code': 'accounts', 'name': 'Contabilidade Escolar', 'description': 'Plano de contas e integração bancária.'},
             {'code': 'saft', 'name': 'Exportação SAFT-AO', 'description': 'Conformidade fiscal para Angola.'},
             {'code': 'fiscal', 'name': 'Módulo Fiscal AGT', 'description': 'Assinatura de documentos e comunicação com a AGT.'},
-            {'code': 'compras', 'name': 'Aprovisionamento', 'description': 'Gestão de compras e stock da instituição.'},
             {'code': 'library', 'name': 'Gestão de Biblioteca', 'description': 'Catálogo, empréstimos e multas.'},
-            {'code': 'cafeteria', 'name': 'Cantina e Refeitório', 'description': 'Vendas POS e controlo de dietas.'},
             {'code': 'transport', 'name': 'Transporte Escolar', 'description': 'Gestão de rotas, frotas e paragens.'},
-            {'code': 'inventory', 'name': 'Gestão de Ativos', 'description': 'Inventário de património e depreciação.'},
             {'code': 'management', 'name': 'Global Management', 'description': 'Torre de controlo multi-tenant.'},
             
             # --- NOVO MÓDULO (Requisito: Site Institucional) ---
