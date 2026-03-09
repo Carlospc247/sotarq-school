@@ -62,7 +62,7 @@
             </div>
 
             <div class="mt-6 flex gap-2">
-                <a href="{% url 'academic:class_grading_sheet' class.id 0 %}" class="flex-1 text-center py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-white rounded-xl text-xs font-black hover:bg-indigo-600 hover:text-white transition">
+                <a href="{% url 'academic:grading_sheet_default' class_id=class.id subject_id=0 %}" class="flex-1 text-center py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-white rounded-xl text-xs font-black hover:bg-indigo-600 hover:text-white transition">
                     PAUTAS
                 </a>
                 <button class="p-2 bg-slate-50 dark:bg-slate-700/50 text-slate-400 rounded-xl hover:text-emerald-500 transition">

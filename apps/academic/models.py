@@ -36,11 +36,13 @@ class AcademicYear(BaseModel):
     def __str__(self):
         return self.name
 
+
 class Course(BaseModel):
     class Level(models.TextChoices):
-        HIGH_SCHOOL = 'HIGH_SCHOOL', _('Ensino Médio (General)')
-        TECHNICAL = 'TECHNICAL', _('Técnico (Vocational)')
-        PROFESSIONAL = 'PROFESSIONAL', _('Profissional (Training)')
+        BASE = 'BASE', _('Ensino de Base (primario, I e II)')
+        HIGH_SCHOOL = 'HIGH_SCHOOL', _('Ensino Médio (Puniv)')
+        TECHNICAL = 'TECHNICAL', _('Médio Técnico (Vocational-Politécnico)')
+        PROFESSIONAL = 'PROFESSIONAL', _('Formação Profissional (Training)')
     
     name = models.CharField(max_length=100)
     code = models.CharField(max_length=20, unique=True)
@@ -50,6 +52,7 @@ class Course(BaseModel):
     
     def __str__(self):
         return f"{self.name} ({self.get_level_display()})"
+
 
 class GradeLevel(BaseModel): # Renomeado de Grade para evitar confusão com 'Notas'
     name = models.CharField(max_length=50, help_text="Ex: 10ª Classe")
@@ -70,6 +73,7 @@ class GradeLevel(BaseModel): # Renomeado de Grade para evitar confusão com 'Not
     def __str__(self):
         return f"{self.name} - {self.course.name}"
 
+
 class Subject(BaseModel):
     name = models.CharField(max_length=100)
     code = models.CharField(max_length=20, blank=True)
@@ -79,7 +83,8 @@ class Subject(BaseModel):
     def __str__(self):
         return f"{self.name} ({self.grade_level})"
 
-class Class(BaseModel): # A Turma
+
+class Class(BaseModel):
     name = models.CharField(max_length=50, help_text="Ex: 10ª A")
     academic_year = models.ForeignKey(AcademicYear, on_delete=models.PROTECT)
     grade_level = models.ForeignKey(GradeLevel, on_delete=models.PROTECT)
@@ -90,7 +95,10 @@ class Class(BaseModel): # A Turma
 
     @property
     def current_occupancy(self):
-        return self.enrollments_records.count()
+        try:
+            return self.enrollments_records.all().count()
+        except Exception:
+            return 0
 
     @property
     def has_vacancy(self):
@@ -108,7 +116,10 @@ class Class(BaseModel): # A Turma
         verbose_name_plural = "Classes (Turmas)"
 
     def __str__(self):
-        return f"{self.name} ({self.academic_year})"
+        # Usar .name explicitamente evita que o Django tente resolver 
+        # o objeto completo caso ele esteja em estado lazy ou corrompido
+        return f"{self.name} - {self.academic_year.name if self.academic_year else 'Sem Ano'}"
+
 
 class VacancyRequest(BaseModel):
     """Solicitação quando a sala está cheia"""

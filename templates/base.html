@@ -33,6 +33,39 @@
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: #475569; }
     </style>
+    {% if school_branding %}
+    <style>
+        :root {
+            /* Injeção dinâmica das cores da SOTARQ SCHOOL */
+            --brand-primary: {{ school_branding.primary_color|default:"#4f46e5" }};
+            --brand-secondary: {{ school_branding.secondary_color|default:"#1e293b" }};
+            
+            /* Cores do Site Institucional (Header/Footer) */
+            --site-header-bg: {{ school_branding.site_header_bg|default:"#ffffff" }};
+            --site-header-text: {{ school_branding.site_header_text|default:"#000000" }};
+            --site-footer-bg: {{ school_branding.site_footer_bg|default:"#1e293b" }};
+            --site-footer-text: {{ school_branding.site_footer_text|default:"#ffffff" }};
+        }
+
+        /* Aplicação Prática das Classes */
+        .bg-brand-primary { background-color: var(--brand-primary) !important; }
+        .text-brand-primary { color: var(--brand-primary) !important; }
+        .border-brand-primary { border-color: var(--brand-primary) !important; }
+        
+        .btn-sotarq {
+            background-color: var(--brand-primary);
+            color: white; /* Depois podemos automatizar o contraste aqui */
+            transition: all 0.3s ease;
+        }
+        .btn-sotarq:hover {
+            filter: brightness(90%);
+        }
+
+        /* Estilo do Site */
+        .site-header { background-color: var(--site-header-bg); color: var(--site-header-text); }
+        .site-footer { background-color: var(--site-footer-bg); color: var(--site-footer-text); }
+    </style>
+    {% endif %}
     
     <script>
         tailwind.config = {
@@ -175,9 +208,9 @@
                     {% endif %}
                     
                     {% if 'saft' in active_modules %}
-                    <a href="{% url 'saft:audit_dashboard' %}" class="flex items-center p-2.5 hover:text-white hover:bg-slate-800 rounded-lg transition-colors group text-sm font-medium">
+                    <a href="{% url 'fiscal:fiscal_audit_log' %}" class="flex items-center p-2.5 hover:text-white hover:bg-slate-800 rounded-lg transition-colors group text-sm font-medium">
                         <i data-feather="file-text" class="mr-3 w-4 h-4 text-rose-400 group-hover:text-white transition-colors"></i>
-                        <span>SAFT (AGT)</span>
+                        <span>Fiscalidade (AGT)</span>
                     </a>
                     {% endif %}
                 {% endif %}
@@ -192,13 +225,6 @@
                 </a>
                 {% endif %}
                 
-                
-                {% if 'compras' in active_modules %}
-                <a href="{% url 'compras:stock_dashboard' %}" class="flex items-center p-2.5 hover:text-white hover:bg-slate-800 rounded-lg transition-colors group text-sm font-medium">
-                    <i data-feather="shopping-cart" class="mr-3 w-4 h-4 text-amber-400 group-hover:text-white transition-colors"></i>
-                    <span>Compras & Stock</span>
-                </a>
-                {% endif %}
 
                 <p class="text-[10px] font-black text-slate-600 uppercase tracking-widest px-3 mt-6 mb-2">Logística</p>
                 
@@ -209,12 +235,6 @@
                 </a>
                 {% endif %}
                 
-                {% if 'cafeteria' in active_modules %}
-                <a href="{% url 'library:library_dashboard' %}" class="flex items-center p-2.5 hover:text-white hover:bg-slate-800 rounded-lg transition-colors group text-sm font-medium">
-                    <i data-feather="book" class="mr-3 w-4 h-4 text-red-400 group-hover:text-white transition-colors"></i>
-                    <span>Biblioteca</span>
-                </a>
-                {% endif %}
                 
                 <p class="text-[10px] font-black text-slate-600 uppercase tracking-widest px-3 mt-6 mb-2">Governança</p>
                 
@@ -226,10 +246,9 @@
                 {% endif %}
                 
                 {% if 'audit' in active_modules %}
-                    {% if request.user.is_staff %}
                     <a href="{% url 'audit:logs' %}" class="flex items-center p-2.5 hover:text-white hover:bg-slate-800 rounded-lg transition-colors group text-sm font-medium">
                         <i data-feather="clipboard" class="mr-3 w-4 h-4 text-brand-400 group-hover:text-white transition-colors"></i>
-                        <span>Auditoria</span>
+                        <span>Auditoria Global</span>
                     </a>
                     {% endif %}
                 {% endif %}
@@ -268,6 +287,22 @@
                     </div>
                 </div>
                 {% endif %}
+
+                <div class="mt-4 px-2 pb-4 space-y-2">
+
+                    <a href="{% url 'core:public_about' %}"
+                        class="flex items-center justify-center w-full p-3 bg-gradient-to-r from-slate-800 to-slate-700 text-slate-300 rounded-xl hover:from-brand-600 hover:to-brand-500 hover:text-white transition-all duration-300 group border border-slate-700 hover:border-brand-500">
+                        <i data-feather="globe" class="w-4 h-4 mr-2"></i>
+                        <span class="text-xs font-bold uppercase tracking-wider">Site da Escola</span>
+                    </a>
+
+                    <a href="{% url 'core:help_center' %}"
+                        class="flex items-center justify-center w-full p-3 bg-gradient-to-r from-slate-800 to-slate-700 text-slate-300 rounded-xl hover:from-brand-600 hover:to-brand-500 hover:text-white transition-all duration-300 group border border-slate-700 hover:border-brand-500">
+                        <i data-feather="help-circle" class="w-4 h-4 mr-2"></i>
+                        <span class="text-xs font-bold uppercase tracking-wider">Central de Ajuda</span>
+                    </a>
+
+                </div>
                 
                 <script>
                     feather.replace();
@@ -291,7 +326,7 @@
             </button>
         </div>
     </aside>
-    {% endif %}
+    
 
     <main class="flex-1 flex flex-col min-h-0 overflow-hidden bg-slate-50 relative">
         
@@ -330,6 +365,12 @@
                     </div>
                 </div>
             </div>
+            <div class="absolute right-0 mt-2 w-32 bg-white rounded-lg shadow-xl border border-slate-100 py-1 hidden group-hover:block animate-fade-in-down">
+                        <form id="logout-form" action="{% url 'core:logout' %}" method="POST">
+                            {% csrf_token %}
+                            <button type="submit" class="block w-full text-left px-4 py-2 text-xs font-bold text-red-600 hover:bg-red-50 uppercase tracking-wider">Sair</button>
+                        </form>
+                    </div>
         </header>
 
         <div class="flex-1 overflow-y-auto p-4 sm:p-8 scroll-smooth">

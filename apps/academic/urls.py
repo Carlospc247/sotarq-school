@@ -42,6 +42,11 @@ urlpatterns = [
     path('courses/add/', views.CourseCreateView.as_view(), name='course_create'),
     
     path('grade-levels/', views.GradeLevelListView.as_view(), name='grade_level_list'),
+    path('grade-levels/add/', views.GradeLevelCreateView.as_view(), name='grade_level_create'),
+    
+    # --- GESTÃO DE DISCIPLINAS ---
+    path('subjects/', views.SubjectListView.as_view(), name='subject_list'),
+    path('subjects/add/', views.SubjectCreateView.as_view(), name='subject_create'),
     
     path('classes/', views.ClassListView.as_view(), name='class_list'),
     path('classes/add/', views.ClassCreateView.as_view(), name='class_create'),

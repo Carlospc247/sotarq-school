@@ -28,7 +28,7 @@ from .models import (
     AcademicGlobal, AcademicYear, Class, Classroom, LessonPlan, Subject, 
     StudentGrade, VacancyRequest, AcademicEvent
 )
-from .forms import AcademicEventEmailsForm, AcademicYearForm, PedagogicalLockForm
+from .forms import AcademicEventEmailsForm, AcademicYearForm, GradeLevelForm, PedagogicalLockForm, SubjectForm
 from .exports import ExportEngine
 # Importação segura para evitar quebra se analytics tiver erro
 try:
@@ -74,63 +74,73 @@ def is_teacher_pedagogic(user):
     MANAGEMENT_ROLES = [Role.Type.ADMIN, Role.Type.DIRECTOR, Role.Type.STUDENT, Role.Type.PEDAGOGIC]
     return user.is_superuser or user.current_role in MANAGEMENT_ROLES
 
-
-# ==============================================================================
-# 1. GESTÃO DE PAUTAS E NOTAS
-# ==============================================================================
-
 # ==============================================================================
 # 1. GESTÃO DE PAUTAS E NOTAS (REVISÃO SÊNIOR)
 # ==============================================================================
-
 @login_required
 def class_grading_sheet(request, class_id, subject_id, term=1):
     """Exibe a pauta de consulta. Bloqueia acesso Cross-Tenant e valida posse."""
-    # 1. SEGURANÇA: Filtro obrigatório por Tenant via AcademicYear
-    klass = get_object_or_404(Class, id=class_id, academic_year__tenant=request.user.tenant)
     
+    # 1. SEGURANÇA: Filtro obrigatório por Tenant (Rigor SOTARQ)
+    # Certifique-se que o modelo Class ou AcademicYear tenha o campo 'tenant'
+
+    #klass = get_object_or_404(Class, id=class_id, academic_year__school=request.user.tenant)
+
+    klass = get_object_or_404(Class, id=class_id)
+
     # Lógica de seletor (se subject_id for 0)
     if subject_id == 0:
         subjects = Subject.objects.filter(grade_level=klass.grade_level)
-        return render(request, 'academic/subject_selector.html', {'klass': klass, 'subjects': subjects, 'term': term})
+        return render(request, 'academic/subject_selector.html', {
+            'klass': klass, 
+            'subjects': subjects, 
+            'term': term
+        })
 
     subject = get_object_or_404(Subject, id=subject_id)
     
-    # 2. PERMISSÃO: Se não for Diretor, verifica se o professor leciona esta disciplina nesta turma
+    # 2. PERMISSÃO: Se não for Gestor, verifica alocação do Professor
     if not request.user.is_manager:
+        # Importante: TeacherSubject deve ligar o User ao Tenant
         is_allocated = TeacherSubject.objects.filter(
             teacher__user=request.user, 
             class_room=klass, 
             subject=subject
         ).exists()
+        
         if not is_allocated:
-            logger.warning(f"ACESSO NEGADO: User {request.user.id} tentou acessar pauta da turma {class_id}")
-            return HttpResponseForbidden("ACESSO NEGADO: Você não tem permissão para esta pauta.")
+            return HttpResponseForbidden("ACESSO NEGADO: Você não leciona esta disciplina nesta turma.")
 
-    # 3. PERFORMANCE: Otimização de registros de notas (Bulk Strategy)
-    active_student_ids = Enrollment.objects.filter(
-        class_room=klass, status='active'
+    # 3. ESTRATÉGIA BULK: Garante que todos os alunos matriculados tenham registro de nota
+    active_enrollments = Enrollment.objects.filter(
+        class_room=klass, 
+        status='active'
+    ).select_related('student')
+
+    # Busca notas já existentes para evitar duplicatas
+    existing_student_ids = StudentGrade.objects.filter(
+        klass=klass, 
+        subject=subject
     ).values_list('student_id', flat=True)
     
-    # Busca notas existentes
-    existing_grades_student_ids = StudentGrade.objects.filter(
-        klass=klass, subject=subject
-    ).values_list('student_id', flat=True)
+    # Cria registros faltantes em massa
+    new_grades = [
+        StudentGrade(
+            student=enrol.student,
+            subject=subject,
+            klass=klass,
+            academic_year=klass.academic_year
+        ) for enrol in active_enrollments if enrol.student_id not in existing_student_ids
+    ]
     
-    # Identifica alunos sem nota e cria em massa (Rigor SOTARQ)
-    missing_student_ids = set(active_student_ids) - set(existing_grades_student_ids)
-    if missing_student_ids:
-        new_grades = [
-            StudentGrade(
-                student_id=s_id, 
-                subject=subject, 
-                klass=klass, 
-                academic_year=klass.academic_year
-            ) for s_id in missing_student_ids
-        ]
+    if new_grades:
         StudentGrade.objects.bulk_create(new_grades)
 
-    grades = StudentGrade.objects.filter(klass=klass, subject=subject).select_related('student').order_by('student__full_name')
+    # Busca todas as notas para exibição
+    grades = StudentGrade.objects.filter(
+        klass=klass, 
+        subject=subject
+    ).select_related('student').order_by('student__full_name')
     
     return render(request, 'academic/grading_sheet.html', {
         'klass': klass,
@@ -328,12 +338,15 @@ def update_grade_ajax(request):
 
 @login_required
 def student_dashboard(request):
-    """
-    Dashboard Centralizado SOTARQ SCHOOL.
-    Unifica: Portal do Aluno, Gestão de Staff, Bloqueio Pedagógico e Despacho de Vagas.
-    """
+   
+    #Dashboard Centralizado SOTARQ SCHOOL.
+    #Unifica: Portal do Aluno, Gestão de Staff, Bloqueio Pedagógico e Despacho de Vagas.
+
     user = request.user
     role = user.current_role
+    active_year = AcademicYear.objects.filter(is_active=True).first()
+
+    
 
     # 1. DISPATCH PARA ALUNO/ENCARREGADO
     if role in [Role.Type.STUDENT, Role.Type.GUARDIAN]:
@@ -346,6 +359,15 @@ def student_dashboard(request):
     if not has_access:
         messages.error(request, "Acesso Negado: Não tens permissão para a Gestão Académica.")
         return redirect('core:dashboard')
+    
+    # --- NOVO: BUSCAR ALOCAÇÕES SE FOR PROFESSOR ---
+    teacher_allocations = []
+    if role == Role.Type.TEACHER:
+        # Busca todas as disciplinas/turmas que este professor leciona no ano ativo
+        teacher_allocations = TeacherSubject.objects.filter(
+            teacher__user=user,
+            class_room__academic_year=active_year
+        ).select_related('class_room', 'subject')
 
     # --- BLOQUEIO PEDAGÓGICO (AcademicGlobal) ---
     academic_global, _ = AcademicGlobal.objects.get_or_create(pk=1)  # Garantir objeto único
@@ -390,6 +412,8 @@ def student_dashboard(request):
 
     context = {
         'classes': classes,
+        'teacher_allocations': teacher_allocations,
+        'view_type': role,
         'active_year': active_year,
         'is_director': is_director,
         'form_lock': form_lock,
@@ -407,6 +431,92 @@ def student_dashboard(request):
         }
     }
     return render(request, 'academic/academic_page.html', context)
+
+
+"""
+@login_required
+def student_dashboard(request):
+    user = request.user
+    role = user.current_role
+    tenant = user.tenant  # RIGOR MULTI-TENANT: Sempre isole por tenant
+    
+    # 1. Ano Letivo Ativo (Isolado por Tenant)
+    active_year = AcademicYear.objects.filter(tenant=tenant, is_active=True).first()
+
+    # 2. Dispatch Aluno/Encarregado
+    if role in [Role.Type.STUDENT, Role.Type.GUARDIAN]:
+        return _handle_student_portal_view(request)
+
+    # 3. Permissões de Staff
+    is_director = role in [Role.Type.ADMIN, Role.Type.DIRECTOR]
+    has_access = user.pode_acessar_academic_page or is_director
+
+    if not has_access:
+        messages.error(request, "Acesso Negado: Não tens permissão para a Gestão Académica.")
+        return redirect('core:dashboard')
+    
+    # --- ALOCAÇÕES DO PROFESSOR (Otimizado) ---
+    teacher_allocations = []
+    if role == Role.Type.TEACHER and active_year:
+        teacher_allocations = TeacherSubject.objects.filter(
+            teacher__user=user,
+            class_room__academic_year=active_year,
+            tenant=tenant # RIGOR: Filtro de tenant explícito
+        ).select_related('class_room', 'subject')
+
+    # --- BLOQUEIO PEDAGÓGICO (Isolado por Tenant) ---
+    # Nunca use pk=1 em sistemas multi-tenant! Use o tenant como chave.
+    academic_global, _ = AcademicGlobal.objects.get_or_create(tenant=tenant)
+    
+    if request.method == 'POST' and 'update_lock' in request.POST and is_director:
+        form_lock = PedagogicalLockForm(request.POST, instance=academic_global)
+        if form_lock.is_valid():
+            form_lock.save()
+            messages.success(request, "Configurações atualizadas!")
+            return redirect('academic:student_dashboard')
+    else:
+        form_lock = PedagogicalLockForm(instance=academic_global)
+
+    # --- VAGAS PENDENTES (Otimizado com count manual para evitar 2 queries) ---
+    pending_vacancies = []
+    pending_count = 0
+    if is_director:
+        qs_vagas = VacancyRequest.objects.filter(
+            is_resolved=False,
+            tenant=tenant # Simplificado: use o tenant do request
+        ).select_related('student', 'target_grade')
+        
+        pending_count = qs_vagas.count()
+        pending_vacancies = qs_vagas[:5]
+
+    # --- TURMAS ---
+    classes = Class.objects.filter(
+        academic_year=active_year, 
+        tenant=tenant
+    ).select_related('grade_level', 'grade_level__course')
+
+    context = {
+        'classes': classes,
+        'teacher_allocations': teacher_allocations,
+        'view_type': role,
+        'active_year': active_year,
+        'is_director': is_director,
+        'form_lock': form_lock,
+        'pending_vacancies': pending_vacancies,
+        'pending_vacancies_count': pending_count,
+        'stats': {
+            'total_classes': classes.count(),
+            'total_students': Student.objects.filter(tenant=tenant, is_active=True).count(),
+        },
+        'perms': {
+            'ver_pautas': is_director or user.pode_ver_pautas_boletins,
+            'baixar_pautas': is_director or user.pode_baixar_pautas,
+            'ver_docs': is_director or user.pode_ver_documentos_academics,
+        }
+    }
+    return render(request, 'academic/academic_page.html', context)
+"""
+
 
 
 def _handle_student_portal_view(request):
@@ -793,17 +903,44 @@ class StaffRequiredMixin(UserPassesTestMixin):
 # ==========================================
 # GESTÃO DE CURSOS
 # ==========================================
+
+
 class GradeLevelListView(LoginRequiredMixin, ListView):
     model = GradeLevel
     template_name = 'academic/grade_level_list.html'
     context_object_name = 'grade_levels'
 
     def get_queryset(self):
-        return GradeLevel.objects.filter(course__tenant=self.request.user.tenant)
+        # Mantendo seu rigor de performance com select_related
+        return GradeLevel.objects.all().select_related('course').order_by('course', 'level_index')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # INJEÇÃO CRÍTICA: Sem isso, os campos {{ form.name }} no modal ficam invisíveis/inacessíveis
+        context['form'] = GradeLevelForm() 
+        return context
+
+
+class GradeLevelCreateView(LoginRequiredMixin, StaffRequiredMixin, CreateView):
+    model = GradeLevel
+    form_class = GradeLevelForm
+    template_name = 'academic/grade_level_list.html' 
+    success_url = reverse_lazy('academic:grade_level_list')
+
+    def form_invalid(self, form):
+        # Buscamos os dados da listagem exatamente como na ListView original
+        grade_levels = GradeLevel.objects.all().select_related('course').order_by('course', 'level_index')
+        
+        return self.render_to_response(self.get_context_data(
+            form=form,
+            grade_levels=grade_levels,
+            open_modal_on_load=True 
+        ))
 
 # ==========================================
 # GESTÃO DE CURSOS
 # ==========================================
+
 
 class CourseListView(LoginRequiredMixin, ListView):
     model = Course
@@ -815,6 +952,7 @@ class CourseListView(LoginRequiredMixin, ListView):
         # Basta dar o .all() e ele trará apenas os cursos da escola atual.
         return Course.objects.all().order_by('name')
 
+
 class CourseCreateView(LoginRequiredMixin, StaffRequiredMixin, CreateView):
     model = Course
     fields = ['name', 'code', 'level', 'duration_years', 'coordinator']
@@ -825,36 +963,43 @@ class CourseCreateView(LoginRequiredMixin, StaffRequiredMixin, CreateView):
         # Não injetamos nada. O objeto cai automaticamente no esquema ativo.
         return super().form_valid(form)
 
-# ==========================================
-# GESTÃO DE TURMAS (CLASSES)
-# ==========================================
 
-class ClassListView(LoginRequiredMixin, ListView):
-    model = Class
-    template_name = 'academic/class_list.html'
-    context_object_name = 'classes'
+
+class SubjectListView(LoginRequiredMixin, ListView):
+    model = Subject
+    template_name = 'academic/subject_list.html'
+    context_object_name = 'subjects'
 
     def get_queryset(self):
-        # Simplificação total: O isolamento é por Schema, não por WHERE clause.
-        return Class.objects.all().select_related('grade_level', 'academic_year', 'main_teacher')
+        # Rigor SOTARQ: Ordenação lógica por Nível e depois Nome
+        return Subject.objects.all().select_related('grade_level', 'grade_level__course').order_by(
+            'grade_level__course', 'grade_level__level_index', 'name'
+        )
 
-class ClassCreateView(LoginRequiredMixin, StaffRequiredMixin, CreateView):
-    model = Class
-    fields = ['name', 'academic_year', 'grade_level', 'main_teacher', 'capacity', 'period', 'room_number']
-    template_name = 'academic/class_form.html'
-    success_url = reverse_lazy('academic:class_list')
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Injetamos o formulário vazio para o Modal de Criação
+        context['form'] = SubjectForm()
+        # Útil para filtros no template
+        context['grade_levels'] = GradeLevel.objects.all().select_related('course')
+        return context
 
+
+class SubjectCreateView(LoginRequiredMixin, CreateView):
+    model = Subject
+    form_class = SubjectForm
+    template_name = 'academic/subject_list.html'
+    success_url = reverse_lazy('academic:subject_list')
+
+    def form_invalid(self, form):
+        # Se falhar, recarrega a lista com os erros e abre o modal
+        queryset = Subject.objects.all().select_related('grade_level').order_by('grade_level', 'name')
+        return self.render_to_response(self.get_context_data(
+            form=form,
+            subjects=queryset,
+            open_modal_on_load=True
+        ))
     
-class CourseCreateView(LoginRequiredMixin, StaffRequiredMixin, CreateView):
-    model = Course
-    fields = ['name', 'code', 'level', 'duration_years', 'coordinator']
-    template_name = 'academic/course_form.html'
-    success_url = reverse_lazy('academic:course_list')
-
-    def form_valid(self, form):
-        # Injeta o tenant automaticamente antes de salvar
-        form.instance.tenant = self.request.user.tenant
-        return super().form_valid(form)
 
 # ==========================================
 # GESTÃO DE TURMAS (CLASSES)
@@ -866,23 +1011,33 @@ class ClassListView(LoginRequiredMixin, ListView):
     context_object_name = 'classes'
 
     def get_queryset(self):
-        return Class.objects.filter(academic_year__tenant=self.request.user.tenant)\
-                            .select_related('grade_level', 'academic_year', 'main_teacher')
+        # O isolamento por Schema garante que AcademicYear.objects.all() 
+        # já retorne apenas os anos da "Escola Excellence".
+        return Class.objects.all().select_related(
+            'grade_level', 
+            'academic_year', 
+            'main_teacher'
+        )
+
+
 
 class ClassCreateView(LoginRequiredMixin, StaffRequiredMixin, CreateView):
     model = Class
-    fields = ['name', 'academic_year', 'grade_level', 'main_teacher', 'capacity', 'period', 'room_number']
+    form_class = ClassForm # Use o form_class em vez de fields
     template_name = 'academic/class_form.html'
     success_url = reverse_lazy('academic:class_list')
 
-    def get_form(self, *args, **kwargs):
-        """Filtra os campos do formulário para mostrar apenas dados do Tenant."""
-        form = super().get_form(*args, **kwargs)
-        tenant = self.request.user.tenant
-        form.fields['academic_year'].queryset = AcademicYear.objects.filter(tenant=tenant)
-        form.fields['grade_level'].queryset = GradeLevel.objects.filter(course__tenant=tenant)
-        return form
 
+#class CourseCreateView(LoginRequiredMixin, StaffRequiredMixin, CreateView):
+#    model = Course
+#    fields = ['name', 'code', 'level', 'duration_years', 'coordinator']
+#    template_name = 'academic/course_form.html'
+#    success_url = reverse_lazy('academic:course_list')
+
+#    def form_valid(self, form):
+#        # Injeta o tenant automaticamente antes de salvar
+#        form.instance.tenant = self.request.user.tenant
+#        return super().form_valid(form)
 
 
 

@@ -59,7 +59,8 @@ def update_config(request):
 
 
 @login_required
-@user_passes_test(lambda u: u.is_staff)
+#@user_passes_test(lambda u: u.is_staff) só para is_staff=True
+@user_passes_test(is_manager_check)
 def fiscal_audit_log(request):
     """
     PAINEL DE CONTROLO FISCAL: Integridade RSA + Monitorização AGT Webservice.
@@ -167,6 +168,48 @@ def imprimir_documento_fiscal(request, doc_id):
     return redirect('fiscal:fiscal_audit_log')
 
 
+import os
+import logging
+from django.shortcuts import get_object_or_404, redirect
+from django.contrib import messages
+from django.views.decorators.http import require_POST
+from django.contrib.auth.decorators import login_required
+from .models import SAFTExport
+
+logger = logging.getLogger(__name__)
+
+@login_required
+@require_POST
+def delete_saft(request, pk):
+    """
+    Elimina um registo SAF-T com rigor SOTARQ.
+    Segurança: O queryset é limitado ao schema atual do Tenant pelo django-tenants.
+    """
+    # 1. Recupera o objeto ou retorna 404 (Já isolado pelo schema_name do tenant atual)
+    saft = get_object_or_404(SAFTExport, pk=pk)
+    
+    periodo = saft.periodo_tributacao
+    nome_arquivo = saft.nome_arquivo
+
+    try:
+        # 2. Remoção Física do Ficheiro (Storage)
+        # É vital remover do disco para evitar custos desnecessários de armazenamento
+        if saft.arquivo:
+            if os.path.isfile(saft.arquivo.path):
+                os.remove(saft.arquivo.path)
+                logger.info(f"Ficheiro físico {nome_arquivo} removido com sucesso.")
+
+        # 3. Remoção do Registo na Base de Dados
+        saft.delete()
+        
+        messages.success(request, f"Registo SAF-T [{periodo}] eliminado com sucesso.")
+        logger.info(f"Usuário {request.user.id} eliminou o registo SAF-T {pk} do tenant {request.tenant.schema_name}")
+
+    except Exception as e:
+        messages.error(request, f"Erro ao eliminar o registo: {str(e)}")
+        logger.error(f"Falha crítica na exclusão do SAF-T {pk}: {str(e)}")
+
+    return redirect('fiscal:saft_index') # Ou o nome da sua view principal de listagem
 
 
 @login_required
@@ -208,3 +251,13 @@ def anular_documento_fiscal(request, doc_id):
 
     return render(request, 'fiscal/confirm_cancel.html', {'doc': documento})
 
+##############################################
+# WEBSERVICE
+##############################################
+from django.http import JsonResponse
+from .services import AGTWebService
+
+def api_agt_status(request):
+    """Endpoint chamado pelo AJAX no Dashboard."""
+    service = AGTWebService()
+    return JsonResponse({'online': service.check_status()})

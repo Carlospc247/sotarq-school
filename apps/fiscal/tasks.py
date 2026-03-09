@@ -67,16 +67,30 @@ def check_and_generate_monthly_saft():
 @shared_task
 def task_generate_xml(saft_id, schema_name):
     from django_tenants.utils import schema_context
-    from .validators import SAFTValidator
-    
+    from .validators import SAFTValidator  # Mantemos o rigor da perícia
+    import calendar
+    from datetime import datetime
+    import logging
+
+    logger = logging.getLogger('fiscal_audit')
+
     with schema_context(schema_name):
         saft_record = SAFTExport.objects.get(id=saft_id)
         try:
-            # 1. Gera o XML (usando o SAFTGenerator que unificamos)
-            generator = SAFTGenerator(saft_record.start_date, saft_record.end_date, saft_record.tenant)
+            # 1. Extração de datas (Corrige o erro de atributo inexistente)
+            ano, mes = map(int, saft_record.periodo_tributacao.split('-'))
+            start_date = datetime(ano, mes, 1).date()
+            last_day = calendar.monthrange(ano, mes)[1]
+            end_date = datetime(ano, mes, last_day).date()
+
+            from django_tenants.utils import get_tenant_model
+            tenant = get_tenant_model().objects.get(schema_name=schema_name)
+
+            # 2. Geração do XML
+            generator = SAFTGenerator(start_date, end_date, tenant)
             xml_content = generator.generate_xml()
-            
-            # 2. Perícia Técnica (XSD Validation)
+
+            # 3. Perícia Técnica (Rigor SOTARQ - Validação XSD)
             validator = SAFTValidator()
             is_valid, errors = validator.validate(xml_content)
             
@@ -84,20 +98,23 @@ def task_generate_xml(saft_id, schema_name):
                 saft_record.status = 'failed'
                 saft_record.log_erros = "Falha no Schema AGT: " + " | ".join(errors)
                 saft_record.save()
-                # Notifica o Chefe via log crítico
-                logger.error(f"SAFT INVÁLIDO gerado para o tenant {schema_name}. Erros: {errors}")
                 return
 
-            # 3. Se válido, guarda o ficheiro para download
+            # 4. Sucesso: Salvar e Atualizar Status (Badge muda para Verde)
             from django.core.files.base import ContentFile
             saft_record.arquivo.save(saft_record.nome_arquivo, ContentFile(xml_content))
             saft_record.status = 'generated'
             saft_record.save()
+
+            # 5. Gatilho de Despacho (Opcional: enviar logo ao contabilista)
+            # task_dispatch_saft_to_accountant.delay(saft_record.id, schema_name)
             
         except Exception as e:
             saft_record.status = 'failed'
             saft_record.log_erros = f"Erro de Exceção: {str(e)}"
             saft_record.save()
+            logger.error(f"Erro crítico no SAF-T ({schema_name}): {str(e)}")
+            
 
 logger = logging.getLogger('fiscal_audit')
 

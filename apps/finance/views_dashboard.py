@@ -9,7 +9,6 @@ from decimal import Decimal
 
 # Imports da Aplicação
 from apps.fiscal.models import DocumentoFiscal
-from apps.inventory.tasks import get_monthly_depreciation_cost
 from .models import Payment, Invoice
 from apps.students.models import Enrollment
 from .services import get_revenue_projection, get_revenue_risk_ranking
@@ -100,8 +99,8 @@ def daily_cash_flow(request):
     plt.close()
 
     # --- 6. CUSTOS E CONFORMIDADE ---
-    monthly_depreciation = get_monthly_depreciation_cost()
-    lucro_real_projetado = projection_next_month - monthly_depreciation
+    #monthly_depreciation = get_monthly_depreciation_cost()
+    #lucro_real_projetado = projection_next_month - monthly_depreciation
     
     # Filtro AGT: Rigorosamente pendente apenas se for deste tenant
     docs_pending_agt = DocumentoFiscal.objects.filter(
@@ -127,8 +126,8 @@ def daily_cash_flow(request):
             student__user__tenant=tenant,
             status='active'
         ).count(),
-        'monthly_depreciation': monthly_depreciation,
-        'lucro_real_projetado': lucro_real_projetado,
+        #'monthly_depreciation': monthly_depreciation,
+        #'lucro_real_projetado': lucro_real_projetado,
         'docs_pending_agt': docs_pending_agt,
     }
     

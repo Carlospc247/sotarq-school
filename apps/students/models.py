@@ -19,6 +19,7 @@ class Student(BaseModel):
         FEMALE = 'F', _('Female')
 
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='student_profile')
+    bi_number = models.CharField(max_length=20, unique=True, verbose_name="Número do BI", null=True, blank=True)
     registration_number = models.CharField(max_length=20, unique=True, editable=False)
     full_name = models.CharField(max_length=255, help_text="Official Full Name")
     birth_date = models.DateField()

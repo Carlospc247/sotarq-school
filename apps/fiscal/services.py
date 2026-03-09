@@ -6,14 +6,14 @@ from django.conf import settings
 from .models import DocumentoFiscal
 from .models import SerieFiscal, AssinaturaDigital, DocumentoFiscal
 from .signing import AGTSigner
-
-
-
-import requests
+from datetime import timezone
+from .models import SerieFiscal, DocType
+from django.utils import timezone
 import json
 from django.conf import settings
 from .models import DocumentoFiscal, SerieFiscal
 from .signing import AGTSigner
+
 
 def request_series_agt(tenant, year, doc_type):
     """
@@ -178,4 +178,77 @@ def register_invoice_agt(document_id):
     except Exception as e:
         return False, str(e)
 
+
+#############################################
+# WEBSERVICE
+#############################################
+import requests
+import logging
+from django.conf import settings
+from django.core.cache import cache
+
+logger = logging.getLogger(__name__)
+
+class AGTWebService:
+    """
+    ENGINEER_SOTARQ: Middleware de comunicação com a AGT.
+    Implementa segurança, timeout e cache para não travar o Tenant.
+    """
+    def __init__(self):
+        # Em DEBUG, usamos um Mock para o sistema não parar
+        self.is_debug = getattr(settings, 'DEBUG', True)
+        self.base_url = "https://sandbox.agt.minfin.gov.ao/api/v1"
+        self.timeout = 5 # Rigor: Nunca esperar mais de 5s pelo governo
+
+    def check_status(self):
+        """Verifica se o portal da AGT está operante."""
+        cache_key = 'agt_status_online'
+        status = cache.get(cache_key)
+        
+        if status is not None:
+            return status
+
+        if self.is_debug:
+            # Simulação de Rigor para Desenvolvimento
+            import random
+            is_online = random.choice([True, True, True, False]) # 75% chance online
+        else:
+            try:
+                response = requests.get(f"{self.base_url}/health", timeout=self.timeout)
+                is_online = response.status_code == 200
+            except Exception as e:
+                logger.error(f"Erro de conexão AGT: {e}")
+                is_online = False
+
+        cache.set(cache_key, is_online, 60) # Cache de 1 minuto
+        return is_online
+
+
+class SerieManager:
+    @staticmethod
+    def get_or_create_active_serie(tenant, tipo_doc):
+        ano_atual = timezone.now().year
+        
+        # 1. Tenta buscar a série já existente e ativa
+        serie = SerieFiscal.objects.filter(
+            tenant=tenant,
+            tipo_documento=tipo_doc,
+            ano=ano_atual,
+            status='ATIVA'
+        ).first()
+
+        if serie:
+            return serie
+
+        # 2. RIGOR SOTARQ: Se não existe, solicita formalmente à AGT antes de criar
+        logger.info(f"Solicitando nova série {tipo_doc} para o Tenant {tenant.name} na AGT...")
+        
+        sucesso, resultado = request_series_agt(tenant, ano_atual, tipo_doc)
+        
+        if sucesso:
+            # O request_series_agt já cria o objeto SerieFiscal no banco se der certo
+            return SerieFiscal.objects.get(codigo=resultado, tenant=tenant)
+        else:
+            # Se a AGT falhar, lançamos erro para não emitir fatura ilegal
+            raise Exception(f"Bloqueio de Compliance: Não foi possível obter série legal da AGT. Erro: {resultado}")
 

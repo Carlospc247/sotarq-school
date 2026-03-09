@@ -3,11 +3,11 @@ import base64
 import logging
 import jwt
 import uuid
-from datetime import datetime
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import serialization
 from django.conf import settings
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -49,26 +49,31 @@ class FiscalSigner:
         return base64.b64encode(signature).decode('utf-8')
 
 
+
 class AGTSigner:
     """
-    Responsável por gerar as assinaturas JWS (RS256) para a API da AGT.
-    (Regra da Faturação Eletrónica)
+    Responsável pelas assinaturas JWS (RS256) para a API da AGT.
+    Diferencia a assinatura da Software House (SOTARQ) da assinatura do Emissor (Escola).
     """
-    def __init__(self, private_key_pem):
-        self.private_key = private_key_pem
+    def __init__(self, tenant_private_key_pem):
+        """
+        Inicia com a chave privada da ESCOLA (Tenant).
+        """
+        self.private_key = tenant_private_key_pem
         self.headers = {"typ": "JWT", "alg": "RS256"}
 
     def get_submission_uuid(self):
         return str(uuid.uuid4())
 
     def get_timestamp(self):
-        return datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        # Rigor: Usar timezone-aware para evitar rejeição por drift de tempo
+        return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     def get_software_info(self):
         """
-        Gera o objeto softwareInfo e ASSINA dinamicamente com a chave MESTRE da SOTARQ.
+        IDENTIFICAÇÃO DO SOFTWARE: Assinado com a Chave Mestre SOTARQ do .env.
+        Isto prova à AGT que o sistema é o SOTARQ SCHOOL Certificado.
         """
-        # 1. Dados do Software (Payload)
         software_info_detail = {
             "productId": settings.AGT_SOFTWARE_PRODUCER_NAME,
             "productVersion": settings.AGT_SOFTWARE_VERSION,
@@ -76,33 +81,32 @@ class AGTSigner:
             "signatureVersion": 1
         }
 
-        # 2. Carregar a Chave Mestre da SOTARQ (Do settings/env)
-        # ATENÇÃO: Aqui usamos a chave do PRODUTOR, não a da escola!
         try:
+            # Rigor: A chave mestre vem do settings (bytes formatados)
             producer_private_key = settings.SOTARQ_PRIVATE_KEY_BYTES
-        except AttributeError:
-            raise ValueError("Chave Mestre SOTARQ não configurada no settings.")
+            
+            # Geramos o Token JWS do software
+            signature = jwt.encode(
+                software_info_detail,
+                producer_private_key,
+                algorithm="RS256",
+                headers=self.headers
+            )
+        except Exception as e:
+            logger.error(f"Erro ao assinar softwareInfo com Chave Mestre: {e}")
+            raise ValueError("Falha na integridade da Chave Mestre SOTARQ.")
 
-        # 3. Gerar a Assinatura (O tal Token JWS)
-        # Isto cria o jwsSoftwareSignature usando a chave privada mestre
-        signature = jwt.encode(
-            software_info_detail,
-            producer_private_key,
-            algorithm="RS256",
-            headers={"typ": "JWT", "alg": "RS256"}
-        )
-
-        # 4. Retornar a estrutura completa exigida pela AGT
         return {
             "softwareInfoDetail": software_info_detail,
-            "jwsSoftwareSignature": signature # O Token gerado agora
+            "jwsSoftwareSignature": signature 
         }
 
     def sign_payload(self, payload):
+        """Assina dados usando a chave da ESCOLA (Tenant)."""
         return jwt.encode(payload, self.private_key, algorithm="RS256", headers=self.headers)
 
     def sign_document_data(self, doc_data):
-        """Assina os campos críticos da fatura para o JWS."""
+        """Assina os campos críticos da fatura (Regra de Ouro da AGT)."""
         payload_to_sign = {
             "documentNo": doc_data["documentNo"],
             "taxRegistrationNumber": doc_data["taxRegistrationNumber"],
@@ -114,11 +118,3 @@ class AGTSigner:
             "documentTotals": doc_data["documentTotals"]
         }
         return self.sign_payload(payload_to_sign)
-
-    def sign_request_invoice(self, tax_reg_number, number_of_entries):
-        payload = {
-            "taxRegistrationNumber": tax_reg_number,
-            "numberOfEntries": number_of_entries
-        }
-        return self.sign_payload(payload)
-

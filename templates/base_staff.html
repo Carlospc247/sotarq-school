@@ -127,7 +127,7 @@
                     <a href="#" class="p-2 text-slate-400 hover:text-slate-600 transition-colors">
                         <i class="fas fa-cog text-xl"></i>
                     </a>
-                    <form action="{% url 'admin:logout' %}" method="post">
+                    <form action="{% url 'core:logout' %}" method="post">
                         {% csrf_token %}
                         <button type="submit" class="px-5 py-2.5 bg-red-50 text-red-600 rounded-2xl text-xs font-black uppercase hover:bg-red-100 transition-all">
                             Sair

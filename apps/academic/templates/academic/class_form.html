@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Nova Turma | SOTARQ SCHOOL{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto p-6">
+    <div class="bg-white dark:bg-slate-800 rounded-3xl shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden">
+        <div class="p-8 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+            <h1 class="text-2xl font-black text-slate-900 dark:text-white flex items-center">
+                <i data-feather="plus-circle" class="w-6 h-6 mr-3 text-emerald-500"></i>
+                Configurar Nova Turma
+            </h1>
+            <p class="text-slate-500 text-sm mt-1">Defina os parâmetros pedagógicos e logísticos da turma.</p>
+        </div>
+
+        <form method="post" class="p-8 space-y-6">
+            {% csrf_token %}
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Nome da Turma</label>
+                    {{ form.name }}
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Ano Lectivo</label>
+                    {{ form.academic_year }}
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Classe/Nível</label>
+                    {{ form.grade_level }}
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Diretor de Turma</label>
+                    {{ form.main_teacher }}
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Período</label>
+                    {{ form.period }}
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Capacidade (Alunos)</label>
+                    {{ form.capacity }}
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Número da Sala</label>
+                    {{ form.room_number }}
+                </div>
+            </div>
+
+            <div class="pt-6 flex items-center justify-end gap-4">
+                <a href="{% url 'academic:class_list' %}" class="px-6 py-3 text-sm font-bold text-slate-500 hover:text-slate-700 dark:hover:text-white transition">Cancelar</a>
+                <button type="submit" class="px-8 py-3 bg-emerald-600 text-white rounded-2xl font-black shadow-lg shadow-emerald-200 dark:shadow-none hover:bg-emerald-700 transition transform hover:-translate-y-1">
+                    Confirmar e Criar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -12,7 +12,6 @@ from django.shortcuts import resolve_url
 from apps.core.views_admin import is_manager_check
 from apps.academic.models import Course
 from apps.fiscal.models import DocumentoCanceladoAudit, DocumentoFiscal
-from apps.inventory.services import AssetManager
 from .models import Notification, HelpArticle, SchoolConfiguration, SupportTicket, UserRole
 import json
 from django.utils import timezone
@@ -37,13 +36,13 @@ from django.http import HttpResponse
 from django.db.models import Q
 from django.utils import timezone
 
-
-
-
-# Views que controla as notificações
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from .models import Notification
+
+
+
+
 
 @login_required
 def check_new_notifications(request):
@@ -83,7 +82,7 @@ def check_new_notifications(request):
 ########################################
 
 class CustomLoginView(LoginView):
-    template_name = 'core/login.html' # Seu template de login
+    template_name = 'core/login.html'
 
     def get_success_url(self):
         """
@@ -201,8 +200,6 @@ def dashboard(request):
         due_date__lt=today
     ).aggregate(total=Sum('total'))['total'] or Decimal('0.00')
 
-    valuation = AssetManager.get_patrimony_valuation() 
-    
 
     context = {
         'page_title': 'Análise Executiva SOTARQ',
@@ -218,7 +215,7 @@ def dashboard(request):
             int(Invoice.objects.filter(status='overdue').count()),
             int(Invoice.objects.filter(status='pending').count()),
         ]),
-        'valuation': valuation, # Dicionário com purchase_value e total_depreciation
+         
     }
     return render(request, 'core/dashboard.html', context)
 
@@ -241,7 +238,7 @@ def get_notifications(request):
     notifications = Notification.objects.filter(user=request.user, is_read=False)[:10]
     return render(request, 'core/partials/notification_list.html', {'notifications': notifications})
 
-@staff_member_required
+@login_required
 def help_center(request):
     """Base de conhecimento para funcionários."""
     articles = HelpArticle.objects.filter(deleted_at__isnull=True).order_by('category')

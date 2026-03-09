@@ -178,7 +178,7 @@
                             </td>
                             <td class="px-6 py-4 text-right space-x-2">
                                 {% if perms.ver_pautas %}
-                                    <a title="Ver Notas" href="{% url 'academic:grading_sheet' klass.id 1 %}" class="text-slate-400 hover:text-indigo-600 transition"><i data-feather="eye" class="w-5 h-5 inline"></i></a>
+                                    <a title="Ver Notas" href="{% url 'academic:grading_sheet' klass.id 0 1 %}" class="text-slate-400 hover:text-indigo-600 transition"><i data-feather="eye" class="w-5 h-5 inline"></i></a>
                                 {% endif %}
                                 {% if perms.baixar_pautas %}
                                     <a title="Exportar Excel" href="{% url 'academic:export_class_pauta_excel' klass.id %}" class="text-emerald-500 hover:text-emerald-700 transition"><i data-feather="file-text" class="w-5 h-5 inline"></i></a>

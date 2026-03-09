@@ -141,6 +141,7 @@ class SupportTicket(BaseModel):
     def __str__(self):
         return f"{self.subject} - {self.user.username}"
 
+
 class HelpArticle(BaseModel):
     title = models.CharField(max_length=200)
     category = models.CharField(max_length=50, choices=[
@@ -153,7 +154,6 @@ class HelpArticle(BaseModel):
 
     def __str__(self):
         return self.title
-
 
 
 class Notification(models.Model):
@@ -169,7 +169,6 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"{self.title} - {self.user.username}"
-
 
 
 class SchoolMessage(BaseModel):
@@ -196,7 +195,6 @@ class SchoolMessage(BaseModel):
 
     def __str__(self):
         return f"{self.get_category_display()} - {self.student.full_name}"
-
 
 
 class SchoolConfiguration(BaseModel):

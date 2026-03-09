@@ -12,7 +12,6 @@ from django.urls import reverse
 
 # Imports Internos (SOTARQ Architecture)
 from apps.academic.models import VacancyRequest
-from apps.compras.models import Purchase, SchoolStoreSale
 from apps.finance.models import Invoice
 from .models import Notification, Role
 

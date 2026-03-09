@@ -6,26 +6,17 @@ from django.db import transaction
 from django.db.models import Sum, Q
 from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.shortcuts import render, redirect
-from django.contrib.auth.decorators import user_passes_test
-from django.shortcuts import render
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.urls import reverse
 from apps.academic.models import AcademicYear
 from apps.academic.views import is_manager_check
 from apps.finance.models import FinanceConfig
-from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
-
 from .models import FeeType
-
-from apps.academic.models import AcademicYear
 from apps.reports.finance.utils_reports import CashClosingReport
 from apps.students.models import Student
 from .models import CashInflow, CashOutflow, CashSession, Payment, Invoice, PaymentType
-from apps.compras.models import Product
 
 
 

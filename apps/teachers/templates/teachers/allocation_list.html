@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Alocações | SOTARQ SCHOOL{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-8 p-4 md:p-6" 
+     x-data="{ openModal: {{ open_modal_on_load|yesno:'true,false' }} }">
+    
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700">
+        <div>
+            <h1 class="text-3xl font-black text-slate-900 dark:text-white flex items-center">
+                <i data-feather="users" class="w-8 h-8 mr-3 text-indigo-600"></i>
+                Alocação de Professores
+            </h1>
+            <p class="text-slate-500 dark:text-slate-400 mt-1 font-medium italic">Vincule docentes às turmas e disciplinas</p>
+        </div>
+        <button @click="openModal = true" class="flex items-center px-6 py-3 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg hover:bg-indigo-700 transition">
+            <i data-feather="plus" class="w-5 h-5 mr-2"></i>
+            Nova Alocação
+        </button>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {% regroup allocations by teacher as teacher_list %}
+        
+        {% for t_group in teacher_list %}
+            <div class="bg-white dark:bg-slate-800 rounded-[2rem] shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden flex flex-col transition-all hover:shadow-md">
+                <div class="p-6 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/30 rounded-2xl flex items-center justify-center text-indigo-600">
+                            <i data-feather="user" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-black text-slate-900 dark:text-white">{{ t_group.grouper.full_name }}</h3>
+                            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Docente Alocado</span>
+                        </div>
+                    </div>
+                    <span class="px-3 py-1 bg-white dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-600 text-[10px] font-black text-slate-500">
+                        {{ t_group.list|length }} Disciplina(s)
+                    </span>
+                </div>
+
+                <div class="overflow-x-auto flex-grow">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50/50 dark:bg-slate-900/20">
+                                <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Turma</th>
+                                <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Disciplina</th>
+                                <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-50 dark:divide-slate-700/50">
+                            {% for alloc in t_group.list %}
+                            <tr class="hover:bg-slate-50/80 dark:hover:bg-slate-700/30 transition-colors">
+                                <td class="px-6 py-4">
+                                    <span class="font-bold text-slate-700 dark:text-slate-300">{{ alloc.class_room.name }}</span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="text-sm font-medium text-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded-lg">
+                                        {{ alloc.subject.name }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 text-right">
+                                    <form action="{% url 'teachers:allocation_delete' alloc.id %}" method="post" 
+                                          onsubmit="return confirm('Rigor SOTARQ: Confirmar remoção?');" class="inline">
+                                        {% csrf_token %}
+                                        <button type="submit" class="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-xl transition">
+                                            <i data-feather="trash-2" class="w-4 h-4"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% empty %}
+            <div class="col-span-full py-20 text-center">
+                <i data-feather="search" class="w-12 h-12 text-slate-300 mx-auto mb-4"></i>
+                <h3 class="text-xl font-bold text-slate-400 italic">Nenhuma alocação registrada.</h3>
+            </div>
+        {% endfor %}
+    </div>
+
+    <template x-teleport="body">
+        <div x-show="openModal" class="fixed inset-0 z-[999] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm" x-cloak>
+            <div @click.away="openModal = false" class="relative w-full max-w-xl p-4">
+                <div class="bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-2xl overflow-hidden">
+                    <div class="p-8 border-b border-slate-100 dark:border-slate-700 bg-indigo-50/30 flex justify-between items-center">
+                        <h2 class="text-2xl font-black text-slate-900 dark:text-white">Vincular Professor</h2>
+                        <button @click="openModal = false" class="text-slate-400 hover:text-slate-600 transition"><i data-feather="x"></i></button>
+                    </div>
+
+                    <form action="{% url 'teachers:allocation_create' %}" method="post" class="p-8 space-y-5">
+                        {% csrf_token %}
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 italic">Professor</label>
+                                {{ form.teacher }}
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 italic">Turma</label>
+                                {{ form.class_room }}
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 italic">Disciplina</label>
+                                {{ form.subject }}
+                            </div>
+                        </div>
+                        <div class="pt-6 flex justify-end gap-4">
+                            <button type="button" @click="openModal = false" class="font-bold text-slate-400">Cancelar</button>
+                            <button type="submit" class="px-10 py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg hover:bg-indigo-700 transition">
+                                Confirmar Alocação
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </template>
+</div>
+
+<script>
+document.addEventListener('change', function(e) {
+    if (e.target && e.target.name === 'class_room') {
+        const classId = e.target.value;
+        const subjectSelect = document.querySelector('select[name="subject"]');
+        if(!subjectSelect) return;
+
+        subjectSelect.innerHTML = '<option value="">Carregando...</option>';
+        
+        fetch(`{% url 'teachers:ajax_get_subjects' %}?class_id=${classId}`)
+            .then(r => r.json())
+            .then(data => {
+                subjectSelect.innerHTML = '<option value="">--- Selecione a Disciplina ---</option>';
+                data.forEach(s => {
+                    let opt = new Option(s.name, s.id);
+                    subjectSelect.add(opt);
+                });
+            });
+    }
+});
+</script>
+{% endblock %}

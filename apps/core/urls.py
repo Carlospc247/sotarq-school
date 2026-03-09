@@ -46,6 +46,7 @@ urlpatterns = [
     path('settings/school/', views.school_configuration_update, name='school_settings'),
 
     # --- PÁGINAS PÚBLICAS ---
+    # --- SITE INSTITUCIONAL --- INÍCIO
     path('portal/about/', views.public_about, name='public_about'),
     path('portal/courses/', views.public_courses, name='public_courses'),
     path('portal/contact/', views.public_contact, name='public_contact'),
@@ -54,6 +55,8 @@ urlpatterns = [
     path('careers/apply/', views_recruitment.public_job_apply, name='public_job_apply'),
     path('management/recruitment/', views_recruitment.recruitment_dashboard, name='recruitment_dashboard'),
     path('management/recruitment/hire/<int:application_id>/', views_recruitment.hire_candidate, name='hire_candidate'),
+    
+    # --- SITE INSTITUCIONAL --- INÍCIO
 
     path('management/recruitment/toggle/', views_recruitment.toggle_recruitment_status, name='toggle_recruitment'),
     path('management/recruitment/areas/', views_recruitment.update_job_areas, name='update_job_areas'),

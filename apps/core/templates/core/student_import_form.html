@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="p-6 max-w-5xl mx-auto">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800">Importação de Alunos</h1>
+            <p class="text-slate-500">Cadastre múltiplos alunos, encarregados e turmas de uma só vez.</p>
+        </div>
+        <a href="{% url 'students:student_import_template' %}" class="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors shadow-sm">
+            <i data-feather="download" class="w-4 h-4 mr-2"></i>
+            Baixar Template Atualizado (.xlsx)
+        </a>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div class="lg:col-span-1 space-y-4">
+            <div class="bg-amber-50 border border-amber-200 p-4 rounded-xl">
+                <h3 class="font-bold text-amber-800 flex items-center mb-2 text-sm">
+                    <i data-feather="info" class="w-4 h-4 mr-2"></i> Rigor SOTARQ: Identificação
+                </h3>
+                <p class="text-xs text-amber-700 leading-relaxed">
+                    O <strong>Número do BI</strong> deve estar na <strong>Coluna 12</strong>. 
+                    O sistema usará este dado para conformidade fiscal e registro histórico.
+                </p>
+            </div>
+
+            <div class="bg-blue-50 border border-blue-200 p-4 rounded-xl">
+                <h3 class="font-bold text-blue-800 flex items-center mb-2 text-sm">
+                    <i data-feather="clock" class="w-4 h-4 mr-2"></i> Estrutura Curricular
+                </h3>
+                <p class="text-xs text-blue-700 leading-relaxed">
+                    A <strong>Duração do Curso (em anos)</strong> deve estar na <strong>Coluna 13</strong>. 
+                    Se vazio, o sistema assumirá o padrão de 3 anos para novos cursos.
+                </p>
+            </div>
+            
+            <div class="bg-white border border-slate-200 p-4 rounded-xl shadow-sm">
+                <h3 class="font-bold text-slate-800 mb-3 text-xs uppercase tracking-wider">Mapeamento de Colunas</h3>
+                <ul class="text-xs text-slate-600 space-y-2">
+                    <li class="flex justify-between border-b pb-1 border-slate-50"><span>Nome Completo</span> <span class="font-mono text-slate-400">Col 1</span></li>
+                    <li class="flex justify-between border-b pb-1 border-slate-50"><span>Email do Aluno</span> <span class="font-mono text-slate-400">Col 4</span></li>
+                    <li class="flex justify-between border-b pb-1 border-slate-50"><span>Código do Curso</span> <span class="font-mono text-slate-400">Col 5</span></li>
+                    <li class="flex justify-between border-b pb-1 border-slate-50 text-indigo-600 font-semibold"><span>Número do BI</span> <span class="font-mono">Col 12</span></li>
+                    <li class="flex justify-between text-emerald-600 font-semibold"><span>Duração Curso</span> <span class="font-mono">Col 13</span></li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="lg:col-span-2">
+            <div class="bg-white border-2 border-dashed border-slate-200 p-10 rounded-2xl flex flex-col items-center justify-center text-center hover:border-slate-300 transition-all">
+                <form method="post" enctype="multipart/form-data" class="w-full max-w-md">
+                    {% csrf_token %}
+                    <div class="mb-6">
+                        <div class="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
+                            <i data-feather="file-text" class="w-10 h-10 text-slate-300"></i>
+                        </div>
+                        <h4 class="text-lg font-semibold text-slate-800">Processar Planilha</h4>
+                        <p class="text-sm text-slate-500 mb-6">Certifique-se de que o arquivo está no formato .xlsx</p>
+                        
+                        <div class="text-left bg-slate-50 p-3 rounded-lg border border-slate-200">
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Selecionar Ficheiro</label>
+                            {{ form.file }}
+                            {% if form.file.errors %}
+                                <p class="text-red-500 text-xs mt-2 font-medium">{{ form.file.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full py-4 bg-slate-900 hover:bg-black text-white rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2 group">
+                        <i data-feather="play-circle" class="w-5 h-5 group-hover:scale-110 transition-transform"></i>
+                        Executar Importação Rigorosa
+                    </button>
+                    
+                    <p class="mt-4 text-[10px] text-slate-400 uppercase tracking-widest font-bold italic">
+                        Powered by SOTARQ Architecture
+                    </p>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

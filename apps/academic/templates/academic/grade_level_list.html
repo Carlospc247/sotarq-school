@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Níveis Académicos | SOTARQ SCHOOL{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-8 p-4 md:p-6" 
+     x-data="{ openModal: {{ open_modal_on_load|yesno:'true,false' }} }">
+    
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700">
+        <div>
+            <h1 class="text-3xl font-black text-slate-900 dark:text-white flex items-center">
+                <i data-feather="layers" class="w-8 h-8 mr-3 text-indigo-600"></i>
+                Classes e Níveis
+            </h1>
+            <p class="text-slate-500 dark:text-slate-400 mt-1 font-medium italic">Estrutura curricular e progressão por curso</p>
+        </div>
+        <div class="flex gap-3">
+            <a href="{% url 'teachers:allocation_list' %}" class="flex items-center px-6 py-3 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-white rounded-2xl font-bold hover:bg-slate-200 transition">
+                Alocação de professores
+            </a>
+            <a href="{% url 'academic:subject_list' %}" class="flex items-center px-6 py-3 bg-indigo-500 text-white rounded-2xl font-bold shadow-lg hover:bg-indigo-700 transition transform hover:-translate-y-1">
+                Ver Disciplinas
+            </a>
+            <a href="{% url 'academic:course_list' %}" class="flex items-center px-6 py-3 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-white rounded-2xl font-bold hover:bg-slate-200 transition">
+                Ver Cursos
+            </a>
+            <button @click="openModal = true" class="flex items-center px-6 py-3 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg hover:bg-indigo-700 transition transform hover:-translate-y-1">
+                <i data-feather="plus" class="w-5 h-5 mr-2"></i>
+                Adicionar Nível
+            </button>
+        </div>
+    </div>
+
+    <div class="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="bg-slate-50 dark:bg-slate-900/50">
+                    <th class="p-4 font-black text-slate-400 uppercase text-xs text-center w-20">Ordem</th>
+                    <th class="p-4 font-black text-slate-400 uppercase text-xs">Nível/Classe</th>
+                    <th class="p-4 font-black text-slate-400 uppercase text-xs">Curso Relacionado</th>
+                    <th class="p-4 font-black text-slate-400 uppercase text-xs text-center">Disciplinas</th>
+                    <th class="p-4 font-black text-slate-400 uppercase text-xs text-right">Ações</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                {% for gl in grade_levels %}
+                <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-700/30 transition">
+                    <td class="p-4 font-bold text-slate-400 text-center">#{{ gl.level_index }}</td>
+                    <td class="p-4">
+                        <span class="text-lg font-black text-slate-900 dark:text-white">{{ gl.name }}</span>
+                    </td>
+                    <td class="p-4">
+                        <div class="flex items-center">
+                            <span class="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg text-xs font-black uppercase border border-indigo-100 dark:border-indigo-800">
+                                {{ gl.course.name }}
+                            </span>
+                        </div>
+                    </td>
+                    <td class="p-4 text-center">
+                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 font-bold text-slate-600 dark:text-slate-300 text-sm">
+                            {{ gl.subjects.count }}
+                        </span>
+                    </td>
+                    <td class="p-4 text-right">
+                        <div class="flex justify-end gap-2">
+                            <button class="p-2 text-slate-400 hover:text-indigo-600 transition hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg">
+                                <i data-feather="edit-2" class="w-4 h-4"></i>
+                            </button>
+                            <button class="p-2 text-slate-400 hover:text-red-600 transition hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg">
+                                <i data-feather="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="p-20 text-center">
+                        <div class="flex flex-col items-center">
+                            <div class="w-20 h-20 bg-slate-50 dark:bg-slate-900 rounded-full flex items-center justify-center mb-4">
+                                <i data-feather="box" class="w-10 h-10 text-slate-300"></i>
+                            </div>
+                            <p class="text-slate-400 font-bold">Nenhum nível académico configurado.</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <template x-teleport="body">
+        <div x-show="openModal" 
+            class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm"
+            style="display: none;"
+            x-transition:enter="transition ease-out duration-300"
+            x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100">
+            
+            <div @click.away="openModal = false" 
+                class="relative w-full max-w-2xl p-4 transition-all"
+                x-transition:enter="transition ease-out duration-300"
+                x-transition:enter-start="opacity-0 scale-95"
+                x-transition:enter-end="opacity-100 scale-100">
+                
+                <div class="bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-slate-700 overflow-hidden">
+                    <div class="p-8 border-b border-slate-100 dark:border-slate-700 bg-indigo-50/30 flex justify-between items-center">
+                        <h2 class="text-2xl font-black text-slate-900 dark:text-white flex items-center">
+                            <i data-feather="layers" class="w-6 h-6 mr-3 text-indigo-600"></i>
+                            Novo Nível Académico
+                        </h2>
+                        <button type="button" @click="openModal = false" class="p-2 rounded-full hover:bg-white dark:hover:bg-slate-700 transition">
+                            <i data-feather="x" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+
+                    <form action="{% url 'academic:grade_level_create' %}" method="post" class="p-8 space-y-6">
+                        {% csrf_token %}
+                        
+                        <div class="grid grid-cols-1 gap-6">
+                            {% if form.errors %}
+                            <div class="p-4 bg-red-50 border border-red-200 rounded-2xl text-red-600 text-sm">
+                                {{ form.non_field_errors }}
+                            </div>
+                            {% endif %}
+
+                            <div>
+                                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 italic">Nome do Nível/Classe</label>
+                                {{ form.name }}
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 italic">Curso Relacionado</label>
+                                {{ form.course }}
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 italic">Ordem de Progressão</label>
+                                {{ form.level_index }}
+                            </div>
+                        </div>
+
+                        <div class="pt-6 flex items-center justify-end gap-4 border-t border-slate-100 dark:border-slate-700 mt-6">
+                            <button type="button" @click="openModal = false" class="px-6 py-3 text-sm font-bold text-slate-500 hover:text-slate-800">Cancelar</button>
+                            <button type="submit" class="px-8 py-3 bg-indigo-600 text-white rounded-2xl font-black shadow-lg hover:bg-indigo-700 transition transform hover:-translate-y-1">
+                                Salvar Nível
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </template>
+</div>
+
+<script>
+    document.addEventListener('alpine:initialized', () => {
+        feather.replace();
+    });
+    
+    // Observer para garantir ícones no modal
+    window.addEventListener('alpine:open-modal', () => {
+        setTimeout(() => feather.replace(), 10);
+    });
+</script>
+{% endblock %}

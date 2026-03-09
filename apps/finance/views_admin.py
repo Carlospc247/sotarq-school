@@ -193,54 +193,6 @@ def promotion_finance_dashboard(request):
 
 
 
-@login_required
-@transaction.atomic
-def generate_self_invoice(request):
-    """
-    Gera o documento de Autofacturação (AF) para prestadores sem NIF jurídico.
-    Rigor: Exclusivo para Direção e Administrativo.
-    """
-    if request.user.current_role not in ['ADMIN', 'DIRECTOR', 'DIRECT_ADMIN']:
-        return HttpResponseForbidden("Acesso restrito.")
-
-    if request.method == 'POST':
-        provider_id = request.POST.get('provider_id')
-        description = request.POST.get('description')
-        amount = Decimal(request.POST.get('amount', '0.00'))
-        
-        provider = get_object_or_404(ServiceProvider, id=provider_id)
-        
-        # 1. Cria a Invoice do tipo AF (Autofacturação)
-        # Usamos um 'aluno dummy' ou deixamos student=None se o model permitir
-        # Para rigor de sistema, criamos a AF vinculada ao prestador
-        af_doc = Invoice.objects.create(
-            student=None, # AF não é para aluno
-            doc_type='AF',
-            total=amount,
-            status='paid', # AF nasce liquidada
-            due_date=timezone.now().date(),
-            notes=f"Prestador: {provider.full_name} | BI: {provider.bi_number}"
-        )
-        
-        InvoiceItem.objects.create(
-            invoice=af_doc,
-            description=description,
-            amount=amount
-        )
-
-        # 2. Motor de Exportação de Elite
-        from .utils import SOTARQExporter
-        pdf_data = SOTARQExporter.generate_fiscal_document(af_doc, 'AF')
-        
-        response = HttpResponse(pdf_data, content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="AF_{af_doc.number}.pdf"'
-        return response
-
-    providers = ServiceProvider.objects.all()
-    return render(request, 'finance/admin/self_invoice_form.html', {'providers': providers})
-
-
-
 
 @login_required
 def budget_approval_list(request):
