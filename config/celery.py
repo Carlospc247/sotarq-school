@@ -3,7 +3,7 @@ import os
 from celery import Celery
 
 # Ajuste aqui para o caminho correto do seu settings de desenvolvimento
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.local')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.production')
 
 app = Celery('sotarq_school')
 

@@ -5,7 +5,7 @@ from django.db import connection, transaction
 from django.core.management import call_command
 
 # 1. SETUP AMBIENTE - EXCLUSIVO SOTARQ SCHOOL
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.local')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.production')
 django.setup()
 
 from django_tenants.utils import schema_context

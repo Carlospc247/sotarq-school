@@ -3,7 +3,7 @@ import django
 import sys
 
 # Configurar ambiente
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.local")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.production")
 django.setup()
 
 from apps.customers.models import Client, Domain

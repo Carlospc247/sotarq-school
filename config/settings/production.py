@@ -4,7 +4,7 @@ import os
 DEBUG = False
 
 # Domínios reais do seu negócio (Exemplo)
-ALLOWED_HOSTS = ['.sotarqschool.com', '.sotarq.ao', 'sotarq.com']
+ALLOWED_HOSTS = ['.sotarqschool.com', '.sotarqschool.pro', 'sotarq.com']
 
 # A chave secreta vem das variáveis de ambiente do servidor (Segurança Máxima)
 SOTARQ_PRIVATE_KEY = os.environ.get('SOTARQ_PRIVATE_KEY')

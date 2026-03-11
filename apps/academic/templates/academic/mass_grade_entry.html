@@ -16,13 +16,30 @@
                 Período Lectivo: {{ term }}º Trimestre
             </p>
         </div>
-        <div class="flex space-x-3">
-            <button onclick="window.print()" class="px-6 py-3 bg-white border border-slate-200 text-slate-700 rounded-2xl text-xs font-black uppercase tracking-widest shadow-sm hover:bg-slate-50 transition">
-                Imprimir Pauta
-            </button>
-            <button class="px-6 py-3 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg">
-                Publicar Notas
-            </button>
+
+        <div class="flex space-x-3 print:hidden">
+            <div class="relative group">
+                <button class="px-6 py-3 bg-white border border-slate-200 text-slate-700 rounded-2xl text-xs font-black uppercase tracking-widest shadow-sm hover:bg-slate-50 transition flex items-center">
+                    <i data-feather="printer" class="w-4 h-4 mr-2"></i>
+                    Exportar Pauta
+                </button>
+                <div class="absolute right-0 mt-2 w-48 bg-white border border-slate-100 rounded-xl shadow-xl hidden group-hover:block z-50 overflow-hidden">
+                    <a href="{% url 'academic:export_class_pauta_excel' allocation.class_room.id allocation.subject.id term %}" class="block px-4 py-3 text-[10px] font-black uppercase text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 transition">
+                        <i data-feather="file-text" class="inline w-3 h-3 mr-2"></i> Excel (.xlsx)
+                    </a>
+                    <a href="{% url 'academic:download_pauta_pdf' allocation.class_room.id allocation.subject.id term %}" class="block px-4 py-3 text-[10px] font-black uppercase text-slate-600 hover:bg-rose-50 hover:text-rose-700 transition">
+                        <i data-feather="file" class="inline w-3 h-3 mr-2"></i> PDF Oficial
+                    </a>
+                </div>
+            </div>
+
+            <form action="{% url 'academic:publish_grades' allocation.class_room.id allocation.subject.id term %}" method="POST" onsubmit="return confirm('Rigor SOTARQ: Deseja publicar as notas? Elas ficarão visíveis para alunos/encarregados.')">
+                {% csrf_token %}
+                <button type="submit" class="px-6 py-3 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-lg flex items-center">
+                    <i data-feather="globe" class="w-4 h-4 mr-2"></i>
+                    Publicar Notas
+                </button>
+            </form>
         </div>
     </div>
 
@@ -51,26 +68,23 @@
                             </div>
                         </div>
                     </td>
-                    
                     <td class="px-4 py-4">
                         <input type="number" step="0.1" name="mac{{ term }}" 
                                value="{% if term == 1 %}{{ grade.mac1 }}{% elif term == 2 %}{{ grade.mac2 }}{% else %}{{ grade.mac3 }}{% endif %}" 
-                               class="w-20 mx-auto block p-3 bg-slate-50 border-none rounded-xl text-center font-black text-slate-700 focus:ring-2 focus:ring-indigo-600 transition-all">
+                               class="grade-input w-20 mx-auto block p-3 bg-slate-50 border-none rounded-xl text-center font-black transition-all">
                     </td>
                     <td class="px-4 py-4">
                         <input type="number" step="0.1" name="npp{{ term }}" 
                                value="{% if term == 1 %}{{ grade.npp1 }}{% elif term == 2 %}{{ grade.npp2 }}{% else %}{{ grade.npp3 }}{% endif %}" 
-                               class="w-20 mx-auto block p-3 bg-slate-50 border-none rounded-xl text-center font-black text-slate-700 focus:ring-2 focus:ring-indigo-600 transition-all">
+                               class="grade-input w-20 mx-auto block p-3 bg-slate-50 border-none rounded-xl text-center font-black transition-all">
                     </td>
                     <td class="px-4 py-4">
                         <input type="number" step="0.1" name="npt{{ term }}" 
                                value="{% if term == 1 %}{{ grade.npt1 }}{% elif term == 2 %}{{ grade.npt2 }}{% else %}{{ grade.npt3 }}{% endif %}" 
-                               class="w-20 mx-auto block p-3 bg-slate-50 border-none rounded-xl text-center font-black text-slate-700 focus:ring-2 focus:ring-indigo-600 transition-all">
+                               class="grade-input w-20 mx-auto block p-3 bg-slate-50 border-none rounded-xl text-center font-black transition-all">
                     </td>
-
                     <td class="px-4 py-4 text-center">
-                        <span class="text-sm font-black mean-cell 
-                        {% if term == 1 and grade.mt1 < 9.5 or term == 2 and grade.mt2 < 9.5 or term == 3 and grade.mt3 < 9.5 %}text-red-500{% else %}text-emerald-600{% endif %}">
+                        <span class="text-sm font-black mean-cell">
                             {% if term == 1 %}{{ grade.mt1|default:"0.0" }}{% elif term == 2 %}{{ grade.mt2|default:"0.0" }}{% else %}{{ grade.mt3|default:"0.0" }}{% endif %}
                         </span>
                     </td>
@@ -79,18 +93,10 @@
             </tbody>
         </table>
     </div>
-
-    <div class="mt-8 p-6 bg-indigo-50 rounded-3xl border border-indigo-100 flex items-center space-x-4">
-        <div class="w-10 h-10 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200">
-            <i data-feather="info" class="w-5 h-5"></i>
-        </div>
-        <p class="text-xs text-indigo-900 font-medium">
-            <strong>Dica SOTARQ:</strong> As notas são guardadas automaticamente ao sair do campo (blur). O cálculo das médias respeita os pesos definidos pela Direção Geral para o {{ term }}º trimestre.
-        </p>
-    </div>
 </div>
 
 <script>
+// --- MOTOR AJAX SOTARQ ---
 function getCookie(name) {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {
@@ -108,7 +114,25 @@ function getCookie(name) {
 
 const csrftoken = getCookie('csrftoken');
 
-document.querySelectorAll('input[type="number"]').forEach(input => {
+// Função para aplicar cor baseada na nota
+function applyGradeColor(element, val) {
+    const value = parseFloat(val);
+    if (value < 9.5) {
+        element.classList.add('text-red-500');
+        element.classList.remove('text-emerald-600', 'text-slate-700');
+    } else {
+        element.classList.add('text-emerald-600');
+        element.classList.remove('text-red-500', 'text-slate-700');
+    }
+}
+
+// Inicializa cores ao carregar
+document.querySelectorAll('.grade-input, .mean-cell').forEach(el => {
+    const val = el.tagName === 'INPUT' ? el.value : el.innerText;
+    applyGradeColor(el, val);
+});
+
+document.querySelectorAll('.grade-input').forEach(input => {
     input.addEventListener('blur', function() {
         const row = this.closest('tr');
         const gradeId = row.dataset.id;
@@ -116,8 +140,8 @@ document.querySelectorAll('input[type="number"]').forEach(input => {
         const value = this.value;
         const meanDisplay = row.querySelector('.mean-cell');
 
-        // Estado: A guardar...
-        this.classList.add('bg-indigo-50', 'ring-1', 'ring-indigo-300');
+        // Feedback visual: A guardar...
+        this.classList.add('bg-indigo-50', 'ring-2', 'ring-indigo-300');
 
         fetch("{% url 'academic:update_grade_ajax' %}", {
             method: 'POST',
@@ -127,44 +151,33 @@ document.querySelectorAll('input[type="number"]').forEach(input => {
             },
             body: `grade_id=${gradeId}&field=${field}&value=${value}`
         })
-        .then(response => {
-            if (!response.ok) throw new Error('Status Error');
-            return response.json();
-        })
+        .then(response => response.json())
         .then(data => {
             if (data.status === 'success') {
                 this.classList.remove('bg-indigo-50', 'ring-indigo-300');
-                this.classList.add('bg-emerald-50', 'ring-1', 'ring-emerald-500');
+                this.classList.add('bg-emerald-50', 'ring-2', 'ring-emerald-500');
                 
-                // Atualiza média trimestral calculada pelo model
+                // Atualiza Média e Cores
                 meanDisplay.innerText = data.new_mean;
-                
-                // Cor da nota baseada no rendimento
-                if (parseFloat(data.new_mean) < 9.5) {
-                    meanDisplay.classList.remove('text-emerald-600');
-                    meanDisplay.classList.add('text-red-500');
-                } else {
-                    meanDisplay.classList.remove('text-red-500');
-                    meanDisplay.classList.add('text-emerald-600');
-                }
+                applyGradeColor(meanDisplay, data.new_mean);
+                applyGradeColor(this, value);
 
                 setTimeout(() => {
                     this.classList.remove('bg-emerald-50', 'ring-emerald-500');
                     this.classList.add('bg-slate-50');
-                }, 1500);
+                }, 1000);
             } else {
-                alert(data.message || "Erro ao salvar nota.");
-                this.classList.add('ring-red-500');
+                alert(data.message || "Erro de validação.");
+                this.classList.add('ring-2', 'ring-red-500');
             }
         })
         .catch(error => {
-            console.error(error);
-            this.classList.add('ring-red-500');
+            console.error('Erro:', error);
+            this.classList.add('ring-2', 'ring-red-500');
         });
     });
 });
 
-// Inicializa ícones feather
 feather.replace();
 </script>
 {% endblock %}
