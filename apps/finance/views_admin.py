@@ -35,7 +35,6 @@ def mass_whatsapp_promotion_alert(request):
     promoted_enrollments = Enrollment.objects.filter(
         academic_year__is_active=True,
         status='pending_placement',
-        student__user__tenant=request.user.tenant
     ).select_related('student', 'grade_level')
 
     if not promoted_enrollments.exists():
@@ -162,7 +161,10 @@ def promotion_finance_dashboard(request):
     Painel de Controle de Promoções vs Tesouraria.
     Focado no DIRECT_ADMIN para recuperação de faturamento.
     """
-    if request.user.current_role != Role.Type.DIRECT_ADMIN or Role.Type.ADMIN and not request.user.is_superuser:
+    ALLOWED_ROLES = [Role.Type.ADMIN, Role.Type.DIRECTOR, Role.Type.DIRECT_ADMIN]
+
+    #if request.user.current_role not in ALLOWED_ROLES:
+    if request.user.current_role not in ALLOWED_ROLES:
         return HttpResponseForbidden("Acesso exclusivo à Direção Administrativa.")
 
     # 1. Busca alunos 'graduated' (aprovados no pedagógico) com faturas abertas

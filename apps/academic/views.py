@@ -11,7 +11,6 @@ from django.db import transaction, models
 from django.db.models import Q
 from django.contrib import messages
 from django.utils import timezone
-# Imports Internos
 from apps.core.models import Notification, Role, SchoolConfiguration, User
 from apps.core.decorators import student_required
 from apps.students.models import Enrollment, Student
@@ -397,11 +396,9 @@ def student_dashboard(request):
     if is_director:
         pending_vacancies = VacancyRequest.objects.filter(
             is_resolved=False,
-            student__user__tenant=request.user.tenant
         ).select_related('student', 'target_grade')[:5]
         pending_count = VacancyRequest.objects.filter(
             is_resolved=False,
-            student__user__tenant=request.user.tenant
         ).count()
 
     # --- DADOS DE TURMAS ---
@@ -609,7 +606,6 @@ def manage_vacancy_request(request, vacancy_id):
     vacancy = get_object_or_404(
         VacancyRequest.objects.select_related('target_grade', 'student__user'), 
         id=vacancy_id,
-        student__user__tenant=request.user.tenant # Segurança de Tenant
     )
     
     if request.method == 'POST':
@@ -819,44 +815,61 @@ def toggle_pedagogical_break(request):
 
 @login_required
 def export_efficiency_report_pdf(request):
-    # 1. Recuperar dados (Mesma lógica da sua view de dashboard)
-    # Aqui você deve filtrar pelo tenant/escola ativa
-    active_year = request.user.profile.active_school_year # Exemplo de relação
+    """
+    Exportação PDF: Rigor SOTARQ com WeasyPrint.
+    Garante consistência com o Dashboard e Multi-tenancy.
+    """
+    if not request.user.is_manager:
+        return redirect('core:dashboard')
+
+    # 1. Recuperar Ano Letivo Ativo (Consistência com o Dashboard)
+    active_year = AcademicYear.objects.filter(is_active=True).first()
+    if not active_year:
+        return HttpResponse("Nenhum ano letivo ativo encontrado.", status=404)
+
+    # 2. Motor de KPI e Analítica (Usando os nomes corrigidos: klass/class_room)
+    from apps.reports.services.kpi_engine import AcademicKPIEngine
+    from apps.academic.analytics import EfficiencyAnalytics
     
-    # Dados simulados (Substitua pelas suas queries reais do banco)
-    top_performers = [...] 
-    alerts = [...]
-    teacher_stats = [...]
-    room_stats = [...]
+    teacher_performance = AcademicKPIEngine.calculate_teacher_performance(active_year.id)
+    
+    # Preparar dados reais para o PDF
+    top_performers = sorted(teacher_performance, key=lambda x: x['pass_rate'], reverse=True)[:10]
+    alerts = sorted(teacher_performance, key=lambda x: x['pass_rate'])[:10]
+    
+    # Analítica de Professores (Gaps)
+    teacher_stats = []
+    teachers = Teacher.objects.filter(is_active=True).select_related('user')
+    for t in teachers:
+        windows = EfficiencyAnalytics.get_teacher_windows(t, active_year)
+        total_gap = sum([w['duration'].total_seconds() // 60 for w in windows])
+        if total_gap > 0:
+            teacher_stats.append({
+                'name': t.user.get_full_name(),
+                'gap_minutes': int(total_gap),
+                'windows': len(windows)
+            })
 
     context = {
         'active_year': active_year,
         'top_performers': top_performers,
         'alerts': alerts,
         'teacher_stats': teacher_stats,
-        'room_stats': room_stats,
-        'report_date': datetime.now(),
-        'school_name': request.user.school.name, # Rigor Multi-tenant
+        'report_date': timezone.now(),
+        'school_name': request.tenant.name.upper(), # Rigor Multi-tenant: Usa o tenant atual
     }
 
-    # 2. Renderizar HTML para String
+    # 3. Renderizar e Gerar PDF
     html_string = render_to_string('academic/pdf/report_efficiency.html', context)
     
-    # 3. Gerar PDF
-    html = HTML(string=html_string, base_url=request.build_absolute_uri())
+    # WeasyPrint para gerar o PDF
+    html = HTML(string=html_string, base_url=request.build_absolute_uri('/'))
     result = html.write_pdf()
 
-    # 4. Preparar Resposta HTTP
-    response = HttpResponse(content_type='application/pdf')
+    # 4. Resposta HTTP (Simplificada e Eficiente)
+    response = HttpResponse(result, content_type='application/pdf')
     response['Content-Disposition'] = f'inline; filename="Relatorio_Eficiencia_{active_year.name}.pdf"'
-    response['Content-Transfer-Encoding'] = 'binary'
     
-    with tempfile.NamedTemporaryFile(delete=True) as output:
-        output.write(result)
-        output.flush()
-        output = open(output.name, 'rb')
-        response.write(output.read())
-
     return response
 
 
@@ -937,6 +950,23 @@ class GradeLevelCreateView(LoginRequiredMixin, StaffRequiredMixin, CreateView):
             open_modal_on_load=True 
         ))
 
+
+
+
+@login_required
+def ajax_load_classes(request):
+    grade_level_id = request.GET.get('grade_level_id')
+    # Rigor SOTARQ: Filtro obrigatório por Tenant e Grade Level
+    classes = Class.objects.filter(
+        grade_level_id=grade_level_id,
+        tenant=request.user.tenant
+    ).order_by('name')
+    
+    data = [
+        {'id': c.id, 'name': c.name} for c in classes
+    ]
+    return JsonResponse(data, safe=False)
+
 # ==========================================
 # GESTÃO DE CURSOS
 # ==========================================
@@ -962,6 +992,90 @@ class CourseCreateView(LoginRequiredMixin, StaffRequiredMixin, CreateView):
     def form_valid(self, form):
         # Não injetamos nada. O objeto cai automaticamente no esquema ativo.
         return super().form_valid(form)
+
+
+# apps/academic/views.py
+from django.shortcuts import render, get_object_or_404, redirect
+from django.db import transaction
+from .forms import CourseForm
+
+from django.db import transaction
+from django.contrib import messages
+
+@login_required
+@user_passes_test(is_manager_check, login_url='/')
+def course_edit(request, pk):
+    # Garante que o curso pertence ao tenant (escola) do usuário
+    #course = get_object_or_404(Course, pk=pk, tenant=request.user.tenant)
+    course = get_object_or_404(Course, pk=pk)
+    
+    # Importamos o Formset de Classes/Níveis que criamos
+    from .forms import CourseForm, GradeLevelFormSet
+
+    if request.method == 'POST':
+        # Passamos os dados do POST para o Form do Curso E para o Formset
+        form = CourseForm(request.POST, instance=course)
+        formset = GradeLevelFormSet(request.POST, instance=course)
+
+        if form.is_valid() and formset.is_valid():
+            try:
+                with transaction.atomic():
+                    # 1. Salva os dados do Curso (incluindo o PREÇO PADRÃO/monthly_fee)
+                    course_obj = form.save()
+                    
+                    # 2. Salva as classes vinculadas (as percentagens)
+                    formset.save()
+                    
+                    messages.success(request, f"Rigor SOTARQ: Curso '{course_obj.name}' e tabela de preços atualizados!")
+                    return redirect('academic:course_list')
+            except Exception as e:
+                messages.error(request, f"Erro ao processar alteração: {str(e)}")
+        else:
+            messages.error(request, "Erro na validação. Verifique os valores inseridos.")
+    else:
+        # Carregamento inicial (GET)
+        form = CourseForm(instance=course)
+        formset = GradeLevelFormSet(instance=course)
+
+    return render(request, 'academic/course_edit.html', {
+        'form': form,
+        'formset': formset,
+        'course': course
+    })
+
+
+
+@login_required
+@user_passes_test(is_manager_check, login_url='/')
+@transaction.atomic
+def course_delete(request, pk):
+    """
+    Exclusão de Curso com verificação de integridade referencial.
+    """
+    # CORRIGIDO: Removido o lixo no nome da função
+    course = get_object_or_404(Course, pk=pk)
+    #course = get_object_or_404(Course, pk=pk, tenant=request.user.tenant)
+    
+    # RIGOR SOTARQ: Verificar se há matrículas ativas neste curso
+    from apps.students.models import Enrollment
+    has_enrollments = Enrollment.objects.filter(course=course).exists()
+    
+    if has_enrollments:
+        messages.error(
+            request, 
+            f"ERRO DE INTEGRIDADE: O curso '{course.name}' não pode ser eliminado "
+            f"pois já existem alunos matriculados ou históricos vinculados a ele."
+        )
+        return redirect('academic:course_list')
+
+    try:
+        course_name = course.name
+        course.delete()
+        messages.success(request, f"Curso '{course_name}' eliminado com sucesso.")
+    except Exception as e:
+        messages.error(request, f"Erro ao eliminar curso: {str(e)}")
+        
+    return redirect('academic:course_list')
 
 
 
@@ -1415,7 +1529,6 @@ def mass_whatsapp_promotion_alert(request):
     promoted_enrollments = Enrollment.objects.filter(
         academic_year__is_active=True,
         status='pending_placement',
-        student__user__tenant=request.user.tenant
     ).select_related('student', 'grade_level')
 
     if not promoted_enrollments.exists():

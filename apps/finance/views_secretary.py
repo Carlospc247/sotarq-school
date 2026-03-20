@@ -1,6 +1,5 @@
 # apps/finance/views_secretary.py
 from decimal import Decimal
-from venv import logger
 from django.utils import timezone
 from django.db import transaction
 from django.db.models import Sum, Q
@@ -9,17 +8,19 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.urls import reverse
-from apps.academic.models import AcademicYear
+from apps.academic.models import AcademicYear, Class
 from apps.academic.views import is_manager_check
+from apps.core.models import Role
 from apps.finance.models import FinanceConfig
 from django.core.exceptions import PermissionDenied
 from .models import FeeType
 from apps.reports.finance.utils_reports import CashClosingReport
 from apps.students.models import Student
-from .models import CashInflow, CashOutflow, CashSession, Payment, Invoice, PaymentType
+from .models import CashInflow, CashOutflow, CashSession, Payment, Invoice, InvoiceItem, PaymentType, PaymentMethod
 
 
-
+import logging
+logger = logging.getLogger(__name__)
 
 
 
@@ -27,23 +28,19 @@ from .models import CashInflow, CashOutflow, CashSession, Payment, Invoice, Paym
 def secretary_finance_dashboard(request):
     """
     Operação de Caixa Central SOTARQ: Controle total de liquidez académica.
-    Foco exclusivo em: Validação de Propinas, Matrículas e Reconfirmações.
     """
-    # Rigor de Acesso: Apenas quem opera o financeiro entra aqui
     if request.user.current_role not in ['SECRETARY', 'DIRECT_ADMIN', 'ADMIN']:
         return HttpResponseForbidden("Acesso restrito à Secretaria e Administração.")
 
     today = timezone.now().date()
     
-    # 1. Recuperação da Sessão de Caixa Ativa (Turno do Operador)
+    # 1. Recuperação da Sessão de Caixa Ativa
     session = CashSession.objects.filter(user=request.user, status='open').last()
     
-    # 2. Inteligência de Cálculo de Saldo (Rigor SOTARQ)
+    # 2. Inteligência de Cálculo de Saldo
     cash_total = Decimal('0.00')
     
     if session:
-        # A. Recebimentos em Dinheiro: Apenas Propinas/Taxas pagas em espécie na secretaria
-        # Filtramos por método CASH para saber o que deve estar fisicamente na gaveta
         cash_payments = Payment.objects.filter(
             confirmed_by=request.user,
             confirmed_at__date=today,
@@ -51,39 +48,173 @@ def secretary_finance_dashboard(request):
             validation_status='validated'
         ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
 
-        # B. Movimentações Avulsas (Suprimentos de troco e Sangrias de despesa)
         total_inflow = session.inflows.aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
         total_outflow = session.outflows.aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
 
-        # C. Fórmula Mestra de Caixa: (Fundo de Maneio + Propinas em Cash + Reforços) - Retiradas
         cash_total = (session.opening_balance + cash_payments + total_inflow) - total_outflow
 
     # 3. Métricas de Operação Académica
-    # Fila de espera: Alunos que enviaram comprovativos pelo Portal (Matrículas/Propinas)
     pending_validations = Payment.objects.filter(
         validation_status='pending'
     ).select_related('invoice', 'invoice__student').order_by('created_at')
 
-    # ELIMINADO: saleable_products (Não vendemos itens no SOTARQ SCHOOL)
-    
-    # Histórico das últimas 5 validações de propinas do turno
     recent_actions = Payment.objects.filter(
         confirmed_by=request.user, 
         confirmed_at__date=today
     ).select_related('invoice__student').order_by('-confirmed_at')[:5]
 
+    # --- CORREÇÃO AQUI ---
+    # Como o modelo Class não tem 'status', contamos turmas sem professor como "pendentes"
+    pending_classes_count = Class.objects.filter(main_teacher__isnull=True).count()
+    
     context = {
         'active_cash_session': session,
+        'pending_validations_count': pending_validations.count(),
+        'pending_classes_count': pending_classes_count,
         'pending_validations': pending_validations,
         'cash_total': cash_total,
+        'user_is_high_director': request.user.current_role in ['ADMIN', 'DIRECTOR', 'PEDAGOGIC'],
+        'is_director': True, 
         'recent_actions': recent_actions,
-        # Útil para o operador saber o que pode cobrar
         'available_fees': FeeType.objects.all(), 
     }
     
     return render(request, 'finance/secretary/dashboard.html', context)
 
 
+# Em apps/finance/views_secretary.py
+def global_search_2(request):
+    query = request.GET.get('q', '').strip()
+    if not query or len(query) < 2:
+        return HttpResponse("") 
+
+    students = Student.objects.filter(
+        full_name__icontains=query
+    ).prefetch_related(
+        'enrollments__class_room__grade_level',
+        'enrollments__course'
+    )[:10] 
+    
+    # CORREÇÃO: Verifique se este caminho existe exatamente assim
+    return render(request, 'finance/global_search_2.html', {'students': students})
+
+
+
+@login_required
+@transaction.atomic
+def process_manual_payment(request):
+    # SEGURANÇA: Verificar se o operador tem uma sessão aberta AGORA
+    session = CashSession.objects.filter(user=request.user, status='open').last()
+    if not session:
+        messages.error(request, "ERRO: Operação bloqueada. Você não possui um turno de trabalho aberto.")
+        return redirect('finance:secretary_dashboard')
+    
+    if request.method == "POST":
+        # 1. Captura de Dados com Rigor
+        student_id = request.POST.get('student_id')
+        fee_type_id = request.POST.get('fee_type_id')
+        quantity = int(request.POST.get('quantity', 1))
+        start_month = int(request.POST.get('start_month'))
+        method_code = request.POST.get('payment_method')
+
+        # 2. Recuperação de Objetos Base
+        student = get_object_or_404(Student, id=student_id)
+        fee_type = get_object_or_404(FeeType, id=fee_type_id)
+        payment_method = get_object_or_404(PaymentMethod, method_code=method_code, is_active=True)
+        
+        # 3. Inteligência de Preço SOTARQ (Hierarquia Académica vs Financeira)
+        is_propina = "propina" in fee_type.name.lower() or "mensalidade" in fee_type.name.lower()
+        unit_price = fee_type.amount  # Valor padrão do catálogo financeiro
+
+        if is_propina:
+            # Busca matrícula ativa para aplicar o preço calculado (Base + % da Classe)
+            enrollment = student.enrollments.filter(
+                status='active', 
+                academic_year__is_active=True
+            ).select_related('course', 'class_room__grade_level').first()
+            
+            if enrollment:
+                if enrollment.class_room and enrollment.class_room.grade_level:
+                    # Preço da 10ª, 11ª, 12ª etc (com o incremento percentual)
+                    unit_price = enrollment.class_room.grade_level.calculated_monthly_fee
+                else:
+                    # Preço base do curso (aluno matriculado mas sem turma)
+                    unit_price = enrollment.course.monthly_fee
+
+        total_amount = unit_price * quantity
+
+        # 4. Criação da Fatura Mãe
+        invoice = Invoice.objects.create(
+            student=student,
+            amount=total_amount,
+            status='paid',
+            description=f"Liquidação: {quantity}x {fee_type.name}",
+            issue_date=timezone.now()
+        )
+
+        # 5. Distribuição por Competência (Garante auditoria de meses individuais)
+        for i in range(quantity):
+            # Lógica de rotação de meses (12 + 1 vira 1)
+            competence_month = ((start_month + i - 1) % 12) + 1
+            
+            InvoiceItem.objects.create(
+                invoice=invoice,
+                description=f"{fee_type.name} - Mês {competence_month}",
+                amount=unit_price,
+                quantity=1,
+                competence_month=competence_month if is_propina else None
+            )
+
+        # 6. Registro do Pagamento e Validação Automática
+        payment = Payment.objects.create(
+            invoice=invoice,
+            amount=total_amount,
+            method=payment_method,
+            confirmed_by=request.user,
+            confirmed_at=timezone.now(),
+            validation_status='validated'
+        )
+
+        # 7. Acionamento do Motor de Baixa (MonthlyControl)
+        # O método validate_payment deve ler os InvoiceItems para baixar cada mês
+        payment.validate_payment(request.user)
+
+        messages.success(request, f"Sucesso! {quantity} mês(es) liquidado(s) para {student.full_name} no valor de {total_amount:,.2f} Kz.")
+        return redirect('finance:print_invoice', invoice_id=invoice.id)
+        #return redirect('finance:secretary_dashboard')
+
+@login_required
+def print_invoice_view(request, invoice_id):
+    """
+    Interface de Saída SOTARQ: Renderiza a fatura para impressão imediata.
+    """
+    invoice = get_object_or_404(Invoice, id=invoice_id)
+    
+    # Validação de Segurança: Apenas o dono do caixa ou admin visualiza
+    if not request.user.is_staff and invoice.confirmed_by != request.user:
+         return HttpResponseForbidden("Não tem permissão para imprimir esta fatura.")
+
+    try:
+        # Aqui chamamos o seu motor de exportação
+        from .utils_reports import SOTARQExporter 
+        
+        exporter = SOTARQExporter(invoice)
+        pdf_content = SOTARQExporter.generate_fiscal_document(invoice, doc_type_code='FT')
+
+        response = HttpResponse(pdf_content, content_type='application/pdf')
+        
+        # 'inline' abre no navegador (permitindo Ctrl+P), 'attachment' baixa o arquivo.
+        filename = f"FATURA_{invoice.invoice_number}.pdf"
+        response['Content-Disposition'] = f'inline; filename="{filename}"'
+        
+        return response
+
+    except Exception as e:
+        logger.error(f"Erro ao imprimir fatura {invoice_id}: {str(e)}")
+        messages.error(request, "Erro ao gerar o documento de impressão.")
+        return redirect('finance:secretary_dashboard')
+
+      
 @login_required
 def generate_budget_view(request, student_id):
     """
@@ -91,7 +222,7 @@ def generate_budget_view(request, student_id):
     Gera uma Fatura Proforma (FP) com os custos previstos para o ano lectivo.
     """
     # 1. Segurança de Tenant e Obtenção do Aluno
-    student = get_object_or_404(Student, id=student_id, user__tenant=request.user.tenant)
+    student = get_object_or_404(Student, id=student_id)
     
     # 2. Obtenção do Ano Lectivo Ativo
     active_year = AcademicYear.objects.filter(is_active=True).first()

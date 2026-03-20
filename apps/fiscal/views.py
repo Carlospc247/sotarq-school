@@ -4,8 +4,8 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required, user_passes_test
 
 from apps.academic.views import is_manager_check
-from .models import SAFTExport, FiscalConfig
-from .forms import FiscalConfigForm
+from .models import SAFTExport, FiscalConfig, TaxaIVAAGT
+from .forms import FiscalConfigForm, TaxaIVAAGTForm
 from django.contrib.admin.views.decorators import staff_member_required
 from .models import DocumentoFiscal
 from django.db.models import F
@@ -261,3 +261,34 @@ def api_agt_status(request):
     """Endpoint chamado pelo AJAX no Dashboard."""
     service = AGTWebService()
     return JsonResponse({'online': service.check_status()})
+
+
+
+@login_required
+@user_passes_test(is_manager_check)
+def taxa_iva_list(request):
+    """Lista as taxas configuradas no sistema"""
+    taxas = TaxaIVAAGT.objects.all().order_by('-ativo', 'tax_percentage')
+    return render(request, 'fiscal/taxa_iva_list.html', {'taxas': taxas})
+
+
+@login_required
+@user_passes_test(is_manager_check)
+def taxa_iva_create(request):
+    if request.method == 'POST':
+        form = TaxaIVAAGTForm(request.POST)
+        if form.is_valid():
+            taxa = form.save()
+            messages.success(request, f"Taxa {taxa.nome} registrada.")
+            return redirect('fiscal:taxa_iva_list')
+        
+        # Se falhar, renderizamos a LISTA novamente com o form inválido
+        # Isso ativará o openModal: true no template
+        taxas = TaxaIVAAGT.objects.all().order_by('-ativo', 'nome')
+        messages.error(request, "Falha na validação fiscal. Verifique os campos.")
+        return render(request, 'fiscal/taxa_iva_list.html', {
+            'taxas': taxas,
+            'form': form
+        })
+    return redirect('fiscal:taxa_iva_list')
+

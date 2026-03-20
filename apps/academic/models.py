@@ -47,17 +47,60 @@ class Course(BaseModel):
     name = models.CharField(max_length=100)
     code = models.CharField(max_length=20, unique=True)
     level = models.CharField(max_length=20, choices=Level.choices, default=Level.HIGH_SCHOOL)
-    duration_years = models.PositiveIntegerField(default=3)
+    duration_years = models.DecimalField(max_digits=5, decimal_places=2, default=3.00, help_text="Anos totais. Use 0.08 para ~1 mês, 0.25 para 3 meses, etc.")
     coordinator = models.ForeignKey('teachers.Teacher', on_delete=models.SET_NULL, null=True, blank=True, related_name='coordinated_courses')
+    
+    taxa_iva = models.ForeignKey(
+        'fiscal.TaxaIVAAGT', 
+        on_delete=models.PROTECT, 
+        null=True, 
+        blank=True,
+        verbose_name="Taxa de IVA Aplicável"
+    )
+ 
+    monthly_fee = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, help_text="Preço da mensalidade padrão")
+    enrollment_fee = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, help_text="Preço da matrícula/inscrição padrão") # NOVO
+
     
     def __str__(self):
         return f"{self.name} ({self.get_level_display()})"
+    
+    @property
+    def get_duration_display(self):
+        val = float(self.duration_years)
+        if val >= 1.0:
+            return f"{int(val)} Ano(s)" if val % 1 == 0 else f"{val} Anos"
+        
+        # 0.0833 é aproximadamente 1/12 (1 mês)
+        if val >= 0.08:
+            months = round(val * 12)
+            return f"{months} Mês(es)"
+        
+        weeks = round(val * 52)
+        return f"{weeks} Semana(s)"
 
 
 class GradeLevel(BaseModel): # Renomeado de Grade para evitar confusão com 'Notas'
     name = models.CharField(max_length=50, help_text="Ex: 10ª Classe")
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='grade_levels')
     level_index = models.PositiveIntegerField(help_text="Sequence number (1, 2, 3...)")
+    
+    fee_percentage_increase = models.DecimalField(
+        max_digits=5, 
+        decimal_places=2, 
+        default=0.00, 
+        help_text="Percentagem acima do preço padrão (Ex: 10.00 para +10%)"
+    )
+
+    @property
+    def calculated_monthly_fee(self):
+        """Calcula o preço real: Preço Base + % de aumento"""
+        base_fee = self.course.monthly_fee
+        if self.fee_percentage_increase > 0:
+            increase = (base_fee * self.fee_percentage_increase) / 100
+            return base_fee + increase
+        return base_fee
+    
 
     def next_level(self):
         """Retorna a próxima classe dentro do mesmo curso."""

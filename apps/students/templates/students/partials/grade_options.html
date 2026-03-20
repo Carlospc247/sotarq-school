@@ -1,6 +1,6 @@
 <option value="">---------</option>
 {% for grade in grades %}
-    <option value="{{ grade.id }}" {% if selected_grade_id|slugify == grade.id|slugify %}selected{% endif %}>
+    <option value="{{ grade.id }}" {% if grade.id|stringformat:"s" == selected_grade_id %}selected{% endif %}>
         {{ grade.name }}
     </option>
 {% endfor %}

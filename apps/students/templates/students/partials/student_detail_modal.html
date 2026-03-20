@@ -122,7 +122,11 @@
                     </div>
                     <div class="p-3 bg-indigo-50 rounded-lg text-center">
                         <p class="text-xs text-indigo-400 font-bold uppercase">Duração</p>
-                        <p class="text-sm font-bold text-indigo-900">{{ academic.current_class.academic_year.name|default:"-" }}</p>
+                        <p class="text-sm font-bold text-indigo-900">{{ academic.current_class.course.duration_years|default:"-" }}</p>
+                    </div>
+                    <div class="p-3 bg-indigo-50 rounded-lg text-center">
+                        <p class="text-xs text-indigo-400 font-bold uppercase">Ano Lectivo</p>
+                        <p class="text-sm font-bold text-indigo-900">{{ student.current_class.academic_year.name|default:"-" }}</p>
                     </div>
                 </div>
             </div>
@@ -158,6 +162,63 @@
                     {% endif %}
                 </div>
             {% endif %}
+
+            <div class="mt-8 border-t-2 border-slate-100 pt-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h4 class="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center">
+                        <span class="w-2 h-2 bg-indigo-600 rounded-full mr-2"></span>
+                        Histórico de Recibos Oficiais
+                    </h4>
+                    <span class="text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-bold">
+                        {{ student.invoice_set.first.payments.count|default:"0" }} Documentos
+                    </span>
+                </div>
+
+                <div class="grid grid-cols-1 gap-3">
+                    {% for payment in student.invoice_set.first.payments.all %}
+                        <div class="group flex items-center justify-between bg-white p-4 rounded-xl border-l-4 border-l-emerald-500 shadow-sm border border-slate-200 hover:shadow-md transition-all duration-200">
+                            <div class="flex items-center gap-4">
+                                <div class="p-2 bg-emerald-50 rounded-lg text-emerald-700">
+                                    <i data-feather="check-shield" class="w-5 h-5"></i>
+                                </div>
+                                <div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-sm font-black text-slate-800">RC-{{ payment.id|stringformat:"04d" }}</span>
+                                        <span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded italic">VALIDADO</span>
+                                    </div>
+                                    <p class="text-xs text-slate-500 font-medium">{{ payment.confirmed_at|date:"d M Y · H:i" }}</p>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center gap-3">
+                                <div class="text-right mr-2">
+                                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Valor Pago</p>
+                                    <p class="text-sm font-black text-slate-900">{{ payment.amount }} Kz</p>
+                                </div>
+                                
+                                <div class="flex h-10 border-l border-slate-100 pl-3 gap-2">
+                                    <a href="{% url 'finance:print_receipt' payment.id %}?format=A4" target="_blank" 
+                                    class="flex items-center justify-center w-10 h-10 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-600 hover:text-white transition-colors group-hover:scale-105" 
+                                    title="Descarregar PDF A4">
+                                        <i data-feather="file-text" class="w-4 h-4"></i>
+                                    </a>
+                                    
+                                    <a href="{% url 'finance:print_receipt' payment.id %}?format=80mm" target="_blank" 
+                                    class="flex items-center justify-center w-10 h-10 bg-slate-800 text-white rounded-lg hover:bg-orange-600 transition-colors group-hover:scale-105" 
+                                    title="Imprimir Talão (80mm)">
+                                        <i data-feather="printer" class="w-4 h-4"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <div class="flex flex-col items-center justify-center p-8 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+                            <i data-feather="file-minus" class="w-8 h-8 text-slate-300 mb-2"></i>
+                            <p class="text-xs text-slate-400 font-bold uppercase tracking-widest">Sem recibos emitidos</p>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
 
         </div>
     </div>

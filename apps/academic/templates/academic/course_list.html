@@ -14,6 +14,10 @@
             </h1>
             <p class="text-slate-500 dark:text-slate-400 mt-1 font-medium italic">Configuração de currículos e especialidades</p>
         </div>
+        <a href="{% url 'fiscal:taxa_iva_list' %}" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-50 hover:text-indigo-600 transition">
+            <i data-feather="percent" class="w-4 h-4"></i>
+            Taxas IVA
+        </a>
         <a href="{% url 'academic:course_create' %}" class="flex items-center px-6 py-3 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg hover:bg-indigo-700 transition transform hover:-translate-y-1">
             <i data-feather="plus" class="w-5 h-5 mr-2"></i>
             Novo Curso
@@ -55,9 +59,17 @@
                                 </span>
                             </div>
                         </td>
-                        <td class="p-5 text-right">
-                            <button class="p-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-xl text-slate-400 hover:text-indigo-600 transition">
-                                <i data-feather="edit-3" class="w-5 h-5"></i>
+                        <td class="p-5 text-right flex justify-end gap-2">
+                            <a href="{% url 'academic:course_edit' course.id %}" 
+                            class="p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl text-indigo-600 hover:bg-indigo-600 hover:text-white transition shadow-sm"
+                            title="Editar Curso e Preços">
+                                <i data-feather="edit-3" class="w-4 h-4"></i>
+                            </a>
+
+                            <button onclick="confirmDelete('{{ course.id }}', '{{ course.name }}')"
+                                    class="p-2 bg-red-50 dark:bg-red-900/20 rounded-xl text-red-600 hover:bg-red-600 hover:text-white transition shadow-sm"
+                                    title="Eliminar Curso">
+                                <i data-feather="trash-2" class="w-4 h-4"></i>
                             </button>
                         </td>
                     </tr>
@@ -71,4 +83,47 @@
         </div>
     </div>
 </div>
+
+<tbody class="divide-y divide-slate-100">
+    {% for fs_form in formset %}
+    <tr class="grade-row" data-base-price="{{ course.monthly_fee }}">
+        <td class="py-3 px-2">{{ fs_form.level_index }}</td>
+        <td class="py-3 px-2 font-bold">{{ fs_form.name }}{{ fs_form.id }}</td>
+        <td class="py-3 px-2">
+            <div class="flex items-center gap-2">
+                {{ fs_form.fee_percentage_increase }}
+                <span class="text-[10px] font-black text-slate-400">% ACIMA</span>
+            </div>
+        </td>
+        <td class="py-3 px-2">
+            <span class="final-price-display text-sm font-black text-emerald-600">
+                Kz
+            </span>
+        </td>
+        <td class="py-3 px-2 text-center text-red-500">{{ fs_form.DELETE }}</td>
+    </tr>
+    {% endfor %}
+</tbody>
+
+<script>
+// Script para mostrar o preço final enquanto o diretor digita a percentagem
+document.querySelectorAll('input[name$="fee_percentage_increase"]').forEach(input => {
+    input.addEventListener('input', function() {
+        const row = this.closest('tr');
+        const basePrice = parseFloat(row.dataset.basePrice);
+        const percentage = parseFloat(this.value) || 0;
+        const finalPrice = basePrice + (basePrice * percentage / 100);
+        
+        row.querySelector('.final-price-display').innerText = finalPrice.toLocaleString() + ' Kz';
+    });
+});
+</script>
+
+<script>
+    function confirmDelete(id, name) {
+        if (confirm(`Rigor Académico: Tem certeza que deseja eliminar o curso "${name}"? Isso pode afetar matrículas e pautas existentes.`)) {
+            window.location.href = `/academic/courses/delete/${id}/`;
+        }
+    }
+</script>
 {% endblock %}

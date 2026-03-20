@@ -194,32 +194,6 @@
             </div>
         </div>
 
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-            <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center border-b pb-2">
-                <i data-feather="percent" class="w-5 h-5 mr-2 text-brand-600"></i> Configuração de Avaliação Acadêmica
-            </h3>
-            <p class="text-xs text-slate-500 mb-6">Defina o peso de cada componente para o cálculo automático da Média Trimestral (MT). 
-                <br><span class="font-bold text-amber-600">Fórmula aplicada:</span> (MAC x Peso + NPP x Peso + NPT x Peso) / Soma dos Pesos.
-            </p>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Peso MAC (Avaliação Contínua)</label>
-                    {{ form.weight_mac }}
-                    <p class="text-[10px] text-slate-400 mt-1">Ex: 1.0 (Peso normal)</p>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Peso NPP (Prova Parcial)</label>
-                    {{ form.weight_npp }}
-                    <p class="text-[10px] text-slate-400 mt-1">Ex: 1.0</p>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Peso NPT (Prova Trimestral)</label>
-                    {{ form.weight_npt }}
-                    <p class="text-[10px] text-slate-400 mt-1">Ex: 2.0 (Se a prova final valer o dobro)</p>
-                </div>
-            </div>
-        </div>
 
         <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
             <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center border-b pb-2">
@@ -241,11 +215,6 @@
                     {{ form.iban_primary }}
                 </div>
             </div>
-        </div>
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-emerald-500">
-            <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center border-b pb-2">
-                <i data-feather="file-text" class="w-5 h-5 mr-2 text-emerald-600"></i> Gestão de Contabilidade (SAF-T)
-            </h3>
         </div>
 
         <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">

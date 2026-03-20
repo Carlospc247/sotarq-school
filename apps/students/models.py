@@ -15,8 +15,8 @@ from django.dispatch import receiver
 
 class Student(BaseModel):
     class Gender(models.TextChoices):
-        MALE = 'M', _('Male')
-        FEMALE = 'F', _('Female')
+        MALE = 'M', _('Masculino')
+        FEMALE = 'F', _('Feminino')
 
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='student_profile')
     bi_number = models.CharField(max_length=20, unique=True, verbose_name="Número do BI", null=True, blank=True)
@@ -102,12 +102,12 @@ class Guardian(BaseModel):
 
 class StudentGuardian(BaseModel):
     RELATIONSHIP_CHOICES = (
-        ('father', _('Father')),
-        ('mother', _('Mother')),
-        ('uncle', _('Uncle')),
-        ('aunt', _('Aunt')),
-        ('grandparent', _('Grandparent')),
-        ('other', _('Other')),
+        ('father', _('Pai')),
+        ('mother', _('Mãe')),
+        ('uncle', _('Tio')),
+        ('aunt', _('Tia')),
+        ('grandparent', _('Avó/Avô')),
+        ('other', _('Outros')),
     )
 
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='guardians')

@@ -5,6 +5,7 @@ from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from apps.core.models import BaseModel
 #from apps.finance.services import PenaltyEngine
+from apps.finance.services import PenaltyEngine
 from apps.students.models import Student
 from django.utils import timezone
 from decimal import Decimal
@@ -39,6 +40,58 @@ class FeeType(models.Model):
         return f"{self.name} - {self.amount} Kz"
 
 
+
+class Month(models.IntegerChoices):
+    JAN = 1, _('Janeiro')
+    FEB = 2, _('Fevereiro')
+    MAR = 3, _('Março')
+    APR = 4, _('Abril')
+    MAY = 5, _('Maio')
+    JUN = 6, _('Junho')
+    JUL = 7, _('Julho')
+    AUG = 8, _('Agosto')
+    SEP = 9, _('Setembro')
+    OCT = 10, _('Outubro')
+    NOV = 11, _('Novembro')
+    DEC = 12, _('Dezembro')
+
+class MonthlyControl(BaseModel):
+    """
+    Rigor de Gestão: Impede que um mês seja pago em duplicidade 
+    e rastreia quais meses cada fatura liquidou.
+    """
+    student = models.ForeignKey(
+        'students.Student', 
+        on_delete=models.CASCADE, 
+        related_name='monthly_payments'
+    )
+    academic_year = models.ForeignKey(
+        'academic.AcademicYear', 
+        on_delete=models.PROTECT
+    )
+    month = models.IntegerField(choices=Month.choices)
+    
+    # A âncora financeira: Só existe registro aqui se houver uma fatura vinculada
+    invoice = models.ForeignKey(
+        'finance.Invoice', 
+        on_delete=models.CASCADE, 
+        related_name='months_covered'
+    )
+    
+    is_paid = models.BooleanField(default=False)
+    payment_date = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ('student', 'academic_year', 'month')
+        verbose_name = "Controle de Mensalidade"
+        verbose_name_plural = "Controle de Mensalidades"
+        ordering = ['academic_year', 'month']
+
+    def __str__(self):
+        return f"{self.student.full_name} - {self.get_month_display()}/{self.academic_year.name}"
+
+
+
 class Invoice(models.Model):
     STATUS_CHOICES = (
         ('pending', _('Pendente')),
@@ -51,7 +104,6 @@ class Invoice(models.Model):
     doc_type = models.CharField(max_length=2, choices=DocType.choices, default=DocType.FT)
     number = models.CharField(max_length=50, unique=True, editable=False)    
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='invoices')
-    total = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     hash_control = models.CharField(max_length=255, blank=True, null=True, editable=False)
     
@@ -60,7 +112,7 @@ class Invoice(models.Model):
 
     is_notified = models.BooleanField(default=False)
 
-
+    total = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
     subtotal = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
     
     # FK com o Fiscal: Rigor AGT
@@ -84,7 +136,6 @@ class Invoice(models.Model):
         null=True, blank=True, 
         related_name='invoice_comercial'
     )
-    total = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
 
     waive_penalty = models.BooleanField(default=False) # Se True, ignora multas/juros
     penalty_waived_by = models.ForeignKey(
@@ -122,6 +173,11 @@ class Invoice(models.Model):
         self.save()
 
     def save(self, *args, **kwargs):
+        # Garante que os totais sejam recalculados antes de persistir, 
+        # sincronizando com o que o JS mostrou ao usuário.
+        if self.pk: # Só calcula se já existirem itens (ou chame após adicionar itens)
+            self.update_totals() 
+            
         if not self.number:
             self.number = generate_document_number(self, self.doc_type)
         super().save(*args, **kwargs)
@@ -185,9 +241,22 @@ class InvoiceItem(models.Model):
     fee_type = models.ForeignKey(FeeType, on_delete=models.SET_NULL, null=True)
     description = models.CharField(max_length=255) # Snapshot of fee name or custom
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    
+
+    # Permite saber que este item paga especificamente o mês X
+    competence_month = models.IntegerField(
+        choices=Month.choices, 
+        null=True, 
+        blank=True,
+        verbose_name="Mês de Competência"
+    )
+
     def __str__(self):
-        return f"{self.description} ({self.amount})"
+        month_str = f" [{self.get_competence_month_display()}]" if self.competence_month else ""
+        return f"{self.description}{month_str} ({self.amount})"
+    
+ 
+
+
 
 class CashFlow(BaseModel):
     """
@@ -247,6 +316,7 @@ class PaymentMethod(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.get_method_type_display()})"
+
 
 class BankAccount(models.Model):
     """Contas Bancárias da Instituição (Substitui os 12 campos manuais)"""
@@ -360,21 +430,22 @@ class Payment(models.Model):
                 'auth_hash': self.hash_control[:12] if self.hash_control else "OFFLINE-VALIDATION"
             }
         return None
-
-
+    
+    @transaction.atomic
     def validate_payment(self, user):
         from django.db import transaction, connection
         from django.utils import timezone
         from .utils.pdf_generator import generate_receipt_pdf
         from .tasks import task_process_payment_notifications
         
-        # Imports Locais dos Módulos Acadêmico e Core
+        # Imports Locais dos Módulos Financeiro, Acadêmico e Core
+        from .models import CashFlow, MonthlyControl, Month
         from apps.students.models import EnrollmentRequest, Enrollment
         from apps.academic.models import AcademicYear, Class, VacancyRequest
         from apps.core.models import Notification, User, Role
 
         with transaction.atomic():
-            # 1. Validação Financeira (Padrão)
+            # 1. VALIDAÇÃO FINANCEIRA
             self.validation_status = self.ValidationStatus.VALIDATED
             self.confirmed_by = user
             self.confirmed_at = timezone.now()
@@ -386,17 +457,44 @@ class Payment(models.Model):
             self.invoice.save()
             self.save()
 
-            from .models import CashFlow # Import local se não quiser mover a classe para cima
+            # Registro no Fluxo de Caixa
             CashFlow.objects.create(
                 description=f"Recebimento: {self.invoice.number} - {self.invoice.student.full_name}",
                 amount=self.amount,
                 transaction_type='IN',
                 payment=self,
-                category="Mensalidades/Serviços",
+                category="Mensalidades",
                 created_by=user 
             )
 
-            # 2. Orquestração de Matrícula (Se for Candidatura)
+            # 2. CONTROLE DE MENSALIDADES (Usando competence_month)
+            # 2. CONTROLE DE MENSALIDADES (Rigor SOTARQ: Update or Create)
+            current_year = AcademicYear.objects.filter(is_active=True).first()
+            if not current_year:
+                current_year = AcademicYear.objects.order_by('-start_date').first()
+            
+            # Filtramos apenas itens que são Propinas/Mensalidades para evitar sujar o MonthlyControl
+            for item in self.invoice.items.filter(competence_month__isnull=False):
+                # O motor identifica se é propina pelo nome ou pelo tipo de taxa
+                is_propina_item = item.fee_type and (
+                    "propina" in item.fee_type.name.lower() or 
+                    "mensalidade" in item.fee_type.name.lower()
+                )
+
+                if is_propina_item and current_year:
+                    MonthlyControl.objects.update_or_create(
+                        student=self.invoice.student,
+                        academic_year=current_year,
+                        month=item.competence_month,
+                        defaults={
+                            'invoice': self.invoice,
+                            'is_paid': True,
+                            'payment_date': self.confirmed_at
+                        }
+                    )
+                    logger.info(f"MENSALIDADE QUITADA: Aluno {self.invoice.student.id}, Mês {item.competence_month}")
+                    
+            # 3. ORQUESTRAÇÃO DE MATRÍCULA (Candidaturas)
             enroll_req = EnrollmentRequest.objects.filter(invoice=self.invoice).first()
             
             if enroll_req and enroll_req.status == 'pending_payment':
@@ -411,34 +509,24 @@ class Payment(models.Model):
                     student.user.is_active = True
                     student.user.save()
 
-                # B. Buscar Ano Letivo Ativo
-                current_year = AcademicYear.objects.filter(is_active=True).first()
-                if not current_year:
-                    # Fallback crítico
-                    current_year = AcademicYear.objects.order_by('-start_date').first()
-
-                # C. ALGORITMO DE AUTO-ALOCAÇÃO DE TURMA
+                # B. Algoritmo de Auto-Alocação de Turma
                 candidate_classes = Class.objects.filter(
                     academic_year=current_year,
                     grade_level=enroll_req.grade_level,
-                    # O curso é obrigatório no modelo Class? Se não, filtrar pelo grade_level é suficiente
-                    # pois grade_level já está ligado a um course.
                 )
 
                 selected_class = None
-                
-                # Verifica vagas disponíveis (Capacity > Occupancy)
                 for klass in candidate_classes:
-                    if klass.has_vacancy: # Usa a property do modelo Class
+                    if klass.has_vacancy:
                         selected_class = klass
                         break
                 
                 if selected_class:
-                    # CASO A: Vaga Automática (Matrícula Direta)
-                    enrollment = Enrollment.objects.create(
+                    # CASO A: Vaga Automática
+                    Enrollment.objects.create(
                         student=student,
                         academic_year=current_year,
-                        course=enroll_req.course, # Campo obrigatório do modelo Enrollment
+                        course=enroll_req.course,
                         class_room=selected_class,
                         status='active'
                     )
@@ -446,7 +534,6 @@ class Payment(models.Model):
                     enroll_req.status = 'enrolled'
                     enroll_req.save()
                     
-                    # Notifica Sucesso ao Aluno
                     Notification.objects.create(
                         user=student.user,
                         title="Matrícula Confirmada! 🎉",
@@ -454,22 +541,18 @@ class Payment(models.Model):
                         link="/portal/dashboard/",
                         icon="check-circle"
                     )
-
                 else:
-                    # CASO B: Sem Vaga (Fluxo de Aprovação Manual - Despacho)
-                    # Cria a Matrícula sem turma (estado 'pending_placement')
-                    enrollment = Enrollment.objects.create(
+                    # CASO B: Sem Vaga (Fluxo de Aprovação Manual)
+                    Enrollment.objects.create(
                         student=student,
                         academic_year=current_year,
                         course=enroll_req.course,
-                        class_room=None, # Aguardando decisão (permitido pelo ajuste anterior)
+                        class_room=None, 
                         status='pending_placement'
                     )
                     
-                    # Registo de Auditoria para o Diretor (usando message)
                     sys_msg = f"Solicitação automática gerada via Pagamento #{self.id}. Validado por: {user.username}."
                     
-                    # Cria o Pedido de Vaga usando apenas os campos do seu modelo
                     vacancy = VacancyRequest.objects.create(
                         student=student,
                         target_grade=enroll_req.grade_level,
@@ -478,23 +561,23 @@ class Payment(models.Model):
                         is_resolved=False
                     )
 
-                    # Notificações para Staff (Secretaria)
-                    # Filtra secretários do tenant atual
-                    secretaries = User.objects.filter(tenant=self.invoice.student.user.tenant, current_role=Role.Type.SECRETARY)
+                    # Notificações para Staff
+                    secretaries = User.objects.filter(
+                        tenant=self.invoice.student.user.tenant, 
+                        current_role=Role.Type.SECRETARY
+                    )
                     for sec in secretaries:
                         Notification.objects.create(
                             user=sec,
                             title="⚠️ Solicitação de Vaga Pendente",
-                            message=f"O aluno {student.full_name} pagou mas não tem vaga automática na {enroll_req.grade_level}. Analise o pedido.",
-                            link=f"/academic/vacancy/manage/{vacancy.id}/", # URL que criaremos a seguir
+                            message=f"O aluno {student.full_name} pagou mas não tem vaga automática na {enroll_req.grade_level}.",
+                            link=f"/academic/vacancy/manage/{vacancy.id}/",
                             icon="clock"
                         )
                     
-                    # Atualiza estado da candidatura
                     enroll_req.status = 'processing'
                     enroll_req.save()
                     
-                    # Feedback Transparente ao Aluno
                     Notification.objects.create(
                         user=student.user,
                         title="Pagamento Recebido - Em Análise",
@@ -502,17 +585,15 @@ class Payment(models.Model):
                         icon="info"
                     )
 
-            # 3. Lógica de Desbloqueio de Devedores (Dívidas Antigas)
+            # 4. LÓGICA DE DESBLOQUEIO DE DEVEDORES
             first_item = self.invoice.items.first()
             if first_item and "Acordo de Dívida" in first_item.description:
                 if self.invoice.student.is_suspended:
                     self.invoice.student.is_suspended = False
                     self.invoice.student.save()
 
-        # Disparo da Task de Notificação Assíncrona
+        # Disparo da Task de Notificação Assíncrona fora da transação
         task_process_payment_notifications.delay(self.id, connection.schema_name)
-
-        
     
     def __str__(self):
         return f"{self.amount} for {self.invoice.number}"

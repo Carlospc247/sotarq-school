@@ -36,24 +36,22 @@ class EfficiencyAnalytics:
                     })
         return windows
 
+   
     @staticmethod
     def get_room_occupancy_rate(classroom, academic_year):
-        """
-        Calcula a % de ocupação de uma sala física.
-        Baseado em 12h de operação (07h às 19h) x 6 dias úteis.
-        """
-        # CORREÇÃO DO SYNTAX ERROR AQUI:
-        daily_capacity_minutes = 12 * 60 * 6 # 4320 min/semana
+        daily_capacity_minutes = 12 * 60 * 6 
         
+        # RIGOR: Filtramos pela Sala Física e pelo Ano Letivo da Turma
         slots = TimetableSlot.objects.filter(
-            classroom=classroom,
-            class_room__academic_year=academic_year
+            classroom=classroom,                  # Sala física (objeto Classroom)
+            class_room__academic_year=academic_year # Turma (objeto Class -> academic_year)
         )
         
         total_minutes = 0
         for s in slots:
+            # Cálculo de duração
             duration = datetime.combine(datetime.today(), s.end_time) - \
-                       datetime.combine(datetime.today(), s.start_time)
+                    datetime.combine(datetime.today(), s.start_time)
             total_minutes += duration.seconds // 60
             
         occupancy_rate = (total_minutes / daily_capacity_minutes) * 100 if daily_capacity_minutes > 0 else 0

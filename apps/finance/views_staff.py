@@ -1,4 +1,5 @@
 # apps/finance/views_staff.py
+from django.http import HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required, user_passes_test
 
@@ -26,23 +27,64 @@ def treasury_dashboard(request):
         'today': timezone.now()
     })
 
+
 @login_required
 @user_passes_test(is_treasury_staff)
 @transaction.atomic
 def validate_payment_fast(request, payment_id):
-    """Valida o pagamento e dispara as notificações via Celery."""
+    """
+    Motor de Validação Ultra-Rápida:
+    1. Executa a baixa financeira e orquestração académica (Turmas/Vagas).
+    2. Gera o Recibo Oficial (PDF) com Hash RSA/AGT.
+    3. Dispara notificações via Celery.
+    4. Retorna o PDF para impressão imediata.
+    """
     payment = get_object_or_404(Payment, id=payment_id)
-    
-    # 1. Validação Financeira
-    payment.validate_payment(user=request.user) # Usa o método que já criamos no modelo
-    
-    # 2. Chamada Assíncrona para Notificações (Celery)
-    schema_name = request.tenant.schema_name
-    from apps.core.tasks import task_process_payment_notifications
-    task_process_payment_notifications.delay(payment.id, schema_name)
 
-    messages.success(request, f"Pagamento de {payment.invoice.student.full_name} liquidado e assinado RSA!")
+    # 1. Segurança: Impedir re-validação
+    if payment.validation_status == 'validated':
+        messages.warning(request, "Este pagamento já foi validado anteriormente.")
+        return redirect('finance:treasury_dashboard')
+
+    try:
+        # 2. Orquestração SOTARQ (Financeiro + Académico)
+        # O método validate_payment já lida com: Invoice status, Fluxo de Caixa, 
+        # Ativação de Aluno, Alocação de Turma e Pedidos de Vaga.
+        payment.validate_payment(user=request.user)
+
+        # 3. Geração do Recibo PDF (Rigor AGT)
+        # Usamos o exportador que você definiu para garantir o layout oficial
+        from apps.finance.utils.pdf_generator import generate_receipt_pdf
+        
+        # O método gera o PDF e já deve salvar no campo payment.receipt_pdf
+        receipt_path = generate_receipt_pdf(payment) 
+
+        # 4. Notificação Assíncrona (Celery)
+        schema_name = request.tenant.schema_name
+        from apps.core.tasks import task_process_payment_notifications
+        task_process_payment_notifications.delay(payment.id, schema_name)
+
+        messages.success(
+            request, 
+            f"Sucesso! Pagamento de {payment.invoice.student.full_name} validado. "
+            f"O aluno foi ativado/alocado automaticamente."
+        )
+
+        # 5. Entrega Inteligente: Se for via AJAX/Modal, podemos retornar JSON.
+        # Se for clique direto, abrimos o PDF em nova aba.
+        if payment.receipt_pdf:
+            response = HttpResponse(payment.receipt_pdf.read(), content_type='application/pdf')
+            filename = f"RECIBO_{payment.invoice.number}.pdf"
+            response['Content-Disposition'] = f'inline; filename="{filename}"'
+            return response
+
+    except Exception as e:
+        messages.error(request, f"Erro crítico na validação: {str(e)}")
+        # O transaction.atomic garante que se o PDF falhar, a baixa não ocorre
+        return redirect('finance:treasury_dashboard')
+
     return redirect('finance:treasury_dashboard')
+
 
 @login_required
 @user_passes_test(is_treasury_staff)

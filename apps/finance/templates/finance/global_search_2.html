@@ -1,0 +1,50 @@
+<div class="bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden">
+    {% for student in students %}
+    {% with enrollment=student.enrollments.first %}
+    
+    {# 1. Lógica de Preço Unificada: Prioriza Grade Level, depois Course, depois 0.00 #}
+    {% if enrollment.class_room.grade_level %}
+        {% set price = enrollment.class_room.grade_level.calculated_monthly_fee %}
+    {% elif student.course %}
+        {% set price = student.course.monthly_fee %}
+    {% else %}
+        {% set price = 0 %}
+    {% endif %}
+
+    <div onclick="selectStudent('{{ student.id }}', '{{ student.full_name|escapejs }}', '{{ price|floatformat:2 }}')"
+         class="p-4 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors flex justify-between items-center group">
+        
+        <div>
+            <p class="text-sm font-black text-slate-800 group-hover:text-indigo-600">
+                {{ student.full_name }}
+            </p>
+            <p class="text-[10px] text-slate-500 uppercase font-bold">
+                {% if enrollment %}
+                    {{ enrollment.class_room.grade_level.name|default:"Sem Turma" }} • {{ enrollment.course.name|default:student.course.name }}
+                {% else %}
+                    <span class="text-amber-500 italic">Sem Matrícula Ativa</span>
+                {% endif %}
+            </p>
+        </div>
+        
+        <div class="flex items-center gap-3">
+            <span class="text-[10px] font-black text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">SELECIONAR</span>
+            <i data-feather="plus" class="w-4 h-4 text-slate-300 group-hover:text-indigo-600"></i>
+        </div>
+    </div>
+    {% endwith %}
+    
+    {% empty %}
+    <div class="p-10 text-center text-slate-400">
+        <i data-feather="search" class="w-10 h-10 mx-auto mb-3 opacity-20"></i>
+        <p class="text-xs font-bold uppercase italic tracking-widest">Nenhum aluno encontrado</p>
+    </div>
+    {% endfor %}
+</div>
+
+<script>
+    // Rigor SOTARQ: Reinicializa ícones Feather para os novos elementos injetados pelo HTMX
+    if (typeof feather !== 'undefined') {
+        feather.replace();
+    }
+</script>

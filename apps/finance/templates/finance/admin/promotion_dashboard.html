@@ -19,7 +19,7 @@
             <span class="text-sm font-bold text-slate-700">{{ total_count }} Alunos na lista de espera</span>
         </div>
         
-        <button hx-post="{% url 'finance:mass_whatsapp_promotion_alert' %}"
+        <button hx-post="{% url 'academic:mass_whatsapp_promotion_alert' %}"
                 hx-vals='js:{student_ids: selectedStudents}'
                 class="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg"
                 :disabled="selectedStudents.length === 0"

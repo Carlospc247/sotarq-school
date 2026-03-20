@@ -1,4 +1,6 @@
 <option value="">---------</option>
-{% for class in classes %}
-    <option value="{{ class.id }}">{{ class.name }} - {{ class.get_period_display }}</option>
+{% for class_obj in classes %}
+    <option value="{{ class_obj.id }}">{{ class_obj.name }}</option>
+{% empty %}
+    <option value="" disabled>Nenhuma turma encontrada</option>
 {% endfor %}

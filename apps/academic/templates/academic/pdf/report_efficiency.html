@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page { size: A4; margin: 2cm; }
+        body { font-family: 'Helvetica', 'Arial', sans-serif; color: #334155; line-height: 1.5; }
+        .header { border-bottom: 2px solid #10b981; padding-bottom: 10px; margin-bottom: 30px; }
+        .school-name { font-size: 24px; font-weight: bold; color: #065f46; }
+        .report-title { font-size: 18px; color: #64748b; }
+        h2 { font-size: 16px; border-left: 4px solid #10b981; padding-left: 10px; margin-top: 25px; color: #1e293b; text-transform: uppercase; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { background-color: #f1f5f9; text-align: left; padding: 8px; font-size: 12px; border: 1px solid #e2e8f0; }
+        td { padding: 8px; font-size: 12px; border: 1px solid #e2e8f0; }
+        .badge-red { color: #b91c1c; font-weight: bold; }
+        .footer { margin-top: 50px; font-size: 10px; text-align: center; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="school-name">{{ school_name }}</div>
+        <div class="report-title">Relatório de Eficiência Académica - {{ active_year.name }}</div>
+        <div style="font-size: 10px;">Gerado em: {{ report_date|date:"d/m/Y H:i" }}</div>
+    </div>
+
+    <h2>Top 10 - Melhor Desempenho (Taxa de Aprovação)</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Professor</th>
+                <th>Disciplina</th>
+                <th>Turma</th>
+                <th>Taxa</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in top_performers %}
+            <tr>
+                <td>{{ item.teacher }}</td>
+                <td>{{ item.subject }}</td>
+                <td>{{ item.class }}</td>
+                <td>{{ item.pass_rate }}%</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>Alertas - Abaixo da Meta (75%)</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Professor</th>
+                <th>Disciplina</th>
+                <th>Turma</th>
+                <th>Taxa</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in alerts %}
+            {% if item.is_below_target %}
+            <tr>
+                <td>{{ item.teacher }}</td>
+                <td>{{ item.subject }}</td>
+                <td>{{ item.class }}</td>
+                <td class="badge-red">{{ item.pass_rate }}%</td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>Ocupação de Salas</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Sala</th>
+                <th>Ocupação (%)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for room in room_stats %}
+            <tr>
+                <td>{{ room.name }}</td>
+                <td>{{ room.occupancy }}%</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="footer">
+        SOTARQ SCHOOL SYSTEMS - Inteligência em Gestão Escolar
+    </div>
+</body>
+</html>

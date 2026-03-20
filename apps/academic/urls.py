@@ -40,9 +40,13 @@ urlpatterns = [
 
     path('courses/', views.CourseListView.as_view(), name='course_list'),
     path('courses/add/', views.CourseCreateView.as_view(), name='course_create'),
-    
+    #path('courses/edit/<int:pk>/', views.CourseUpdateView.as_view(), name='course_edit'),
+    path('courses/edit/<int:pk>/', views.course_edit, name='course_edit'),
+    path('courses/delete/<int:pk>/', views.course_delete, name='course_delete'),
+
     path('grade-levels/', views.GradeLevelListView.as_view(), name='grade_level_list'),
     path('grade-levels/add/', views.GradeLevelCreateView.as_view(), name='grade_level_create'),
+    path('ajax/load-classes/', views.ajax_load_classes, name='ajax_load_classes'),
     
     # --- GESTÃO DE DISCIPLINAS ---
     path('subjects/', views.SubjectListView.as_view(), name='subject_list'),
@@ -50,7 +54,7 @@ urlpatterns = [
     
     path('classes/', views.ClassListView.as_view(), name='class_list'),
     path('classes/add/', views.ClassCreateView.as_view(), name='class_create'),
-
+    
     # --- 6. EXPORTAÇÕES (Sincronizadas com Rigor) ---
     path('class/<int:class_id>/pauta/excel/', views.export_class_pauta_excel, name='export_class_pauta_excel'),
     path('export/pauta/pdf/<int:class_id>/', views.download_pauta_pdf, name='download_pauta_pdf'),

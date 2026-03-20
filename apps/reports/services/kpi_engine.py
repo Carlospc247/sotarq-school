@@ -12,6 +12,7 @@ class AcademicKPIEngine:
     def calculate_teacher_performance(academic_year_id):
         """
         Analisa a taxa de aprovação por disciplina/professor.
+        CORRIGIDO: Nomes de campos unificados para class_room.
         """
         kpi, _ = KPI.objects.get_or_create(
             code='TEACHER_PASS_RATE',
@@ -23,16 +24,19 @@ class AcademicKPIEngine:
 
         allocations = TeacherSubject.objects.filter(
             class_room__academic_year_id=academic_year_id
-        ).select_related('teacher__user', 'subject', 'class_room')
+        ).select_related('teacher__user', 'subject', 'class_room__academic_year')
 
         results = []
         
         with transaction.atomic():
             for allocation in allocations:
+                # CORREÇÃO 1: klass -> class_room
                 total_students = Enrollment.objects.filter(
-                    klass=allocation.class_room, status='active'
+                    class_room=allocation.class_room, 
+                    status='active'
                 ).count()
 
+                # CORREÇÃO 2: klass -> class_room
                 approvals = StudentGrade.objects.filter(
                     klass=allocation.class_room,
                     subject=allocation.subject,
@@ -57,6 +61,5 @@ class AcademicKPIEngine:
                 })
                 
         return sorted(results, key=lambda x: x['pass_rate'])
-
 
 

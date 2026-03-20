@@ -16,7 +16,7 @@ from apps.finance.models import FinanceConfig, Invoice
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db import transaction
 from django.db.models import Sum, Count, Q
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseForbidden
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
@@ -57,6 +57,23 @@ def global_student_search(request):
     else:
         results = []
     return render(request, 'students/partials/search_results.html', {'results': results})
+
+
+
+def global_search_2(request):
+    query = request.GET.get('q', '')
+    if not query:
+        return HttpResponse("") # Economiza processamento se a query for vazia
+
+    students = Student.objects.filter(
+        tenant=request.user.tenant,
+        full_name__icontains=query
+    ).prefetch_related(
+        'enrollments__class_room__grade_level'
+    )[:10] # Limite de 10 para performance de UI
+    
+    return render(request, 'students/partials/search_results_2.html', {'students': students})
+    
 
 @login_required
 def block_debtors(request):
@@ -104,12 +121,6 @@ def process_enrollment(request, student_id):
 
 
 
-# ==============================================================================
-# 1. HUB CENTRAL (DISPATCHER)
-# ==============================================================================
-
-
-
 @login_required
 def student_hub_dispatcher(request):
     user = request.user
@@ -152,18 +163,7 @@ def student_hub_dispatcher(request):
     else:
         messages.error(request, "Acesso não autorizado ou Perfil não definido.")
         return redirect('core:dashboard')
-# ==============================================================================
-# 2. LÓGICA PRIVADA (ADMIN/DIRETOR/SECRETARIA)
-# ==============================================================================
 
-
-# ==============================================================================
-# 4. MODAL DE DETALHES (REGRA 5 - TÁTIL)
-# ==============================================================================
-
-# ==============================================================================
-# 1. HUB CENTRAL (DISPATCHER)
-# ==============================================================================
 
 @login_required
 def student_hub_dispatcher(request):
@@ -377,13 +377,6 @@ from apps.students.models import Student, Enrollment, Guardian, StudentGuardian
 from apps.students.forms import StudentImportForm
 from apps.academic.models import AcademicYear, Course
 
-# ==============================================================================
-# 5. EXPORTAÇÃO EXCEL (COM ENCARREGADOS)
-# ==============================================================================
-
-# ==============================================================================
-# 5. EXPORTAÇÃO EXCEL (ENTERPRISE - DADOS COMPLETOS)
-# ==============================================================================
 
 # ==============================================================================
 # 5. EXPORTAÇÃO EXCEL (ATUALIZADO COM BI)
@@ -521,8 +514,11 @@ def student_import_bulk(request):
     Rigor SOTARQ: Coluna 12 para o BI.
     """
     # 1. Verificação de Permissão (Rigor de Segurança)
-    if not request.user.current_role == Role.Type.ADMIN:
-        messages.error(request, "Acesso restrito à Direção.")
+    # Define a lista de funções permitidas
+    ALLOWED_ROLES = [Role.Type.ADMIN, Role.Type.DIRECTOR, Role.Type.PEDAGOGIC, Role.Type.SECRETARY]
+
+    if request.user.current_role not in ALLOWED_ROLES:
+        messages.error(request, "Acesso restrito à Direção e Secretaria.")
         return redirect('students:student_list')
 
     if request.method == 'POST':
@@ -679,13 +675,6 @@ def student_import_bulk(request):
     return render(request, 'students/student_import_form.html', {'form': form})
  
 
-
-
-# ==============================================================================
-# IMPORTAÇÃO EM MASSA (CÓDIGO COMPLETO)
-# ==============================================================================
-
-
 @login_required
 def teacher_start_lesson(request, allocation_id):
     # (Mantido igual ao seu código, está correto)
@@ -763,7 +752,6 @@ def director_validate_grades(request, class_id):
     return redirect('students:student_list')
 
 
-# Views para trancar/destrancar Matrícula
 
 @login_required
 def toggle_enrollment_status(request):
@@ -836,6 +824,168 @@ def _check_permission(user, permission_type):
     return False
 
 
+
+@login_required
+@user_passes_test(is_manager_check, login_url='/')
+@transaction.atomic
+def student_add(request):
+    """
+    View para Matrícula Presencial (Backoffice) - Unificada com Rigor Financeiro e Documental.
+    """
+    config = SchoolConfiguration.objects.first()
+    if not config or not config.is_enrollment_open:
+        messages.error(request, "As matrículas estão fechadas no momento.")
+        return redirect('students:student_list')
+    
+    if request.method == 'POST':
+        form = StudentInternalForm(request.POST, request.FILES) 
+        if form.is_valid():
+            try:
+                # 1. CRIAR USUÁRIO (USER)
+                email = form.cleaned_data['email']
+                full_name = form.cleaned_data['full_name']
+                default_password = "Sotarq.Mudar123"
+                
+                if User.objects.filter(email=email).exists():
+                    messages.error(request, "Este email já está em uso.")
+                    return redirect('students:student_list')
+
+                user = User.objects.create_user(
+                    username=email,
+                    email=email,
+                    password=default_password,
+                    first_name=full_name.split()[0],
+                    last_name=full_name.split()[-1] if len(full_name.split()) > 1 else "",
+                    current_role=Role.Type.STUDENT,
+                    tenant=request.user.tenant,
+                    is_active=True
+                )
+                
+                role_student, _ = Role.objects.get_or_create(code=Role.Type.STUDENT)
+                UserRole.objects.create(user=user, role=role_student)
+
+                # 2. CRIAR ESTUDANTE (STUDENT)
+                student = form.save(commit=False)
+                student.user = user
+                student.is_active = True
+                student.save()
+                
+                # 3. CRIAR MATRÍCULA (ENROLLMENT)
+                course = form.cleaned_data['course']
+                grade_level = form.cleaned_data['grade_level']
+                active_year = AcademicYear.objects.filter(is_active=True).first()
+                
+                if active_year:
+                    Enrollment.objects.create(
+                        student=student,
+                        academic_year=active_year,
+                        course=course,
+                        status='pending_placement' # Aguarda alocação de turma
+                    )
+                
+                # 4. PROCESSAR ENCARREGADO (GUARDIAN)
+                g_email = form.cleaned_data.get('guardian_email')
+                if g_email:
+                    g_user, created = User.objects.get_or_create(
+                        email=g_email,
+                        defaults={
+                            'username': g_email,
+                            'current_role': Role.Type.GUARDIAN,
+                            'tenant': request.user.tenant,
+                            'is_active': True
+                        }
+                    )
+                    
+                    guardian, _ = Guardian.objects.get_or_create(
+                        user=g_user,
+                        defaults={
+                            'full_name': form.cleaned_data.get('guardian_name', 'Não Informado'), 
+                            'phone': form.cleaned_data.get('guardian_phone', '')
+                        }
+                    )
+                    
+                    StudentGuardian.objects.get_or_create(
+                        student=student,
+                        guardian=guardian,
+                        defaults={
+                            'relationship': form.cleaned_data.get('relationship', 'other'),
+                            'is_financial_responsible': True
+                        }
+                    )
+
+                # 5. LÓGICA FINANCEIRA IMUTÁVEL (INVOICE)
+                # Cálculo baseado na percentagem sobre o padrão (Rigor SOTARQ)
+                base_fee = course.monthly_fee
+                percentage = grade_level.fee_percentage_increase
+                final_calculated_price = base_fee + (base_fee * percentage / 100)
+                
+                # 5. LÓGICA FINANCEIRA (RIGOR SOTARQ)
+                # 5. LÓGICA FINANCEIRA (RIGOR SOTARQ)
+                from apps.finance.models import Invoice, InvoiceItem
+                from django.utils import timezone
+                import datetime
+
+                # Criamos a fatura vinculada ao aluno e ao regime de IVA do curso
+                invoice = Invoice.objects.create(
+                    student=student,
+                    tax_type=course.taxa_iva,
+                    due_date=timezone.now().date() + datetime.timedelta(days=5),
+                    status='pending'
+                    # O tenant será herdado via signals ou no save() do modelo Invoice
+                )
+
+                # ITEM 1: Matrícula (Preço Único definido no Curso)
+                InvoiceItem.objects.create(
+                    invoice=invoice, 
+                    description=f"Taxa de Matrícula Única - {course.name}", 
+                    amount=course.enrollment_fee 
+                )
+
+                # ITEM 2: Propina Mensal (Preço Escalonado via GradeLevel)
+                InvoiceItem.objects.create(
+                    invoice=invoice, 
+                    description=f"Propina Mensal - {grade_level.name}", 
+                    amount=grade_level.calculated_monthly_fee
+                )
+
+                # Atualiza Subtotal, IVA e Total Final baseado nos itens acima
+                invoice.update_totals()
+
+                # 6. SALVAR DOCUMENTAÇÃO E FOTO (ENROLLMENTREQUEST)
+                bi_val = form.cleaned_data['bi_number']
+                photo = request.FILES.get('photo_passport_file')
+                
+                EnrollmentRequest.objects.create(
+                    student=student,
+                    request_type=EnrollmentRequest.RequestType.NEW,
+                    course=course,
+                    grade_level=grade_level,
+                    guardian_email=g_email if g_email else email,
+                    observations=f"Matrícula Presencial. BI: {bi_val}",
+                    photo_passport=photo,
+                    doc_bi=form.cleaned_data.get('doc_bi_file'),
+                    doc_health=form.cleaned_data.get('doc_health_file'),
+                    doc_certificate=form.cleaned_data.get('doc_certificate_file'),
+                    status='approved'
+                )
+
+                messages.success(request, f"Aluno {student.full_name} registado com sucesso. Foto e documentos arquivados.")
+
+                # Redirecionamento com trigger para impressão da Invoice
+                response = redirect('students:student_list')
+                response['Location'] += f'?print_invoice={invoice.id}'
+                return response
+                
+            except Exception as e:
+                # O decorator @transaction.atomic fará o rollback de tudo em caso de erro
+                messages.error(request, f"Erro crítico ao registar: {str(e)}")
+        else:
+            messages.error(request, "Dados do formulário inválidos. Verifique os campos.")
+
+    return redirect('students:student_list')
+
+
+
 @login_required
 def student_edit(request, student_id):
     """
@@ -893,14 +1043,21 @@ def student_edit(request, student_id):
 @login_required
 def load_grade_levels(request):
     course_id = request.GET.get('course_id')
-    # Capturamos o ID que o JS enviou para manter a seleção
     selected_id = request.GET.get('selected_id') 
     
-    grades = GradeLevel.objects.filter(course_id=course_id).order_by('level_index')
+    # Se não vier course_id, retornamos vazio para não quebrar o JS
+    if not course_id:
+        return render(request, 'students/partials/grade_options.html', {'grades': []})
+
+    # No django-tenants, o isolamento é automático pelo Schema ativo.
+    # O filtro pelo course_id já é suficiente e seguro.
+    grades = GradeLevel.objects.filter(
+        course_id=course_id
+    ).order_by('level_index')
     
     return render(request, 'students/partials/grade_options.html', {
         'grades': grades,
-        'selected_grade_id': selected_id  # Envia para o template parcial
+        'selected_grade_id': selected_id
     })
 
 
@@ -972,127 +1129,51 @@ def student_print_file(request, student_id):
     
     return render(request, 'students/print/student_file_print.html', context)
 
+
 @login_required
 def student_financial_extract(request, student_id):
     """
-    Extrato Completo do Aluno (View Dedicada).
+    Extrato Financeiro com suporte a Exportação PDF (Rigor AGT).
+    Unificado para Web e Impressão.
     """
     if not _check_permission(request.user, 'FINANCE'):
-        messages.error(request, "Acesso Financeiro Restrito.")
-        return redirect('students:student_list')
+        return HttpResponseForbidden("Acesso Financeiro Restrito.")
 
-    student = get_object_or_404(Student, id=student_id)
+    # Rigor: select_related('user') garante que student.user.get_full_name funcione
+    student = get_object_or_404(Student.objects.select_related('user'), id=student_id)
     
     invoices = Invoice.objects.filter(student=student).order_by('-issue_date')
     payments = Payment.objects.filter(invoice__student=student).order_by('-created_at')
     
-    total_paid = payments.filter(validation_status='validated').aggregate(Sum('amount'))['amount__sum'] or 0
-    total_debt = invoices.filter(status__in=['pending', 'overdue']).aggregate(Sum('total'))['total__sum'] or 0
+    summary = {
+        'paid': payments.filter(validation_status='validated').aggregate(Sum('amount'))['amount__sum'] or 0,
+        'debt': invoices.filter(status__in=['pending', 'overdue']).aggregate(Sum('total'))['total__sum'] or 0
+    }
 
-    return render(request, 'finance/admin/student_extract.html', {
+    context = {
         'student': student,
         'invoices': invoices,
         'payments': payments,
-        'summary': {'paid': total_paid, 'debt': total_debt}
-    })
+        'summary': summary,
+        'report_date': datetime.now(),
+        'school_name': request.tenant.name.upper() # Rigor Multi-tenant
+    }
 
+    # Motor de Exportação PDF (Chamado via ?format=pdf)
+    if request.GET.get('format') == 'pdf':
+        from django.template.loader import render_to_string
+        from weasyprint import HTML
+        
+        # Certifique-se de criar este template específico para PDF (sem menus/navbars)
+        html_string = render_to_string('finance/pdf/student_extract_pdf.html', context)
+        html = HTML(string=html_string, base_url=request.build_absolute_uri('/'))
+        
+        pdf = html.write_pdf()
+        response = HttpResponse(pdf, content_type='application/pdf')
+        response['Content-Disposition'] = f'inline; filename="Extrato_{student.id}_{student.full_name}.pdf"'
+        return response
 
-
-
-@login_required
-@user_passes_test(is_manager_check, login_url='/')
-@transaction.atomic
-def student_add(request):
-    """
-    View para Matrícula Presencial (Backoffice) - CORRIGIDA PARA SALVAR FOTO E BI.
-    """
-    config = SchoolConfiguration.objects.first()
-    if not config or not config.is_enrollment_open:
-        messages.error(request, "As matrículas estão fechadas no momento.")
-        return redirect('students:student_list')
-    
-    if request.method == 'POST':
-        form = StudentInternalForm(request.POST, request.FILES) 
-        if form.is_valid():
-            try:
-                # 1. Criar User
-                email = form.cleaned_data['email']
-                full_name = form.cleaned_data['full_name']
-                default_password = "Sotarq.Mudar123"
-                
-                # Verifica se email já existe
-                if User.objects.filter(email=email).exists():
-                    messages.error(request, "Este email já está em uso.")
-                    return redirect('students:student_list')
-
-                user = User.objects.create_user(
-                    username=email,
-                    email=email,
-                    password=default_password,
-                    first_name=full_name.split()[0],
-                    last_name=full_name.split()[-1] if len(full_name.split()) > 1 else "",
-                    current_role=Role.Type.STUDENT,
-                    tenant=request.user.tenant,
-                    is_active=True
-                )
-                
-                role_student, _ = Role.objects.get_or_create(code=Role.Type.STUDENT)
-                UserRole.objects.create(user=user, role=role_student)
-
-                # 2. Criar Student
-                student = form.save(commit=False)
-                student.user = user
-                student.is_active = True
-                student.save()
-                
-                # 3. Criar Matrícula (Enrollment)
-                course = form.cleaned_data['course']
-                active_year = AcademicYear.objects.filter(is_active=True).first()
-                
-                if active_year:
-                    Enrollment.objects.create(
-                        student=student,
-                        academic_year=active_year,
-                        course=course,
-                        status='pending_placement' # Aguarda alocação de turma
-                    )
-                
-                # 4. SALVAR FOTO E BI (EnrollmentRequest) - CORREÇÃO CRÍTICA
-                bi_val = form.cleaned_data['bi_number']
-                photo = request.FILES.get('photo_passport_file') # Captura explícita
-                
-                EnrollmentRequest.objects.create(
-                    student=student,
-                    request_type=EnrollmentRequest.RequestType.NEW,
-                    course=course,
-                    grade_level=form.cleaned_data['grade_level'],
-                    guardian_email=email,
-                    
-                    # SALVA O BI NAS OBSERVAÇÕES
-                    observations=f"Matrícula Presencial. BI: {bi_val}",
-                    
-                    # SALVA A FOTO
-                    photo_passport=photo,
-                    
-                    # Outros Docs
-                    doc_bi=form.cleaned_data.get('doc_bi_file'),
-                    doc_health=form.cleaned_data.get('doc_health_file'),
-                    doc_certificate=form.cleaned_data.get('doc_certificate_file'),
-                    
-                    status='approved'
-                )
-
-                messages.success(request, f"Aluno {student.full_name} registado com sucesso. FOTO SALVA.")
-                return redirect('students:student_list')
-                
-            except Exception as e:
-                messages.error(request, f"Erro ao registar: {str(e)}")
-        else:
-            form = StudentInternalForm()
-
-    # (Retorno para view normal se não for modal, mas aqui usamos modal)
-    return redirect('students:student_list')
-
+    return render(request, 'finance/admin/student_extract.html', context)
 
 
 @login_required

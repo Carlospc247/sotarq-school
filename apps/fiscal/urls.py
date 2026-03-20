@@ -33,5 +33,8 @@ urlpatterns = [
     # Anulação com Auditoria e Captura de IP
     path('anular/<int:doc_id>/', views.anular_documento_fiscal, name='anular_documento'),
 
-    path('dashboard/', views.fiscal_audit_log, name='fiscal_audit_log'),   
+    path('dashboard/', views.fiscal_audit_log, name='fiscal_audit_log'),
+
+    path('config/iva/', views.taxa_iva_list, name='taxa_iva_list'),
+    path('config/iva/novo/', views.taxa_iva_create, name='taxa_iva_create'),
 ]

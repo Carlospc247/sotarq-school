@@ -8,11 +8,8 @@
         openPagamento: false, 
         openSangria: false, 
         openSuprimento: false, 
-        openFecho: false,
-        qty: 1, 
-        price: 0 
-     }"
-     @set-price.window="price = $event.detail.price; qty = 1">
+        openFecho: false 
+     }">
     
     <div class="flex flex-col md:flex-row justify-between items-end mb-8 gap-4">
         <div>
@@ -127,8 +124,13 @@
         </div>
     </div>
 
-    <div x-show="openPagamento" class="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/95 p-4" x-cloak x-transition> 
-        <div class="bg-white rounded-[3rem] shadow-2xl border-t-[12px] border-brand-600 w-full max-w-2xl overflow-hidden p-8" @click.away="openPagamento = false">
+    <div x-show="openPagamento" 
+        class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/95 p-4" 
+        x-cloak x-transition
+        x-data="{ qty: 1, price: 0 }"
+        @set-price.window="price = $event.detail.price; qty = 1"> 
+        
+        <div class="bg-white rounded-[3rem] shadow-2xl border-t-[12px] border-brand-600 w-full max-w-2xl overflow-hidden p-8">
             <h3 class="text-2xl font-black text-slate-800 uppercase italic">Liquidação Rápida</h3>
             
             <form action="{% url 'finance:process_manual_payment' %}" method="POST" class="space-y-6">
@@ -145,7 +147,9 @@
                         hx-trigger="keyup changed delay:500ms"
                         class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-bold outline-none focus:border-brand-600"
                         placeholder="Digite para buscar...">
+                    
                     <div id="search-results" class="absolute left-0 right-0 z-[120] bg-white shadow-2xl rounded-2xl max-h-60 overflow-y-auto mt-1 border border-slate-100 empty:hidden"></div>
+                    
                     <input type="hidden" name="student_id" id="selected_student_id">
                 </div>
 
@@ -171,17 +175,27 @@
                     <div class="space-y-2">
                         <label class="text-[10px] font-black text-slate-500 uppercase">Mês de Referência (Início)</label>
                         <select name="start_month" required class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-bold outline-none focus:border-brand-600">
-                            <option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">Março</option>
-                            <option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option>
-                            <option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option>
-                            <option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option>
+                            <option value="1">Janeiro</option>
+                            <option value="2">Fevereiro</option>
+                            <option value="3">Março</option>
+                            <option value="4">Abril</option>
+                            <option value="5">Maio</option>
+                            <option value="6">Junho</option>
+                            <option value="7">Julho</option>
+                            <option value="8">Agosto</option>
+                            <option value="9">Setembro</option>
+                            <option value="10">Outubro</option>
+                            <option value="11">Novembro</option>
+                            <option value="12">Dezembro</option>
                         </select>
                     </div>
 
-                    <div class="col-span-1 md:col-span-1 text-right pt-4">
+                    <div class="col-span-2 text-right pt-4">
                         <p class="text-[10px] font-black text-slate-400 uppercase">Total a Receber</p>
                         <p class="text-3xl font-black text-brand-600" 
-                           x-text="(qty * price).toLocaleString('pt-PT', { minimumFractionDigits: 2 }) + ' Kz'"></p>
+                           x-text="(qty * price).toLocaleString('pt-PT', { minimumFractionDigits: 2 }) + ' Kz'">
+                            0,00 Kz
+                        </p>
                     </div>
                 </div>
 
@@ -212,45 +226,12 @@
             </form>
         </div>
     </div>
-
-    <div x-show="openAbertura" class="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/95 p-4" x-cloak x-transition>
-        <div class="bg-white rounded-[3rem] p-10 max-w-md w-full shadow-2xl">
-            <h3 class="text-xl font-black text-slate-800 mb-6 uppercase italic">Abertura de Caixa</h3>
-            <form action="{% url 'finance:open_cash_daily' %}" method="POST" class="space-y-4">
-                {% csrf_token %}
-                <div>
-                    <label class="text-[10px] font-black text-slate-500 uppercase">Fundo de Maneio (Kz)</label>
-                    <input type="number" step="0.01" name="initial_amount" required class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-bold focus:border-brand-600 outline-none">
-                </div>
-                <button type="submit" class="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase hover:bg-emerald-700 transition-all">Confirmar Abertura</button>
-                <button type="button" @click="openAbertura = false" class="w-full text-slate-400 text-[10px] font-black uppercase mt-2">Cancelar</button>
-            </form>
-        </div>
-    </div>
-
-    <div x-show="openFecho" class="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/95 p-4" x-cloak x-transition>
-        <div class="bg-white rounded-[3rem] p-10 max-w-md w-full shadow-2xl">
-            <h3 class="text-xl font-black text-slate-800 mb-2 uppercase italic">Encerrar Turno</h3>
-            <p class="text-xs text-slate-500 mb-6">Informe o valor total em espécie (notas/moedas) que está na gaveta agora.</p>
-            <form action="{% url 'finance:close_cash_daily' %}" method="POST" class="space-y-4">
-                {% csrf_token %}
-                <div>
-                    <label class="text-[10px] font-black text-slate-500 uppercase">Valor Contado (Cash)</label>
-                    <input type="number" step="0.01" name="reported_balance" required class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-bold focus:border-brand-600 outline-none">
-                </div>
-                <div>
-                    <label class="text-[10px] font-black text-slate-500 uppercase">Justificativa (Se houver quebra)</label>
-                    <textarea name="justification" class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-xs font-bold focus:border-brand-600 outline-none h-20"></textarea>
-                </div>
-                <button type="submit" class="w-full py-4 bg-red-600 text-white rounded-2xl font-black text-xs uppercase hover:bg-red-700 transition-all">Finalizar e Gerar Mapa</button>
-                <button type="button" @click="openFecho = false" class="w-full text-slate-400 text-[10px] font-black uppercase mt-2">Cancelar</button>
-            </form>
-        </div>
-    </div>
-
 </div>
 
 <script>
+    /**
+     * Função chamada pelos resultados do HTMX para selecionar o aluno
+     */
     function selectStudent(id, name, monthlyFee) {
         const searchInput = document.getElementById('student_search_input'); 
         const hiddenInput = document.getElementById('selected_student_id');
@@ -259,12 +240,15 @@
 
         if (!searchInput || !hiddenInput || !feeSelect) return;
 
+        // 1. Normalização do preço vindo do HTMX
         const normalizedFee = parseFloat(monthlyFee.toString().replace(',', '.')) || 0;
 
+        // 2. Preencher Identidade do Aluno
         searchInput.value = name;
         hiddenInput.value = id;
         searchResults.innerHTML = ''; 
 
+        // 3. Tentar auto-selecionar a opção de Propina no Select
         let foundPropina = false;
         for (let option of feeSelect.options) {
             const text = option.text.toLowerCase();
@@ -279,15 +263,22 @@
 
         if (!foundPropina) feeSelect.selectedIndex = 0;
 
+        // 4. Sincronização com o estado do Alpine.js via Custom Event
         window.dispatchEvent(new CustomEvent('set-price', { 
-            detail: { price: (foundPropina ? normalizedFee : 0) } 
+            detail: { price: normalizedFee } 
         }));
 
+        // Disparar evento de mudança para garantir que qualquer outro listener saiba da troca
         feeSelect.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
+    /**
+     * Listeners de Inicialização
+     */
     document.addEventListener('DOMContentLoaded', () => {
         if (typeof feather !== 'undefined') feather.replace();
+
+        // UX: Fecha a lista de busca ao clicar fora
         document.addEventListener('click', (e) => {
             const results = document.getElementById('search-results');
             const input = document.getElementById('student_search_input');

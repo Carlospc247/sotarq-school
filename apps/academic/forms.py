@@ -72,31 +72,60 @@ class AcademicEventEmailsForm(forms.ModelForm):
         }
 
 
+from django import forms
+from django.forms import inlineformset_factory
+from .models import Course, GradeLevel
+
+
 
 class CourseForm(forms.ModelForm):
     class Meta:
         model = Course
-        fields = ['name', 'code', 'level', 'duration_years', 'coordinator']
+        fields = ['name', 'code', 'level', 'duration_years', 'coordinator', 'monthly_fee', 'enrollment_fee', 'taxa_iva']
         widgets = {
-            'name': forms.TextInput(attrs={
-                'class': 'form-control rounded-xl border-slate-200 focus:border-indigo-500',
-                'placeholder': 'Ex: Informática de Gestão'
+            'name': forms.TextInput(attrs={'class': 'form-input rounded-xl border-slate-200 w-full'}),
+            'monthly_fee': forms.NumberInput(attrs={
+                'class': 'w-full pl-4 pr-12 py-3 bg-white border-2 border-indigo-200 rounded-2xl font-black text-indigo-700 focus:ring-4 focus:ring-indigo-500/20 transition text-lg',
+                'step': '0.01'
             }),
-            'code': forms.TextInput(attrs={
-                'class': 'form-control rounded-xl border-slate-200 font-mono uppercase',
-                'placeholder': 'INF-GEST'
+            # Novo Widget para Matrícula
+            'enrollment_fee': forms.NumberInput(attrs={
+                'class': 'w-full pl-4 pr-12 py-3 bg-emerald-50 border-2 border-emerald-200 rounded-2xl font-black text-emerald-700 focus:ring-4 focus:ring-emerald-500/20 transition text-lg',
+                'step': '0.01',
+                'placeholder': 'Valor da Matrícula'
             }),
-            'level': forms.Select(attrs={'class': 'form-select rounded-xl border-slate-200'}),
-            'duration_years': forms.NumberInput(attrs={'class': 'form-control rounded-xl border-slate-200', 'min': '1'}),
-            'coordinator': forms.Select(attrs={'class': 'form-select rounded-xl border-slate-200'}),
+            # NOVO CAMPO COM ESTILO SOTARQ
+            'taxa_iva': forms.Select(attrs={
+                'class': 'w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold text-slate-700 focus:border-indigo-500 transition'
+            }),
         }
 
-    def clean_code(self):
-        code = self.cleaned_data.get('code').upper()
-        # Validação de unicidade no Rigor SOTARQ
-        if Course.objects.filter(code=code).exists():
-            raise forms.ValidationError("Este código de curso já está em uso.")
-        return code
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Filtra apenas taxas ativas para não escolher taxas obsoletas
+        self.fields['taxa_iva'].queryset = self.fields['taxa_iva'].queryset.filter(ativo=True)
+        self.fields['taxa_iva'].empty_label = "Selecione a Taxa (Ex: Isento M02)"
+
+
+# O Coração da edição em massa:
+# O Coração da edição em massa por percentagem:
+GradeLevelFormSet = inlineformset_factory(
+    Course, 
+    GradeLevel, 
+    fields=['name', 'level_index', 'fee_percentage_increase'], # Alterado para percentagem
+    extra=0,
+    can_delete=True,
+    widgets={
+        'name': forms.TextInput(attrs={'class': 'form-input text-xs rounded-lg border-slate-200', 'readonly': 'readonly'}),
+        'fee_percentage_increase': forms.NumberInput(attrs={
+            'class': 'form-input text-xs font-black text-indigo-600 rounded-lg border-indigo-200',
+            'step': '0.01',
+            'placeholder': '0.00'
+        }),
+        'level_index': forms.NumberInput(attrs={'class': 'form-input text-xs w-16 rounded-lg'}),
+    }
+)
+
 
 
 
@@ -117,13 +146,6 @@ class ClassForm(forms.ModelForm):
             'room_number': forms.TextInput(attrs={'class': 'w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900', 'placeholder': 'Ex: Sala 04'}),
         }
 
-#    def clean_capacity(self):
-#        capacity = self.cleaned_data.get('capacity')
-#        if capacity < 5:
-#            raise forms.ValidationError("A capacidade mínima permitida é de 5 alunos.")
-#        if capacity > 60:
-#             raise forms.ValidationError("Alerta: Capacidade acima de 60 alunos viola as normas de conforto SOTARQ.")
-#        return capacity
 
 class GradeLevelForm(forms.ModelForm):
     class Meta:

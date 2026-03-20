@@ -10,9 +10,6 @@ urlpatterns = [
     # --- INTERFACE DO ALUNO/ENCARREGADO ---
     path('checkout/<int:invoice_id>/', views.checkout_invoice, name='checkout'),
     
-    # --- ÁREA DA TESOURARIA (OPERAÇÕES) ---
-    path('staff/treasury/', views_staff.treasury_dashboard, name='treasury_dashboard'),
-    path('staff/validate-fast/<int:payment_id>/', views_staff.validate_payment_fast, name='validate_payment_fast'),
     
     # --- BUSINESS INTELLIGENCE (DIRETORIA) ---
     path('admin/cash-flow/', views_dashboard.daily_cash_flow, name='daily_cash_flow'),
@@ -27,12 +24,20 @@ urlpatterns = [
     # Dashboard e Operação
     path('secretary/dashboard/', views_secretary.secretary_finance_dashboard, name='secretary_dashboard'),
     path('budget/proforma/<int:student_id>/', views_secretary.generate_budget_view, name='generate_budget_proforma'),
+    path('invoice/print/<int:invoice_id>/', views_secretary.print_invoice_view, name='print_invoice'),
+    
+    path('search-quick/', views_secretary.global_search_2, name='global_search_2'),
+
+    
     path('staff/treasury/', views_staff.treasury_dashboard, name='treasury_dashboard'),
     
     path('admin/budget-approvals/', views_admin.budget_approval_list, name='budget_approval_list'),
     path('admin/budget-discount/<int:proforma_id>/', views_admin.apply_budget_discount, name='apply_budget_discount'),
 
-
+    # --- ÁREA DA TESOURARIA (OPERAÇÕES) ---
+    path('staff/treasury/', views_staff.treasury_dashboard, name='treasury_dashboard'),
+    path('staff/validate-fast/<int:payment_id>/', views_staff.validate_payment_fast, name='validate_payment_fast'),
+    
     # Validação e Estorno
     path('staff/validate-fast/<int:payment_id>/', views_staff.validate_payment_fast, name='validate_payment_fast'),
     path('staff/reject/<int:payment_id>/', views_staff.reject_payment, name='reject_payment'),

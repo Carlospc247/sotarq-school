@@ -92,21 +92,15 @@ def generate_agt_qrcode_image(instance):
 
 
 
-
+"""
 
 class SOTARQExporter:
-    """
-    Motor Supremo v2.6 - Dual Format (A4 & 80mm).
-    Rigor: Identidade de Cliente Híbrida + Conformidade AGT + Design Adaptativo.
-    """
-
+    
     @staticmethod
     def generate_fiscal_document(instance, doc_type_code, is_copy=False, page_format='A4'):
         buffer = BytesIO()
-        
-        # Definição de Dimensões e Margens
         if page_format == '80mm':
-            page_size = (8.0 * cm, 30.0 * cm) 
+            page_size = (8.0 * cm, 35.0 * cm) # Aumentado para acomodar detalhes
             margin = 0.3 * cm
         else:
             page_size = A4
@@ -115,7 +109,7 @@ class SOTARQExporter:
         p = canvas.Canvas(buffer, pagesize=page_size)
         width, height = page_size
 
-        # 1. RESGATE DO TENANT (Hierarquia de Descoberta)
+        # 1. RECUPERAÇÃO DO TENANT
         tenant = getattr(instance, 'tenant', None)
         if not tenant:
             if hasattr(instance, 'student') and instance.student:
@@ -123,38 +117,20 @@ class SOTARQExporter:
             elif hasattr(instance, 'invoice') and instance.invoice:
                 tenant = instance.invoice.tenant
 
-        # 2. LÓGICA DE IDENTIDADE HÍBRIDA (Aluno vs Externo vs Consumidor)
-        client_info = {
-            'name': "CONSUMIDOR FINAL",
-            'nif': "999999999",
-            'id': "N/A"
-        }
-
+        # 2. IDENTIDADE DO CLIENTE
+        client_info = {'name': "CONSUMIDOR FINAL", 'nif': "999999999", 'id': "N/A"}
         if hasattr(instance, 'student') and instance.student:
-            # Caso A: É um Aluno (Identidade Acadêmica)
             client_info['name'] = instance.student.full_name.upper()
             client_info['nif'] = getattr(instance.student, 'nif', "999999999")
             client_info['id'] = f"PROC: {instance.student.registration_number}"
-        
         elif hasattr(instance, 'external_client_name') and instance.external_client_name:
-            # Caso B: É um Visitante/Staff (Identidade Externa direta)
             client_info['name'] = instance.external_client_name.upper()
             client_info['nif'] = getattr(instance, 'external_client_nif', "999999999")
-            
-        elif hasattr(instance, 'invoice') and instance.invoice:
-            # Caso C: Fallback via Invoice (Pagamentos)
-            inv = instance.invoice
-            if inv.student:
-                client_info['name'] = inv.student.full_name.upper()
-                client_info['id'] = f"PROC: {inv.student.registration_number}"
-            elif hasattr(inv, 'external_name') and inv.external_name:
-                client_info['name'] = inv.external_name.upper()
 
-        # 3. METADADOS FISCAIS
-        doc_number = getattr(instance, 'number', getattr(instance, 'numero_documento', 'S/N'))
-        agt_status_label = "NORMAL" if instance.status == 'confirmed' else "ANULADO"
+        doc_number = getattr(instance, 'number', 'S/N')
+        agt_status_label = "NORMAL" if instance.status in ['paid', 'confirmed', 'pending'] else "ANULADO"
 
-        # 4. DIRECOMANENTO DE LAYOUT
+        # 3. CHAMADA DE LAYOUT
         if page_format == 'A4':
             SOTARQExporter._draw_a4_layout(p, instance, tenant, client_info, doc_number, agt_status_label, is_copy, width, height)
         else:
@@ -164,9 +140,11 @@ class SOTARQExporter:
         p.save()
         return buffer.getvalue()
 
+    
+
     @staticmethod
     def _draw_80mm_layout(p, instance, tenant, client_info, doc_number, agt_status_label, is_copy, width, height):
-        """Layout térmico otimizado com Bloco de Cliente Dinâmico."""
+        Layout térmico otimizado com Bloco de Cliente Dinâmico.
         y = height - 1*cm
         
         # Logo do Tenant
@@ -185,55 +163,34 @@ class SOTARQExporter:
         y -= 0.8*cm
 
         # Info do Documento
-        p.line(0.5*cm, y, width-0.5*cm, y)
-        y -= 0.4*cm
-        p.setFont("Helvetica-Bold", 9)
-        # get_doc_type_display() garante compatibilidade com apps/fiscal/models.py
-        p.drawCentredString(width/2, y, f"{instance.get_doc_type_display().upper()}") 
-        y -= 0.4*cm
-        p.drawCentredString(width/2, y, doc_number)
-        y -= 0.4*cm
-        p.setFont("Helvetica", 7)
-        p.drawCentredString(width/2, y, f"ESTADO: {agt_status_label}")
-        y -= 0.4*cm
-        p.line(0.5*cm, y, width-0.5*cm, y)
-
-        # BLOCO DE CLIENTE (Visitante ou Aluno)
-        y -= 0.5*cm
-        p.setFont("Helvetica-Bold", 7)
-        p.drawString(0.5*cm, y, "CLIENTE:")
-        y -= 0.35*cm
-        p.setFont("Helvetica", 7)
-        p.drawString(0.5*cm, y, client_info['name'][:40])
-        y -= 0.35*cm
-        p.drawString(0.5*cm, y, f"NIF: {client_info['nif']} | {client_info['id']}")
         y -= 0.5*cm
         p.line(0.5*cm, y, width-0.5*cm, y)
+        y -= 0.5*cm
 
-        # Itens da Venda
-        y -= 0.6*cm
-        p.setFont("Helvetica-Bold", 7)
-        p.drawString(0.5*cm, y, "DESCRIÇÃO")
-        p.drawRightString(width-0.5*cm, y, "TOTAL")
-        y -= 0.3*cm
-
-        p.setFont("Helvetica", 7)
-        items = []
-        if hasattr(instance, 'items'): items = instance.items.all()
-        elif hasattr(instance, 'invoice') and hasattr(instance.invoice, 'items'): items = instance.invoice.items.all()
-
-        for item in items:
-            y -= 0.4*cm
-            p.drawString(0.5*cm, y, item.description[:30])
-            # Suporta campo 'amount' ou 'total' dependendo do modelo
-            valor = getattr(item, 'amount', getattr(item, 'total', 0))
-            p.drawRightString(width-0.5*cm, y, f"{valor:,.2f}")
+        # --- BLOCO DE TOTAIS RIGOROSO (80mm) ---
+        p.setFont("Helvetica", 8)
         
-        # Totais
-        y -= 1*cm
-        p.setFont("Helvetica-Bold", 9)
-        total_final = getattr(instance, 'valor_total', getattr(instance, 'total_amount', 0))
-        p.drawRightString(width-0.5*cm, y, f"TOTAL: {total_final:,.2f} Kz")
+        # 1. SUBTOTAL (Soma bruta)
+        p.drawString(width-4.5*cm, y, "SUBTOTAL (Sem Imposto):")
+        p.drawRightString(width-0.5*cm, y, f"{instance.subtotal:,.2f}")
+        
+        # 2. DESCONTO (Só mostra se for > 0)
+        if instance.discount_amount > 0:
+            y -= 0.4*cm
+            p.drawString(width-4.5*cm, y, f"DESCONTO ({'%' if instance.discount_is_pct else 'Vlr'}):")
+            p.drawRightString(width-0.5*cm, y, f"- {instance.discount_amount:,.2f}")
+
+        # 3. IVA (Total de Imposto)
+        y -= 0.4*cm
+        tax_pct = instance.tax_type.tax_percentage if instance.tax_type else 0
+        p.drawString(width-4.5*cm, y, f"TOTAL IVA ({tax_pct:g}%):")
+        p.drawRightString(width-0.5*cm, y, f"{instance.tax_amount:,.2f}")
+
+        # 4. TOTAL FINAL (Líquido a Pagar)
+        y -= 0.6*cm
+        p.setFont("Helvetica-Bold", 10)
+        p.drawString(width-4.5*cm, y, "TOTAL A PAGAR:")
+        p.drawRightString(width-0.5*cm, y, f"{instance.total:,.2f} Kz")
         
         # QR Code AGT (Obrigatório)
         y -= 2.5*cm
@@ -248,16 +205,227 @@ class SOTARQExporter:
 
     @staticmethod
     def _draw_a4_layout(p, instance, tenant, client_info, doc_number, agt_status_label, is_copy, width, height):
-        """Layout A4 com marca d'água e rigor institucional."""
-        # [Aqui mantemos a lógica de desenho A4 que o senhor já possui, 
-        # apenas substituindo 'student' por 'client_info' no cabeçalho]
-        p.setFont("Helvetica-Bold", 10)
-        p.drawString(2*cm, height-7.0*cm, f"ESTADO: {agt_status_label}")
+        Layout A4 de Alto Nível com Tabela de Totais.
+        # Cabeçalho Institucional A4 (Omitido por brevidade, mantendo seu padrão)
+        p.setFont("Helvetica-Bold", 12)
         p.drawString(2*cm, height-7.5*cm, f"CLIENTE: {client_info['name']}")
-        p.setFont("Helvetica", 9)
-        p.drawString(2*cm, height-7.9*cm, f"NIF: {client_info['nif']} | {client_info['id']}")
+        
+        # --- TABELA DE TOTAIS NO A4 (Posicionada ao final da página ou após itens) ---
+        # No A4, para ser "lindo", usamos um retângulo de destaque para o Total
+        total_y_start = 6*cm # Exemplo de posição no rodapé do A4
+        
+        p.setStrokeColor(colors.lightgrey)
+        p.line(12*cm, total_y_start + 2.2*cm, width-2*cm, total_y_start + 2.2*cm)
+        
+        p.setFont("Helvetica", 10)
+        # Alinhamento de labels à esquerda da coluna de valores
+        label_x = 13*cm
+        value_x = width - 2*cm
 
-    
+        # Linha Subtotal
+        p.drawString(label_x, total_y_start + 1.5*cm, "Total Ilíquido (Subtotal):")
+        p.drawRightString(value_x, total_y_start + 1.5*cm, f"{instance.subtotal:,.2f} Kz")
+
+        # Linha Desconto
+        p.drawString(label_x, total_y_start + 1.0*cm, f"Total de Descontos:")
+        p.drawRightString(value_x, total_y_start + 1.0*cm, f"- {instance.discount_amount:,.2f} Kz")
+
+        # Linha IVA
+        tax_pct = instance.tax_type.tax_percentage if instance.tax_type else 0
+        p.drawString(label_x, total_y_start + 0.5*cm, f"Imposto (IVA {tax_pct:g}%):")
+        p.drawRightString(value_x, total_y_start + 0.5*cm, f"{instance.tax_amount:,.2f} Kz")
+
+        # Destaque do Total Final
+        p.setFillColor(colors.whitesmoke)
+        p.rect(12.5*cm, total_y_start - 0.7*cm, 6.5*cm, 0.8*cm, fill=1, stroke=0)
+        p.setFillColor(colors.black)
+        p.setFont("Helvetica-Bold", 12)
+        p.drawString(13*cm, total_y_start - 0.4*cm, "TOTAL A PAGAR:")
+        p.drawRightString(value_x, total_y_start - 0.4*cm, f"{instance.total:,.2f} Kz")
+
+
+"""
+
+
+
+class SOTARQExporter:
+    """
+    Motor Supremo v3.2 - Clean Fiscal Edition.
+    Rigor: Faturamento Direto (Sem Itens/Produtos) + Transparência AGT.
+    """
+
+    @staticmethod
+    def generate_fiscal_document(instance, doc_type_code, is_copy=False, page_format='A4'):
+        buffer = BytesIO()
+        if page_format == '80mm':
+            page_size = (8.0 * cm, 20.0 * cm) # Reduzido, pois não há lista de itens
+            margin = 0.3 * cm
+        else:
+            page_size = A4
+            margin = 2.0 * cm
+
+        p = canvas.Canvas(buffer, pagesize=page_size)
+        width, height = page_size
+
+        # 1. IDENTIDADE DO TENANT E CLIENTE
+        tenant = getattr(instance, 'tenant', None)
+        client_info = {'name': "CONSUMIDOR FINAL", 'nif': "999999999", 'id': "N/A"}
+        
+        if hasattr(instance, 'student') and instance.student:
+            client_info['name'] = instance.student.full_name.upper()
+            client_info['nif'] = getattr(instance.student, 'nif', "999999999")
+            client_info['id'] = f"PROC: {instance.student.registration_number}"
+
+        doc_number = getattr(instance, 'number', 'S/N')
+        agt_status_label = "NORMAL" if instance.status in ['paid', 'confirmed'] else "ANULADO"
+
+        # 2. SELEÇÃO DE LAYOUT
+        if page_format == 'A4':
+            SOTARQExporter._draw_a4_clean_layout(p, instance, tenant, client_info, doc_number, agt_status_label, width, height)
+        else:
+            SOTARQExporter._draw_80mm_clean_layout(p, instance, tenant, client_info, doc_number, agt_status_label, width, height)
+
+        p.showPage()
+        p.save()
+        return buffer.getvalue()
+
+    @staticmethod
+    def _draw_80mm_clean_layout(p, instance, tenant, client_info, doc_number, agt_status_label, width, height):
+        """Layout Térmico com Listagem Simples."""
+        y = height - 1*cm
+        
+        # Cabeçalho Institucional
+        p.setFont("Helvetica-Bold", 10)
+        p.drawCentredString(width/2, y, tenant.name.upper() if tenant else "SOTARQ SYSTEM")
+        y -= 0.4*cm
+        p.setFont("Helvetica", 8)
+        p.drawCentredString(width/2, y, f"NIF: {getattr(tenant, 'tax_id', '9999999999')}")
+        
+        # Info Documento
+        y -= 0.8*cm
+        p.line(0.5*cm, y, width-0.5*cm, y)
+        y -= 0.5*cm
+        p.setFont("Helvetica-Bold", 9)
+        p.drawCentredString(width/2, y, f"{instance.get_doc_type_display().upper()} {doc_number}")
+        y -= 0.4*cm
+        p.setFont("Helvetica", 7)
+        p.drawCentredString(width/2, y, f"ESTADO: {agt_status_label}")
+        y -= 0.5*cm
+        p.line(0.5*cm, y, width-0.5*cm, y)
+
+        # Info Cliente
+        y -= 0.5*cm
+        p.setFont("Helvetica-Bold", 7)
+        p.drawString(0.5*cm, y, f"CLIENTE: {client_info['name']}")
+        y -= 0.35*cm
+        p.setFont("Helvetica", 7)
+        p.drawString(0.5*cm, y, f"NIF: {client_info['nif']} | {client_info['id']}")
+        y -= 0.5*cm
+        p.line(0.5*cm, y, width-0.5*cm, y)
+
+        # Dentro de _draw_80mm_clean_layout, antes do Bloco de Engenharia Financeira:
+        y -= 0.5*cm
+        p.setFont("Helvetica-Bold", 7)
+        p.drawString(0.5*cm, y, "DESCRIÇÃO")
+        p.drawRightString(width-0.5*cm, y, "TOTAL")
+        y -= 0.3*cm
+
+        p.setFont("Helvetica", 7)
+        for item in instance.items.all():
+            y -= 0.4*cm
+            # Trunca a descrição se for muito longa para o papel de 80mm
+            desc = (item.description[:25] + '..') if len(item.description) > 25 else item.description
+            p.drawString(0.5*cm, y, desc)
+            p.drawRightString(width-0.5*cm, y, f"{item.amount:,.2f}")
+
+        # --- BLOCO DE ENGENHARIA FINANCEIRA (TUDO O QUE RESTOU E IMPORTA) ---
+        y -= 0.8*cm
+        p.setFont("Helvetica", 8)
+        
+        # Subtotal
+        p.drawString(0.5*cm, y, "Valor Base (Sem Imposto):")
+        p.drawRightString(width-0.5*cm, y, f"{instance.subtotal:,.2f} Kz")
+        
+        # Desconto
+        y -= 0.5*cm
+        p.drawString(0.5*cm, y, "Total de Descontos:")
+        p.drawRightString(width-0.5*cm, y, f"- {instance.discount_amount:,.2f} Kz")
+
+        # IVA
+        y -= 0.5*cm
+        tax_pct = instance.tax_type.tax_percentage if instance.tax_type else 0
+        p.drawString(0.5*cm, y, f"Imposto IVA ({tax_pct:g}%):")
+        p.drawRightString(width-0.5*cm, y, f"{instance.tax_amount:,.2f} Kz")
+
+        # TOTAL FINAL
+        y -= 0.8*cm
+        p.line(3*cm, y+0.5*cm, width-0.5*cm, y+0.5*cm)
+        p.setFont("Helvetica-Bold", 9)
+        p.drawString(0.5*cm, y, "TOTAL A PAGAR:")
+        p.drawRightString(width-0.5*cm, y, f"{instance.total:,.2f} Kz")
+        
+        # QR Code AGT no rodapé
+        y -= 2.5*cm
+        try:
+            qr_img = generate_agt_qrcode_image(instance)
+            qr_buffer = BytesIO()
+            qr_img.save(qr_buffer, format='PNG')
+            p.drawImage(ImageReader(qr_buffer), (width/2)-1.25*cm, y, width=2.5*cm, height=2.5*cm)
+        except: pass
+
+    @staticmethod
+    def _draw_a4_clean_layout(p, instance, tenant, client_info, doc_number, agt_status_label, width, height):
+        """Layout A4 com Tabela de Itens Detalhada."""
+        # 1. Cabeçalho e Info Cliente (Mantido)
+        p.setFont("Helvetica-Bold", 14)
+        p.drawString(2*cm, height-3*cm, tenant.name.upper() if tenant else "SOTARQ SCHOOL")
+        
+        p.setFont("Helvetica", 10)
+        p.drawString(2*cm, height-3.5*cm, f"NIF: {getattr(tenant, 'tax_id', '999999999')}")
+        
+        p.setFont("Helvetica-Bold", 11)
+        p.drawString(2*cm, height-5*cm, f"DOCUMENTO: {instance.get_doc_type_display().upper()} {doc_number}")
+        p.setFont("Helvetica", 10)
+        p.drawString(2*cm, height-5.6*cm, f"CLIENTE: {client_info['name']} | NIF: {client_info['nif']}")
+
+        # 2. TABELA DE ITENS (O Coração da Fatura)
+        data = [["Descrição", "Qtd", "Preço Unit.", "Total"]]
+        for item in instance.items.all():
+            data.append([
+                item.description, 
+                "1", 
+                f"{item.amount:,.2f}", 
+                f"{item.amount:,.2f}"
+            ])
+
+        table = Table(data, colWidths=[9*cm, 2*cm, 4*cm, 3.5*cm])
+        table.setStyle(TableStyle([
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,-1), 9),
+            ('ALIGN', (1,0), (-1,-1), 'RIGHT'),
+            ('LINEBELOW', (0,0), (-1,0), 1, colors.black),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.black),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ]))
+        
+        tw, th, = table.wrapOn(p, width-4*cm, height)
+        table.drawOn(p, 2*cm, height-10*cm)
+
+        # 3. Bloco de Totais (Posição Dinâmica abaixo da tabela)
+        total_y = height - 10*cm - th - 1*cm
+        p.line(12*cm, total_y + 0.8*cm, width-2*cm, total_y + 0.8*cm)
+        
+        p.setFont("Helvetica", 10)
+        p.drawString(12*cm, total_y, "Subtotal:")
+        p.drawRightString(width-2*cm, total_y, f"{instance.subtotal:,.2f} Kz")
+        
+        p.drawString(12*cm, total_y - 0.5*cm, f"IVA ({instance.tax_type.tax_percentage if instance.tax_type else 0:g}%):")
+        p.drawRightString(width-2*cm, total_y - 0.5*cm, f"{instance.tax_amount:,.2f} Kz")
+
+        p.setFont("Helvetica-Bold", 12)
+        p.drawString(12*cm, total_y - 1.2*cm, "TOTAL:")
+        p.drawRightString(width-2*cm, total_y - 1.2*cm, f"{instance.total:,.2f} Kz")
+
 
 
 def generate_debt_agreement_pdf(agreement):

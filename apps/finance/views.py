@@ -175,6 +175,28 @@ def validate_payment_fast(request, payment_id):
     messages.success(request, f"Pagamento de {payment.amount} Kz validado com sucesso.")
     return redirect('finance:treasury_dashboard')
 
+
+@login_required
+def print_receipt(request, payment_id):
+    payment = get_object_or_404(Payment, id=payment_id)
+    page_format = request.GET.get('format', 'A4') # Default A4
+    
+    # Rigor: No multi-tenant, o get_object_or_404 já filtra pelo schema
+    
+    exporter = SOTARQExporter()
+    # doc_type_code 'RC' para Recibo, 'FT' para Fatura
+    pdf_buffer = exporter.generate_fiscal_document(
+        instance=payment, 
+        doc_type_code='RC', 
+        page_format=page_format
+    )
+    
+    pdf_buffer.seek(0)
+    filename = f"Recibo_{payment.id}_{page_format}.pdf"
+    
+    return FileResponse(pdf_buffer, as_attachment=False, filename=filename)
+
+
 def download_report_card(request, student_id):
     student = get_object_or_404(Student, id=student_id)
     
@@ -295,7 +317,7 @@ def invoice_detail(request, invoice_id):
     Rigor: Mostra itens, multas, juros e o link com o DocumentoFiscal.
     """
     # Busca a fatura garantindo o isolamento do Tenant (Segurança Máxima)
-    invoice = get_object_or_404(Invoice, id=invoice_id, student__user__tenant=request.user.tenant)
+    invoice = get_object_or_404(Invoice, id=invoice_id)
     
     # Cálculos de Mora em tempo real (Motor de Rigor PenaltyEngine)
     multa, juros, total_atualizado = PenaltyEngine.calculate_invoice_mora(invoice)

@@ -25,6 +25,8 @@ urlpatterns = [
     
     # --- OUTRAS ROTAS OPERACIONAIS ---
     path('search/', views.global_student_search, name='global_search'),
+    path('search/', views.global_search_2, name='global_search_2'),
+
     path('lesson/start/<int:allocation_id>/', views.teacher_start_lesson, name='start_lesson'),
     path('lesson/end/<int:lesson_id>/', views.teacher_end_lesson, name='end_lesson'),
     path('validate/report-cards/<int:class_id>/', views.director_validate_grades, name='validate_grades'),
