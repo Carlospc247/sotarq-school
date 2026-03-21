@@ -4,7 +4,7 @@ import qrcode
 import os
 from io import BytesIO
 from datetime import timedelta
-
+from cloudinary.models import CloudinaryField
 from django.db import models, connection
 from django.conf import settings
 from django.utils import timezone
@@ -31,7 +31,7 @@ class Document(models.Model):
     document_type = models.ForeignKey(DocumentType, on_delete=models.PROTECT)
     file = models.FileField(upload_to='documents/%Y/%m/')
     issued_at = models.DateTimeField(auto_now_add=True)
-    qr_code = models.ImageField(upload_to='qr_codes/%Y/%m/', blank=True, null=True)
+    qr_code = CloudinaryField('qr_code', blank=True, null=True)
     
     def save(self, *args, **kwargs):
         is_new = self.pk is None

@@ -1,4 +1,5 @@
 # apps/academic/models.py
+from decimal import Decimal
 import math
 from django.db import models
 from django.forms import ValidationError
@@ -58,9 +59,37 @@ class Course(BaseModel):
         verbose_name="Taxa de IVA Aplicável"
     )
  
-    monthly_fee = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, help_text="Preço da mensalidade padrão")
-    enrollment_fee = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, help_text="Preço da matrícula/inscrição padrão") # NOVO
+    # RIGOR: O curso agora aponta para os TIPOS de taxa, não para valores fixos
+    default_monthly_fee_type = models.ForeignKey(
+        'finance.FeeType', 
+        on_delete=models.PROTECT, 
+        related_name='courses_monthly',
+        null=True, blank=True,
+        verbose_name="Tipo de Mensalidade Padrão"
+    )
+    default_enrollment_fee_type = models.ForeignKey(
+        'finance.FeeType', 
+        on_delete=models.PROTECT, 
+        related_name='courses_enrollment',
+        null=True, blank=True,
+        verbose_name="Tipo de Matrícula Padrão"
+    )
 
+    taxa_iva = models.ForeignKey(
+        'fiscal.TaxaIVAAGT', 
+        on_delete=models.PROTECT, 
+        null=True, blank=True,
+        verbose_name="Taxa de IVA Aplicável"
+    )
+
+    # Propriedades para manter a compatibilidade com o resto do sistema
+    @property
+    def monthly_fee(self):
+        return self.default_monthly_fee_type.amount if self.default_monthly_fee_type else Decimal('0.00')
+
+    @property
+    def enrollment_fee(self):
+        return self.default_enrollment_fee_type.amount if self.default_enrollment_fee_type else Decimal('0.00')
     
     def __str__(self):
         return f"{self.name} ({self.get_level_display()})"
@@ -85,22 +114,44 @@ class GradeLevel(BaseModel): # Renomeado de Grade para evitar confusão com 'Not
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='grade_levels')
     level_index = models.PositiveIntegerField(help_text="Sequence number (1, 2, 3...)")
     
+    
     fee_percentage_increase = models.DecimalField(
-        max_digits=5, 
-        decimal_places=2, 
-        default=0.00, 
-        help_text="Percentagem acima do preço padrão (Ex: 10.00 para +10%)"
+        max_digits=5, decimal_places=2, default=0.00, 
+        help_text="Ex: 10.00 para cobrar 10% a mais que o valor base do curso no FeeType"
     )
+
+    total_monthly_fee = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0.00,
+        help_text="Preço final calculado (Base + % + IVA) para esta classe."
+    )
+
+    def save(self, *args, **kwargs):
+        # Lógica de negócio no servidor para garantir integridade
+        # 1. Busca o preço base do curso (via FeeType associado)
+        base_fee = self.course.default_monthly_fee_type.amount if self.course.default_monthly_fee_type else 0
+        
+        # 2. Calcula o acréscimo da classe
+        increase = Decimal(str(self.fee_percentage_increase)) / 100
+        price_before_tax = base_fee + (base_fee * increase)
+        
+        # 3. Aplica o IVA do curso
+        tax_pct = Decimal('0.00')
+        if self.course.taxa_iva:
+            # Extração da percentagem do nome ou campo específico do seu TaxaIVAAGT
+            # Assumindo que seu modelo TaxaIVAAGT tem um campo 'valor' ou similar
+            tax_pct = Decimal(str(self.course.taxa_iva.tax_percentage)) / 100
+        
+        self.total_monthly_fee = price_before_tax + (price_before_tax * tax_pct)
+        
+        super().save(*args, **kwargs)
+        
 
     @property
     def calculated_monthly_fee(self):
-        """Calcula o preço real: Preço Base + % de aumento"""
-        base_fee = self.course.monthly_fee
+        base_fee = self.course.monthly_fee # Puxa do FeeType via property
         if self.fee_percentage_increase > 0:
-            increase = (base_fee * self.fee_percentage_increase) / 100
-            return base_fee + increase
+            return base_fee * (1 + (self.fee_percentage_increase / 100))
         return base_fee
-    
 
     def next_level(self):
         """Retorna a próxima classe dentro do mesmo curso."""

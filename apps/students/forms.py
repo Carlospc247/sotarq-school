@@ -30,77 +30,7 @@ class ReconfirmationForm(forms.ModelForm):
             'doc_health': forms.FileInput(attrs={'class': 'block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100'}),
             'doc_payment_proof': forms.FileInput(attrs={'class': 'block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100'}),
         }
-"""
 
-# forms.py (app students)
-class StudentInternalForm(forms.ModelForm):
-    course = forms.ModelChoiceField(
-        queryset=Course.objects.none(), # Iniciado vazio para filtrar no __init__
-        label="Curso", 
-        required=True,
-        widget=forms.Select(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm bg-white'})
-    )
-    
-    grade_level = forms.ModelChoiceField(
-        queryset=GradeLevel.objects.none(), # Iniciado vazio
-        label="Classe", 
-        required=True,
-        widget=forms.Select(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm bg-white'})
-    )
-
-    doc_bi_file = forms.FileField(required=True, label="Cópia do BI")
-    doc_health_file = forms.FileField(required=False, label="Atestado Médico")
-    doc_certificate_file = forms.FileField(required=False, label="Certificado")
-    photo_passport_file = forms.ImageField(required=False, label="Foto Passe")
-    email = forms.EmailField(required=True, label="Email do Aluno/Encarregado")
-
-    class Meta:
-        model = Student
-        fields = ['full_name', 'birth_date', 'gender', 'current_class', 'bi_number']
-        widgets = {
-            'full_name': forms.TextInput(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm'}),
-            'birth_date': forms.DateInput(attrs={'type': 'date', 'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm'}),
-            'gender': forms.Select(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm bg-white'}),
-            'current_class': forms.Select(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm bg-white'}),
-            'bi_number': forms.TextInput(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm'}),
-        }
-
-    # apps/students/forms.py
-
-    def __init__(self, *args, **kwargs):
-        # Removemos o pop do tenant para não causar erro se não for passado
-        self.tenant = kwargs.pop('tenant', None) 
-        super().__init__(*args, **kwargs)
-        
-        # Se o isolamento é por Schema, basta dar o .all()
-        # O Django Tenants filtrará sozinho pelo schema ativo
-        self.fields['course'].queryset = Course.objects.all()
-        self.fields['grade_level'].queryset = GradeLevel.objects.all()
-        self.fields['current_class'].queryset = Class.objects.none()
-
-        # Repopulação em caso de erro no POST (sem o filtro de tenant=self.tenant)
-        if 'grade_level' in self.data:
-            try:
-                gl_id = int(self.data.get('grade_level'))
-                self.fields['current_class'].queryset = Class.objects.filter(grade_level_id=gl_id)
-            except (ValueError, TypeError):
-                pass
-        
-      
-        if self.instance and self.instance.pk:
-            if self.instance.user:
-                self.fields['email'].initial = self.instance.user.email
-            
-            self.fields['bi_number'].widget.attrs['readonly'] = True
-            self.fields['bi_number'].widget.attrs['class'] += ' bg-slate-100 cursor-not-allowed'
-
-            if self.instance.current_class:
-                self.fields['current_class'].queryset = Class.objects.filter(
-                    grade_level=self.instance.current_class.grade_level,
-                    tenant=self.tenant
-                )
-
-"""
 
 from django import forms
 from .models import Student, StudentGuardian

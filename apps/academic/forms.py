@@ -76,25 +76,30 @@ from django import forms
 from django.forms import inlineformset_factory
 from .models import Course, GradeLevel
 
-
+"""
 
 class CourseForm(forms.ModelForm):
     class Meta:
         model = Course
-        fields = ['name', 'code', 'level', 'duration_years', 'coordinator', 'monthly_fee', 'enrollment_fee', 'taxa_iva']
+        # REMOVIDOS: monthly_fee e enrollment_fee (Agora são FeeTypes)
+        fields = ['name', 'code', 'level', 'duration_years', 'coordinator', 'taxa_iva']
+        
         widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-input rounded-xl border-slate-200 w-full'}),
-            'monthly_fee': forms.NumberInput(attrs={
-                'class': 'w-full pl-4 pr-12 py-3 bg-white border-2 border-indigo-200 rounded-2xl font-black text-indigo-700 focus:ring-4 focus:ring-indigo-500/20 transition text-lg',
-                'step': '0.01'
+            'name': forms.TextInput(attrs={
+                'class': 'w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 transition'
             }),
-            # Novo Widget para Matrícula
-            'enrollment_fee': forms.NumberInput(attrs={
-                'class': 'w-full pl-4 pr-12 py-3 bg-emerald-50 border-2 border-emerald-200 rounded-2xl font-black text-emerald-700 focus:ring-4 focus:ring-emerald-500/20 transition text-lg',
-                'step': '0.01',
-                'placeholder': 'Valor da Matrícula'
+            'code': forms.TextInput(attrs={
+                'class': 'w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-700'
             }),
-            # NOVO CAMPO COM ESTILO SOTARQ
+            'level': forms.Select(attrs={
+                'class': 'w-full p-3 bg-slate-50 border border-slate-200 rounded-xl'
+            }),
+            'duration_years': forms.NumberInput(attrs={
+                'class': 'w-full p-3 bg-white border border-slate-200 rounded-xl'
+            }),
+            'coordinator': forms.Select(attrs={
+                'class': 'w-full p-3 bg-white border border-slate-200 rounded-xl'
+            }),
             'taxa_iva': forms.Select(attrs={
                 'class': 'w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold text-slate-700 focus:border-indigo-500 transition'
             }),
@@ -102,30 +107,115 @@ class CourseForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Filtra apenas taxas ativas para não escolher taxas obsoletas
-        self.fields['taxa_iva'].queryset = self.fields['taxa_iva'].queryset.filter(ativo=True)
-        self.fields['taxa_iva'].empty_label = "Selecione a Taxa (Ex: Isento M02)"
+        # Filtro de conformidade AGT: Apenas taxas de IVA ativas
+        if 'taxa_iva' in self.fields:
+            self.fields['taxa_iva'].queryset = self.fields['taxa_iva'].queryset.filter(ativo=True)
+            self.fields['taxa_iva'].empty_label = "Selecione a Taxa (Ex: Isento M02)"
+
+"""
 
 
-# O Coração da edição em massa:
-# O Coração da edição em massa por percentagem:
+class CourseForm(forms.ModelForm):
+    class Meta:
+        model = Course
+        # Unificamos os campos de configuração e os campos de tarifário
+        fields = [
+            'name', 'code', 'level', 'duration_years', 
+            'coordinator', 'taxa_iva', 
+            'default_monthly_fee_type', 'default_enrollment_fee_type'
+        ]
+        
+        widgets = {
+            'name': forms.TextInput(attrs={
+                'class': 'w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 transition'
+            }),
+            'code': forms.TextInput(attrs={
+                'class': 'w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-700'
+            }),
+            'level': forms.Select(attrs={
+                'class': 'w-full p-3 bg-slate-50 border border-slate-200 rounded-xl'
+            }),
+            'duration_years': forms.NumberInput(attrs={
+                'class': 'w-full p-3 bg-white border border-slate-200 rounded-xl',
+                'step': '0.01',
+                'readonly': 'readonly' # Definido pelo JS do template
+            }),
+            'coordinator': forms.Select(attrs={
+                'class': 'w-full p-3 bg-white border border-slate-200 rounded-xl'
+            }),
+            'taxa_iva': forms.Select(attrs={
+                'class': 'w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold text-slate-700 focus:border-indigo-500 transition'
+            }),
+            # Widgets para as taxas (ID sincronizado com o JS que te enviei antes)
+            'default_monthly_fee_type': forms.Select(attrs={
+                'id': 'id_fee_type',
+                'class': 'w-full p-3 rounded-xl border-none bg-white shadow-sm focus:ring-2 focus:ring-indigo-500'
+            }),
+            'default_enrollment_fee_type': forms.Select(attrs={
+                'class': 'w-full p-3 rounded-xl border-none bg-white shadow-sm focus:ring-2 focus:ring-emerald-500'
+            }),
+        }
+
+    def __init__(self, *args, **kwargs):
+        # Rigor Multi-tenant: Captura a escola
+        school = kwargs.pop('school', None)
+        super().__init__(*args, **kwargs)
+        
+        if school:
+            # Filtro de Coordenadores da Escola
+            if 'coordinator' in self.fields:
+                self.fields['coordinator'].queryset = Teacher.objects.filter(school=school, user__is_active=True)
+            
+            # Filtro de Taxas do Tarifário da Escola
+            if 'default_monthly_fee_type' in self.fields:
+                self.fields['default_monthly_fee_type'].queryset = self.fields['default_monthly_fee_type'].queryset.filter(
+                    school=school, recurring=True
+                )
+            
+            if 'default_enrollment_fee_type' in self.fields:
+                self.fields['default_enrollment_fee_type'].queryset = self.fields['default_enrollment_fee_type'].queryset.filter(
+                    school=school, recurring=False # Geralmente matrícula não é recorrente mensal
+                )
+
+        # Conformidade AGT
+        if 'taxa_iva' in self.fields:
+            self.fields['taxa_iva'].queryset = self.fields['taxa_iva'].queryset.filter(ativo=True)
+            self.fields['taxa_iva'].empty_label = "Selecione a Taxa (Ex: Isento M02)"
+
+
+
+class CourseFeeAssociationForm(forms.ModelForm):
+    class Meta:
+        model = Course
+        fields = ['default_monthly_fee_type', 'default_enrollment_fee_type']
+        widgets = {
+            'default_monthly_fee_type': forms.Select(attrs={'class': 'p-2 bg-slate-800 text-white rounded-lg border-slate-700 text-xs'}),
+            'default_enrollment_fee_type': forms.Select(attrs={'class': 'p-2 bg-slate-800 text-white rounded-lg border-slate-700 text-xs'}),
+        }
+
+
+
+
+# Mantenha como está se o modelo suportar, mas garanta o estilo SOTARQ
 GradeLevelFormSet = inlineformset_factory(
     Course, 
     GradeLevel, 
-    fields=['name', 'level_index', 'fee_percentage_increase'], # Alterado para percentagem
+    fields=['name', 'level_index', 'fee_percentage_increase'],
     extra=0,
     can_delete=True,
     widgets={
-        'name': forms.TextInput(attrs={'class': 'form-input text-xs rounded-lg border-slate-200', 'readonly': 'readonly'}),
+        'name': forms.TextInput(attrs={
+            'class': 'form-input text-xs rounded-lg border-slate-200 bg-slate-50', 
+            'readonly': 'readonly'
+        }),
         'fee_percentage_increase': forms.NumberInput(attrs={
-            'class': 'form-input text-xs font-black text-indigo-600 rounded-lg border-indigo-200',
+            'class': 'form-input text-xs font-black text-indigo-600 rounded-lg border-indigo-200 focus:ring-indigo-500',
             'step': '0.01',
             'placeholder': '0.00'
         }),
         'level_index': forms.NumberInput(attrs={'class': 'form-input text-xs w-16 rounded-lg'}),
     }
 )
-
 
 
 
@@ -148,34 +238,50 @@ class ClassForm(forms.ModelForm):
 
 
 class GradeLevelForm(forms.ModelForm):
+    # DEFINIÇÃO PRIORITÁRIA: required=False mata o erro de validação
+    total_monthly_fee = forms.DecimalField(
+        required=False, # Essencial para não barrar o POST
+        max_digits=12, 
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={
+            'readonly': 'readonly',
+            'class': 'total-monthly-fee-input w-full p-2 bg-slate-100 font-black text-emerald-600 rounded-lg border-none text-right',
+            'step': '0.01'
+        })
+    )
+
     class Meta:
         model = GradeLevel
-        fields = ['name', 'course', 'level_index']
+        # Unimos Identidade + Finanças
+        fields = ['name', 'level_index', 'fee_percentage_increase', 'total_monthly_fee']
         
         widgets = {
             'name': forms.TextInput(attrs={
-                'class': 'w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none transition',
-                'placeholder': 'Ex: 10ª Classe'
-            }),
-            'course': forms.Select(attrs={
-                'class': 'w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none transition'
+                'class': 'w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900 font-bold',
+                'readonly': 'readonly'
             }),
             'level_index': forms.NumberInput(attrs={
-                'class': 'w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none transition',
-                'min': '1',
-                'placeholder': '1'
+                'class': 'hidden',
             }),
+            'fee_percentage_increase': forms.NumberInput(attrs={
+                'class': 'w-full p-2 bg-white border border-slate-200 rounded-lg text-center font-bold focus:ring-2 focus:ring-indigo-500',
+                'step': '0.01'
+            }),
+            # O widget do total_monthly_fee aqui na Meta será sobrescrito 
+            # pela definição do campo lá em cima, o que é o comportamento desejado.
         }
 
-    def __init__(self, *args, **kwargs):
-        # Capturamos a escola enviada pela View
-        school = kwargs.pop('school', None)
-        super().__init__(*args, **kwargs)
-        
-        if school:
-            # FILTRO CRÍTICO: Garante que apenas cursos desta escola apareçam
-            self.fields['course'].queryset = self.fields['course'].queryset.filter(school=school)
 
+# Factory para garantir que as GradeLevels sigam o Course
+from django.forms import inlineformset_factory
+
+GradeLevelFormSet = inlineformset_factory(
+    Course, 
+    GradeLevel, 
+    form=GradeLevelForm, 
+    extra=0, 
+    can_delete=False # Segurança: Não permite deletar classes durante a edição de preços
+)
 
 
 class SubjectForm(forms.ModelForm):

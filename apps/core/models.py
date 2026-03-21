@@ -4,7 +4,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from django.conf import settings
-
+from cloudinary.models import CloudinaryField
 
 
 class SoftDeleteManager(models.Manager):
@@ -204,8 +204,8 @@ class SchoolConfiguration(BaseModel):
     # --- Identidade ---
     school_name = models.CharField(max_length=255)
     tax_id = models.CharField(max_length=20, verbose_name="NIF/Contribuinte")
-    logo = models.ImageField(upload_to='branding/logos/', blank=True, null=True)
-    favicon = models.ImageField(upload_to='branding/favicons/', blank=True, null=True)
+    logo = CloudinaryField('logo', blank=True, null=True)
+    favicon = CloudinaryField('favicon', blank=True, null=True)
 
     # --- Configurações de Avaliação (Pesos das Notas) ---
     weight_mac = models.DecimalField(max_digits=3, decimal_places=2, default=1.0, help_text="Peso da Média de Avaliação Contínua")
@@ -292,9 +292,9 @@ class SchoolConfiguration(BaseModel):
     hero_mode = models.CharField(max_length=10, choices=HeroMode.choices, default=HeroMode.SINGLE_IMAGE)
     hero_title = models.CharField(max_length=100, default="Educação de Excelência")
     hero_subtitle = models.TextField(default="Preparando líderes para o futuro.")
-    hero_image_1 = models.ImageField(upload_to='branding/hero/', blank=True, null=True)
-    hero_image_2 = models.ImageField(upload_to='branding/hero/', blank=True, null=True)
-    hero_image_3 = models.ImageField(upload_to='branding/hero/', blank=True, null=True)
+    hero_image_1 = CloudinaryField('hero_image_1', blank=True, null=True)
+    hero_image_2 = CloudinaryField('hero_image_2', blank=True, null=True)
+    hero_image_3 = CloudinaryField('hero_image_3', blank=True, null=True)
 
     # --- CONTROLE DE CALENDÁRIO ACADÉMICO (Requisito 4) ---
     

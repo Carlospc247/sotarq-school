@@ -2,16 +2,12 @@
     {% for student in students %}
     {% with enrollment=student.enrollments.first %}
     
-    {# 1. Lógica de Preço Unificada: Prioriza Grade Level, depois Course, depois 0.00 #}
-    {% if enrollment.class_room.grade_level %}
-        {% set price = enrollment.class_room.grade_level.calculated_monthly_fee %}
-    {% elif student.course %}
-        {% set price = student.course.monthly_fee %}
-    {% else %}
-        {% set price = 0 %}
-    {% endif %}
-
-    <div onclick="selectStudent('{{ student.id }}', '{{ student.full_name|escapejs }}', '{{ price|floatformat:2 }}')"
+    {# Lógica de Preço Nativa do Django: Usamos encadeamento de filtros ou tags if #}
+    <div onclick="selectStudent(
+            '{{ student.id }}', 
+            '{{ student.full_name|escapejs }}', 
+            '{% if enrollment.class_room.grade_level %}{{ enrollment.class_room.grade_level.calculated_monthly_fee|floatformat:2 }}{% elif student.course %}{{ student.course.monthly_fee|floatformat:2 }}{% else %}0.00{% endif %}'
+         )"
          class="p-4 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors flex justify-between items-center group">
         
         <div>
@@ -28,7 +24,7 @@
         </div>
         
         <div class="flex items-center gap-3">
-            <span class="text-[10px] font-black text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">SELECIONAR</span>
+            <span class="text-[10px] font-black text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity uppercase">Selecionar</span>
             <i data-feather="plus" class="w-4 h-4 text-slate-300 group-hover:text-indigo-600"></i>
         </div>
     </div>
@@ -43,7 +39,7 @@
 </div>
 
 <script>
-    // Rigor SOTARQ: Reinicializa ícones Feather para os novos elementos injetados pelo HTMX
+    // Rigor SOTARQ: Reinicializa ícones Feather após a carga do HTMX
     if (typeof feather !== 'undefined') {
         feather.replace();
     }

@@ -40,6 +40,19 @@ class FeeType(models.Model):
         return f"{self.name} - {self.amount} Kz"
 
 
+class FeePriceHistory(BaseModel):
+    """
+    LOG DE AUDITORIA: Registra quem alterou o preço, quando e de quanto para quanto.
+    Rigor SOTARQ: Essencial para conformidade fiscal e transparência.
+    """
+    fee_type = models.ForeignKey('FeeType', on_delete=models.CASCADE, related_name='price_history')
+    old_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    new_amount = models.DecimalField(max_digits=12, decimal_places=2)
+
+    class Meta:
+        ordering = ['-updated_at']
+        verbose_name = "Histórico de Preço"
+
 
 class Month(models.IntegerChoices):
     JAN = 1, _('Janeiro')
@@ -54,6 +67,7 @@ class Month(models.IntegerChoices):
     OCT = 10, _('Outubro')
     NOV = 11, _('Novembro')
     DEC = 12, _('Dezembro')
+
 
 class MonthlyControl(BaseModel):
     """
@@ -146,31 +160,43 @@ class Invoice(models.Model):
     )
     waive_reason = models.TextField(blank=True, null=True)
     
+    
+
     def update_totals(self):
         """
-        Motor de Cálculo Enterprise:
-        1. Soma itens -> 2. Aplica Desconto -> 3. Calcula IVA -> 4. Resultado Final
+        Motor de Cálculo Enterprise (Versão Blindada):
+        Força conversão explícita para evitar conflitos entre Decimal e Float.
         """
-        self.subtotal = sum(item.amount for item in self.items.all())
+        if self.status in ['paid', 'cancelled'] or self.hash_control:
+            return 
 
-        # A. Processamento do Desconto Híbrido
+        # 1. Soma os itens (Garantindo Base Decimal)
+        self.subtotal = sum((item.amount for item in self.items.all()), Decimal('0.00'))
+
+        # 2. Processamento do Desconto Híbrido
+        # Forçamos o valor do desconto a ser Decimal para evitar o erro /: 'float' and 'decimal'
+        d_value = Decimal(str(self.discount_value))
+        
         if self.discount_is_pct:
-            self.discount_amount = (self.subtotal * (self.discount_value / 100))
+            self.discount_amount = (self.subtotal * (d_value / Decimal('100')))
         else:
-            self.discount_amount = self.discount_value
+            self.discount_amount = d_value
 
         base_apos_desconto = self.subtotal - self.discount_amount
 
-        # B. Processamento do IVA via FK Fiscal
+        # 3. Processamento do IVA via FK Fiscal
         if self.tax_type:
-            # Cálculo conforme percentagem oficial da AGT
-            self.tax_amount = (base_apos_desconto * (self.tax_type.tax_percentage / 100))
+            # Rigor AGT: Converte a percentagem para string e depois Decimal (o caminho mais seguro)
+            tax_pct = Decimal(str(self.tax_type.tax_percentage))
+            self.tax_amount = (base_apos_desconto * (tax_pct / Decimal('100')))
         else:
-            self.tax_amount = 0
+            self.tax_amount = Decimal('0.00')
 
-        # C. Valor Final (Líquido a Pagar)
+        # 4. Valor Final
         self.total = base_apos_desconto + self.tax_amount
-        self.save()
+        
+        # Salva apenas os campos afetados para otimizar e evitar recursividade infinita no save()
+        super(Invoice, self).save(update_fields=['subtotal', 'discount_amount', 'tax_amount', 'total'])
 
     def save(self, *args, **kwargs):
         # Garante que os totais sejam recalculados antes de persistir, 
@@ -182,22 +208,27 @@ class Invoice(models.Model):
             self.number = generate_document_number(self, self.doc_type)
         super().save(*args, **kwargs)
     
+
+
     def calculate_current_total(self):
-        """Retorna o valor original + multas se estiver vencido."""
+        """Retorna o valor original + multas com Rigor Decimal."""
         from apps.finance.services import PenaltyEngine
         if self.status in ['pending', 'overdue'] and self.due_date < timezone.now().date():
             config = FinanceConfig.objects.first()
             if not config:
-                return self.total # Retorna original se não houver config definida
+                return self.total
                 
             days_late = (timezone.now().date() - self.due_date).days
             
             if days_late > config.grace_period_days:
-                multa = self.total * (config.late_fee_percentage / 100)
-                juros = self.total * (config.daily_interest_rate / 100) * days_late
+                # CORREÇÃO AQUI: Decimal('100')
+                multa = self.total * (Decimal(str(config.late_fee_percentage)) / Decimal('100'))
+                juros = self.total * (Decimal(str(config.daily_interest_rate)) / Decimal('100')) * Decimal(str(days_late))
                 return self.total + multa + juros
         return self.total
-    
+
+
+
     @property
     def mora_data(self):
         """Cache temporário do cálculo de mora para evitar múltiplas consultas."""
@@ -319,15 +350,20 @@ class PaymentMethod(models.Model):
 
 
 class BankAccount(models.Model):
-    """Contas Bancárias da Instituição (Substitui os 12 campos manuais)"""
-    bank_name = models.CharField(max_length=50) # BAI, BFA, etc.
-    iban = models.CharField(max_length=21, unique=True)
-    account_holder = models.CharField(max_length=100, help_text="Nome do Titular")
-    is_active = models.BooleanField(default=True)
+    """Contas Bancárias da Instituição - Rigor SOTARQ v4"""
+    bank_name = models.CharField(max_length=50, verbose_name="Banco") # BAI, BFA, etc.
+    account_number = models.CharField(max_length=30, verbose_name="Número de Conta")
+    iban = models.CharField(max_length=25, unique=True, verbose_name="IBAN")
+    #account_holder = models.CharField(max_length=100, help_text="Nome da Entidade/Titular")
+    is_active = models.BooleanField(default=True, verbose_name="Ativa")
+
+    class Meta:
+        verbose_name = "Conta Bancária"
+        verbose_name_plural = "Contas Bancárias"
 
     def __str__(self):
-        return f"{self.bank_name} - {self.iban}"
-
+        return f"{self.bank_name} - {self.account_number}"
+    
 
 class Payment(models.Model):
     invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='payments')
@@ -709,5 +745,4 @@ class CashOutflow(BaseModel):
 
     def __str__(self):
         return f"-{self.amount} Kz ({self.description})"
-
 

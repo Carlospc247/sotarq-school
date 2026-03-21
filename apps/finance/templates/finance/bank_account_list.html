@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Contas Bancárias | SOTARQ SCHOOL{% endblock %}
+
+{% block content %}
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+    <div>
+        <nav class="flex mb-2" aria-label="Breadcrumb">
+            <ol class="inline-flex items-center space-x-1 md:space-x-3 text-xs text-slate-400 uppercase font-bold tracking-wider">
+                <li>Configurações</li>
+                <li>
+                    <div class="flex items-center">
+                        <svg class="w-4 h-4 text-slate-300" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1.125 1.125 0 010-1.414L10.586 10 7.293 6.707a1.125 1.125 0 011.414-1.414l4 4a1.125 1.125 0 010 1.414l-4 4a1.125 1.125 0 01-1.414 0z" clip-rule="evenodd"></path></svg>
+                        <span class="ml-1 md:ml-2">Finanças</span>
+                    </div>
+                </li>
+            </ol>
+        </nav>
+        <h1 class="text-3xl font-black text-slate-800 tracking-tight">Contas Bancárias</h1>
+        <p class="text-slate-500 text-sm mt-1">Gerencie os destinos de pagamento para emissão de faturas oficiais.</p>
+    </div>
+
+    <a href="{% url 'finance:bank_account_add' %}" 
+       class="bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest flex items-center gap-2 transition-all shadow-lg hover:shadow-brand-200 active:scale-95">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="w-4 h-4">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        </svg>
+        Nova Conta
+    </a>
+</div>
+
+<div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="bg-slate-50/50 border-b border-slate-100">
+                    <th class="px-6 py-5 text-xs font-black text-slate-400 uppercase tracking-widest">Banco</th>
+                    <th class="px-6 py-5 text-xs font-black text-slate-400 uppercase tracking-widest">IBAN</th>
+                    <th class="px-6 py-5 text-xs font-black text-slate-400 uppercase tracking-widest">Titular da Conta</th>
+                    <th class="px-6 py-5 text-xs font-black text-slate-400 uppercase tracking-widest text-center">Estado</th>
+                    <th class="px-6 py-5 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Ações</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-50">
+                {% for account in accounts %}
+                <tr class="hover:bg-slate-50/80 transition-all group">
+                    <td class="px-6 py-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-lg bg-brand-50 flex items-center justify-center text-brand-600 font-black text-xs">
+                                {{ account.bank_name|slice:":3"|upper }}
+                            </div>
+                            <span class="font-bold text-slate-700">{{ account.bank_name }}</span>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <code class="text-sm font-mono bg-slate-100 px-2 py-1 rounded text-slate-600 tracking-tighter">
+                            {{ account.iban }}
+                        </code>
+                    </td>
+                    <td class="px-6 py-4 text-slate-600 font-medium">
+                        {{ account.account_holder }}
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                        {% if account.is_active %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-tighter bg-emerald-100 text-emerald-700">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span>
+                                Ativa
+                            </span>
+                        {% else %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-tighter bg-slate-100 text-slate-400">
+                                Inativa
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                        <button class="text-slate-300 hover:text-brand-600 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                            </svg>
+                        </button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="px-6 py-16 text-center">
+                        <div class="flex flex-col items-center">
+                            <div class="p-4 bg-slate-50 rounded-full mb-4">
+                                <svg class="w-12 h-12 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0 0 12 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75Z"></path>
+                                </svg>
+                            </div>
+                            <span class="text-slate-400 font-medium">Nenhuma conta bancária configurada para o faturamento.</span>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

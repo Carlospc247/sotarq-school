@@ -142,6 +142,7 @@
                         autocomplete="off"
                         hx-get="{% url 'finance:global_search_2' %}" 
                         hx-target="#search-results" 
+                        hx-swap="innerHTML"
                         hx-trigger="keyup changed delay:500ms"
                         class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-bold outline-none focus:border-brand-600"
                         placeholder="Digite para buscar...">
@@ -252,42 +253,62 @@
 
 <script>
     function selectStudent(id, name, monthlyFee) {
+        // --- LOG DE ENTRADA SOTARQ ---
+        console.log(" [SOTARQ DEBUG] Aluno Selecionado:", {id, name, monthlyFee});
+
         const searchInput = document.getElementById('student_search_input'); 
         const hiddenInput = document.getElementById('selected_student_id');
         const searchResults = document.getElementById('search-results');
         const feeSelect = document.getElementById('fee_type_select');
 
-        if (!searchInput || !hiddenInput || !feeSelect) return;
+        // Validação de existência de elementos
+        if (!searchInput || !hiddenInput || !feeSelect) {
+            console.error(" [SOTARQ ERROR] Elementos do formulário não encontrados no DOM!");
+            return;
+        }
 
+        // Tratamento do preço (Garante que vira número mesmo se vier com vírgula ou string)
         const normalizedFee = parseFloat(monthlyFee.toString().replace(',', '.')) || 0;
+        console.log(" [SOTARQ DEBUG] Preço Normalizado:", normalizedFee);
 
         searchInput.value = name;
         hiddenInput.value = id;
         searchResults.innerHTML = ''; 
 
         let foundPropina = false;
+        
+        // Percorre as opções para injetar o preço dinâmico do aluno na opção de Propina
         for (let option of feeSelect.options) {
             const text = option.text.toLowerCase();
+            // Verifica se é a opção de propina para atualizar o preço específico deste aluno
             if (text.includes('propina') || text.includes('mensalidade')) {
                 option.setAttribute('data-price', normalizedFee);
                 option.text = `Propina Mensal - ${normalizedFee.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} Kz`;
                 feeSelect.value = option.value; 
                 foundPropina = true;
+                console.log(" [SOTARQ DEBUG] Select atualizado com preço do aluno.");
                 break;
             }
         }
 
-        if (!foundPropina) feeSelect.selectedIndex = 0;
+        if (!foundPropina) {
+            console.warn(" [SOTARQ WARNING] Nenhuma opção de 'Propina' encontrada no Select.");
+            feeSelect.selectedIndex = 0;
+        }
 
+        // Dispara evento para o Alpine.js atualizar o estado global 'price'
         window.dispatchEvent(new CustomEvent('set-price', { 
             detail: { price: (foundPropina ? normalizedFee : 0) } 
         }));
 
+        // Força o trigger do evento change para garantir que o Alpine.js ouça
         feeSelect.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
     document.addEventListener('DOMContentLoaded', () => {
         if (typeof feather !== 'undefined') feather.replace();
+        
+        // Fechar resultados ao clicar fora
         document.addEventListener('click', (e) => {
             const results = document.getElementById('search-results');
             const input = document.getElementById('student_search_input');

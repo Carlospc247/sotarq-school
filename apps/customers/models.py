@@ -2,7 +2,7 @@
 from django.conf import settings
 from django.db import models
 from django_tenants.models import TenantMixin, DomainMixin
-
+from cloudinary.models import CloudinaryField
 from apps.core.models import BaseModel
 
 
@@ -33,9 +33,17 @@ class Client(TenantMixin):
     name = models.CharField(max_length=100)
     sub_agent = models.ForeignKey(SubAgent, on_delete=models.SET_NULL, null=True, blank=True, related_name='my_clients') # A Escola (Tenant) vinculada a um Subagente.
     name = models.CharField(max_length=100)
-    logo = models.ImageField(upload_to='customer_logos/', blank=True, null=True)
+    logo = CloudinaryField('logo', blank=True, null=True)
     primary_color = models.CharField(max_length=7, default='#4338ca') 
     secondary_color = models.CharField(max_length=7, default='#ffffff')
+
+    #########
+    address = models.TextField(blank=True, null=True, verbose_name="Endereço")
+    phone = models.CharField(max_length=50, blank=True, null=True, verbose_name="Telefone")
+    email = models.EmailField(blank=True, null=True)
+    website = models.URLField(blank=True, null=True)
+    nif = models.CharField(max_length=50, blank=True, null=True, verbose_name="NIF")  # Se não existir
+    #########
     
     # Especialização K12 (Essencial para regras de notas automáticas)
     TYPE_CHOICES = (

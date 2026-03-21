@@ -1,4 +1,5 @@
 # apps/finance/tasks.py
+import requests
 from email.message import EmailMessage
 from celery import shared_task
 from django.conf import settings
@@ -7,7 +8,7 @@ from datetime import timedelta
 from django.db import transaction
 from django_tenants.utils import schema_context
 from apps.core.models import User
-from apps.core.services.notifications import AlertService
+from apps.core.servicos.notifications import AlertService
 from apps.customers.models import Client
 from apps.finance.models import Invoice, InvoiceItem, FeeType
 from apps.finance.services import PenaltyEngine, RiskAnalysisService

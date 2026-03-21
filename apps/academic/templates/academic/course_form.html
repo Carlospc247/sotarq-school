@@ -2,11 +2,11 @@
 {% block title %}Cadastro Académico | SOTARQ{% endblock %}
 
 {% block content %}
-<div class="max-w-3xl mx-auto p-6">
+<div class="max-w-4xl mx-auto p-6">
     <div class="bg-white dark:bg-slate-800 rounded-3xl shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden">
         <div class="p-8 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50">
-            <h2 class="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Novo Curso</h2>
-            <p class="text-slate-500 text-sm font-bold">Configuração inicial de estrutura e valores base com rigor documental.</p>
+            <h2 class="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Novo Registro de Curso</h2>
+            <p class="text-slate-500 text-sm font-bold">Definição de estrutura acadêmica e base tributária AGT.</p>
         </div>
         
         <form method="post" class="p-8 space-y-8">
@@ -14,7 +14,7 @@
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {% for field in form %}
-                    {% if field.name != 'monthly_fee' and field.name != 'enrollment_fee' and field.name != 'duration_years' and field.name != 'taxa_iva' %}
+                    {% if field.name not in "duration_years,taxa_iva,default_monthly_fee_type,default_enrollment_fee_type" %}
                         <div>
                             <label class="block text-xs font-black uppercase text-slate-400 tracking-widest mb-2">{{ field.label }}</label>
                             {{ field }}
@@ -25,58 +25,75 @@
             </div>
 
             <div class="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-3xl border-2 border-dashed border-slate-200">
-                <label class="block text-xs font-black uppercase text-indigo-600 mb-4 tracking-widest">Duração do Curso (Conversor Rigoroso)</label>
+                <label class="block text-xs font-black uppercase text-indigo-600 mb-4 tracking-widest">Duração Estrutural</label>
                 <div class="grid grid-cols-3 gap-4 mb-4">
-                    <div>
-                        <label class="text-[10px] font-bold text-slate-400 uppercase">Semanas</label>
-                        <input type="number" id="calc_weeks" class="w-full p-2 rounded-xl border-none shadow-sm focus:ring-2 focus:ring-indigo-500" placeholder="Ex: 6">
-                    </div>
-                    <div>
-                        <label class="text-[10px] font-bold text-slate-400 uppercase">Meses</label>
-                        <input type="number" id="calc_months" class="w-full p-2 rounded-xl border-none shadow-sm focus:ring-2 focus:ring-indigo-500" placeholder="Ex: 3">
-                    </div>
-                    <div>
-                        <label class="text-[10px] font-bold text-slate-400 uppercase">Anos</label>
-                        <input type="number" id="calc_years" class="w-full p-2 rounded-xl border-none shadow-sm focus:ring-2 focus:ring-indigo-500" placeholder="Ex: 1">
-                    </div>
+                    <input type="number" id="calc_weeks" class="w-full p-2 rounded-xl border-none shadow-sm focus:ring-2 focus:ring-indigo-500" placeholder="Semanas">
+                    <input type="number" id="calc_months" class="w-full p-2 rounded-xl border-none shadow-sm focus:ring-2 focus:ring-indigo-500" placeholder="Meses">
+                    <input type="number" id="calc_years" class="w-full p-2 rounded-xl border-none shadow-sm focus:ring-2 focus:ring-indigo-500" placeholder="Anos">
                 </div>
-                <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border-2 border-indigo-500 shadow-inner">
-                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Valor Decimal para o Sistema (Anos)</label>
+                <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border-2 border-indigo-500">
                     {{ form.duration_years }}
                     <p class="text-[10px] text-indigo-500 mt-2 font-bold italic">
-                        <i data-feather="cpu" class="w-3 h-3 inline"></i> SOTARQ SCHOOL processará: <span id="duration_preview">...</span>
+                        <i data-feather="cpu" class="w-3 h-3 inline"></i> Sistema: <span id="duration_preview">...</span>
                     </p>
                 </div>
             </div>
 
-            <div class="bg-indigo-50 dark:bg-indigo-900/20 p-8 rounded-3xl border border-indigo-100 dark:border-indigo-800/50">
+            <div class="bg-indigo-50 dark:bg-indigo-900/20 p-8 rounded-3xl border border-indigo-100">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                        <h3 class="text-sm font-black text-indigo-900 dark:text-indigo-300 uppercase tracking-tighter mb-2">Propina Base (Mensal)</h3>
-                        <div class="relative">
-                            {{ form.monthly_fee }}
-                            <span class="absolute right-4 top-3 font-black text-indigo-400">AKZ</span>
-                        </div>
+                        <label class="block text-xs font-black uppercase text-indigo-600 mb-2">Mensalidade Padrão</label>
+                        {{ form.default_monthly_fee_type }}
                     </div>
                     <div>
-                        <h3 class="text-sm font-black text-emerald-900 dark:text-emerald-300 uppercase tracking-tighter mb-2">Taxa de Matrícula (Única)</h3>
-                        <div class="relative">
-                            {{ form.enrollment_fee }}
-                            <span class="absolute right-4 top-3 font-black text-emerald-400">AKZ</span>
-                        </div>
+                        <label class="block text-xs font-black uppercase text-emerald-600 mb-2">Matrícula Padrão</label>
+                        {{ form.default_enrollment_fee_type }}
                     </div>
                 </div>
                 
-                <div class="mt-6 pt-6 border-t border-indigo-100 dark:border-indigo-800/50">
-                    <label class="block text-xs font-black uppercase text-slate-400 mb-2">Regime de IVA Aplicável (Padrão AGT)</label>
+                <div class="mt-6 pt-6 border-t border-indigo-100">
+                    <label class="block text-xs font-black uppercase text-slate-400 mb-2">Regime de IVA (AGT)</label>
                     {{ form.taxa_iva }}
                 </div>
             </div>
 
+            {% if formset %}
+            <div class="overflow-x-auto rounded-2xl border border-slate-200">
+                {{ formset.management_form }}
+                <table class="w-full text-left bg-white">
+                    <thead class="bg-slate-50 text-[10px] uppercase font-black text-slate-400">
+                        <tr>
+                            <th class="p-4">Classe</th>
+                            <th class="p-4">% Aumento</th>
+                            <th class="p-4">Preço Final (Persistido)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for fs_form in formset %}
+                        <tr class="grade-row border-t border-slate-100">
+                            <td class="p-4 font-bold text-slate-700">
+                                {% for hidden in fs_form.hidden_fields %}
+                                    {{ hidden }}
+                                {% endfor %}
+                                
+                                {{ fs_form.name }} </td>
+                            <td class="p-4">
+                                {{ fs_form.fee_percentage_increase }}
+                            </td>
+                            <td class="p-4">
+                                {{ fs_form.total_monthly_fee }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+
             <div class="flex justify-end gap-3 pt-4">
-                <a href="{% url 'academic:course_list' %}" class="px-6 py-2 text-sm font-bold text-slate-500 hover:text-slate-700 transition">Cancelar</a>
-                <button type="submit" class="px-8 py-3 bg-indigo-600 text-white rounded-2xl font-black shadow-lg hover:bg-indigo-700 transition transform hover:-translate-y-1">
-                    Finalizar Cadastro
+                <a href="{% url 'academic:course_list' %}" class="px-6 py-2 text-sm font-bold text-slate-500">Cancelar</a>
+                <button type="submit" class="px-8 py-3 bg-indigo-600 text-white rounded-2xl font-black shadow-lg hover:bg-indigo-700 transition">
+                    Finalizar e Salvar Estrutura
                 </button>
             </div>
         </form>
@@ -85,77 +102,52 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Referências do Conversor de Duração
-    const realDurationInput = document.querySelector('input[name="duration_years"]');
-    const inputWeeks = document.getElementById('calc_weeks');
-    const inputMonths = document.getElementById('calc_months');
-    const inputYears = document.getElementById('calc_years');
-    const preview = document.getElementById('duration_preview');
+    const feeTypeSelect = document.querySelector('select[name="default_monthly_fee_type"]');
+    const taxSelect = document.querySelector('select[name="taxa_iva"]');
 
-    // Referências Financeiras (Nomes sincronizados com CourseForm/Model)
-    const monthlyFeeInput = document.querySelector('input[name="monthly_fee"]');
-    const taxElement = document.querySelector('select[name="taxa_iva"]');
+    function updateGrades() {
+        // 1. Captura Preço Padrão do Curso (Regex para pegar o número no texto do Option)
+        const selectedOption = feeTypeSelect.options[feeTypeSelect.selectedIndex];
+        const matchBase = selectedOption ? selectedOption.text.match(/(\d+(\.\d+)?)/) : null;
+        const basePrice = matchBase ? parseFloat(matchBase[0]) : 0;
 
-    // --- FUNÇÕES DE DURAÇÃO ---
-    function updateDuration(val, unit) {
-        if (!realDurationInput) return;
-        let finalValue = 0;
-        const num = parseFloat(val) || 0;
+        // 2. Captura Taxa de IVA (Regime AGT)
+        const selectedTax = taxSelect.options[taxSelect.selectedIndex];
+        const matchTax = selectedTax ? selectedTax.text.match(/(\d+(\.\d+)?)/) : null;
+        const taxPercentage = matchTax ? parseFloat(matchTax[0]) : 0;
 
-        if (unit === 'weeks') finalValue = num / 52;
-        else if (unit === 'months') finalValue = num / 12;
-        else if (unit === 'years') finalValue = num;
-
-        realDurationInput.value = finalValue.toFixed(2);
-        renderDurationPreview();
-    }
-
-    function renderDurationPreview() {
-        if (!realDurationInput || !preview) return;
-        const val = parseFloat(realDurationInput.value) || 0;
-        if (val >= 1) preview.innerText = val.toFixed(2) + " Ano(s)";
-        else if (val >= 0.08) preview.innerText = Math.round(val * 12) + " Mês(es)";
-        else preview.innerText = Math.round(val * 52) + " Semana(s)";
-    }
-
-    inputWeeks?.addEventListener('input', (e) => { inputMonths.value = ''; inputYears.value = ''; updateDuration(e.target.value, 'weeks'); });
-    inputMonths?.addEventListener('input', (e) => { inputWeeks.value = ''; inputYears.value = ''; updateDuration(e.target.value, 'months'); });
-    inputYears?.addEventListener('input', (e) => { inputWeeks.value = ''; inputMonths.value = ''; updateDuration(e.target.value, 'years'); });
-
-    // --- LÓGICA DE IVA E CÁLCULO DINÂMICO ---
-    function calculateFullFinancials() {
-        if (!monthlyFeeInput || !taxElement) return;
-
-        const basePrice = parseFloat(monthlyFeeInput.value) || 0;
-        if (taxElement.selectedIndex === -1) return;
-
-        const selectedText = taxElement.options[taxElement.selectedIndex].text;
-        const match = selectedText.match(/(\d+(\.\d+)?)/); 
-        const taxPercentage = match ? parseFloat(match[0]) : 0;
-
-        // Lógica para as classes (GradeLevel) - Sincronizado com fee_percentage_increase
         document.querySelectorAll('.grade-row').forEach(row => {
             const percentInput = row.querySelector('input[name$="fee_percentage_increase"]');
-            const display = row.querySelector('.final-price-display');
+            const totalInput = row.querySelector('input[name$="total_monthly_fee"]');
 
-            if (percentInput && display) {
-                const increase = parseFloat(percentInput.value) || 0;
-                const priceBeforeTax = basePrice + (basePrice * increase / 100);
-                const finalWithTax = priceBeforeTax + (priceBeforeTax * taxPercentage / 100);
+            if (percentInput && totalInput) {
+                const increasePercent = parseFloat(percentInput.value) || 0;
                 
-                display.innerText = finalWithTax.toLocaleString('pt-AO', { 
-                    style: 'currency', currency: 'AOA' 
-                });
+                // CÁLCULO RIGOROSO:
+                // A. Valor do Ajuste da Classe
+                const classAjustValue = basePrice * (increasePercent / 100);
+                // B. Subtotal (Base para Imposto)
+                const subtotal = basePrice + classAjustValue;
+                // C. Valor do IVA
+                const ivatotal = subtotal * (taxPercentage / 100);
+                
+                // D. Preço Final Persistido
+                const final = subtotal + ivatotal;
+                
+                totalInput.value = final.toFixed(2);
             }
         });
     }
 
-    monthlyFeeInput?.addEventListener('input', calculateFullFinancials);
-    taxElement?.addEventListener('change', calculateFullFinancials);
+    // Gatilhos de atualização
+    feeTypeSelect?.addEventListener('change', updateGrades);
+    taxSelect?.addEventListener('change', updateGrades);
+    document.addEventListener('input', (e) => {
+        if (e.target.name.includes('fee_percentage_increase')) updateGrades();
+    });
 
-    // Init
-    renderDurationPreview();
-    if(typeof feather !== 'undefined') { feather.replace(); }
+    // Executa ao carregar para mostrar valores já salvos no banco
+    updateGrades(); 
 });
 </script>
 {% endblock %}

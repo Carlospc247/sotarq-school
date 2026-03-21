@@ -99,120 +99,39 @@ def global_search_2(request):
     return render(request, 'finance/global_search_2.html', {'students': students})
 
 
-
-@login_required
-@transaction.atomic
-def process_manual_payment(request):
-    # SEGURANÇA: Verificar se o operador tem uma sessão aberta AGORA
-    session = CashSession.objects.filter(user=request.user, status='open').last()
-    if not session:
-        messages.error(request, "ERRO: Operação bloqueada. Você não possui um turno de trabalho aberto.")
-        return redirect('finance:secretary_dashboard')
-    
-    if request.method == "POST":
-        # 1. Captura de Dados com Rigor
-        student_id = request.POST.get('student_id')
-        fee_type_id = request.POST.get('fee_type_id')
-        quantity = int(request.POST.get('quantity', 1))
-        start_month = int(request.POST.get('start_month'))
-        method_code = request.POST.get('payment_method')
-
-        # 2. Recuperação de Objetos Base
-        student = get_object_or_404(Student, id=student_id)
-        fee_type = get_object_or_404(FeeType, id=fee_type_id)
-        payment_method = get_object_or_404(PaymentMethod, method_code=method_code, is_active=True)
-        
-        # 3. Inteligência de Preço SOTARQ (Hierarquia Académica vs Financeira)
-        is_propina = "propina" in fee_type.name.lower() or "mensalidade" in fee_type.name.lower()
-        unit_price = fee_type.amount  # Valor padrão do catálogo financeiro
-
-        if is_propina:
-            # Busca matrícula ativa para aplicar o preço calculado (Base + % da Classe)
-            enrollment = student.enrollments.filter(
-                status='active', 
-                academic_year__is_active=True
-            ).select_related('course', 'class_room__grade_level').first()
-            
-            if enrollment:
-                if enrollment.class_room and enrollment.class_room.grade_level:
-                    # Preço da 10ª, 11ª, 12ª etc (com o incremento percentual)
-                    unit_price = enrollment.class_room.grade_level.calculated_monthly_fee
-                else:
-                    # Preço base do curso (aluno matriculado mas sem turma)
-                    unit_price = enrollment.course.monthly_fee
-
-        total_amount = unit_price * quantity
-
-        # 4. Criação da Fatura Mãe
-        invoice = Invoice.objects.create(
-            student=student,
-            amount=total_amount,
-            status='paid',
-            description=f"Liquidação: {quantity}x {fee_type.name}",
-            issue_date=timezone.now()
-        )
-
-        # 5. Distribuição por Competência (Garante auditoria de meses individuais)
-        for i in range(quantity):
-            # Lógica de rotação de meses (12 + 1 vira 1)
-            competence_month = ((start_month + i - 1) % 12) + 1
-            
-            InvoiceItem.objects.create(
-                invoice=invoice,
-                description=f"{fee_type.name} - Mês {competence_month}",
-                amount=unit_price,
-                quantity=1,
-                competence_month=competence_month if is_propina else None
-            )
-
-        # 6. Registro do Pagamento e Validação Automática
-        payment = Payment.objects.create(
-            invoice=invoice,
-            amount=total_amount,
-            method=payment_method,
-            confirmed_by=request.user,
-            confirmed_at=timezone.now(),
-            validation_status='validated'
-        )
-
-        # 7. Acionamento do Motor de Baixa (MonthlyControl)
-        # O método validate_payment deve ler os InvoiceItems para baixar cada mês
-        payment.validate_payment(request.user)
-
-        messages.success(request, f"Sucesso! {quantity} mês(es) liquidado(s) para {student.full_name} no valor de {total_amount:,.2f} Kz.")
-        return redirect('finance:print_invoice', invoice_id=invoice.id)
-        #return redirect('finance:secretary_dashboard')
-
 @login_required
 def print_invoice_view(request, invoice_id):
-    """
-    Interface de Saída SOTARQ: Renderiza a fatura para impressão imediata.
-    """
     invoice = get_object_or_404(Invoice, id=invoice_id)
     
-    # Validação de Segurança: Apenas o dono do caixa ou admin visualiza
-    if not request.user.is_staff and invoice.confirmed_by != request.user:
-         return HttpResponseForbidden("Não tem permissão para imprimir esta fatura.")
+    # Rigor de Segurança SOTARQ
+    STAFF_ROLES = ['ADMIN', 'DIRECTOR', 'SECRETARY', 'ACCOUNTANT', 'DIRECT_FINANC']
+    user_role = getattr(request.user, 'current_role', None)
+    
+    if not (request.user.is_superuser or user_role in STAFF_ROLES or (hasattr(invoice.student, 'user') and invoice.student.user == request.user)):
+        return HttpResponseForbidden("Não tem permissão para imprimir esta fatura.")
 
     try:
-        # Aqui chamamos o seu motor de exportação
-        from .utils_reports import SOTARQExporter 
+        # CORREÇÃO DO CAMINHO DE IMPORTAÇÃO:
+        from apps.finance.utils.pdf_generator import SOTARQExporter 
         
-        exporter = SOTARQExporter(invoice)
-        pdf_content = SOTARQExporter.generate_fiscal_document(invoice, doc_type_code='FT')
+        # Rigor no nome do arquivo (limpando caracteres especiais do número)
+        clean_number = str(invoice.number).replace('/', '_').replace('\\', '_')
+        filename = f"FATURA_{clean_number}.pdf"
+        
+        # Chamada do motor (usando A4 como padrão no SOTARQ SCHOOL)
+        pdf_content = SOTARQExporter.generate_fiscal_document(invoice, doc_type_code='FT', page_format='A4')
 
         response = HttpResponse(pdf_content, content_type='application/pdf')
-        
-        # 'inline' abre no navegador (permitindo Ctrl+P), 'attachment' baixa o arquivo.
-        filename = f"FATURA_{invoice.invoice_number}.pdf"
         response['Content-Disposition'] = f'inline; filename="{filename}"'
         
         return response
 
     except Exception as e:
-        logger.error(f"Erro ao imprimir fatura {invoice_id}: {str(e)}")
-        messages.error(request, "Erro ao gerar o documento de impressão.")
-        return redirect('finance:secretary_dashboard')
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Erro Crítico SOTARQ PDF: {str(e)}")
+        messages.error(request, f"Erro técnico ao gerar o PDF: {str(e)}")
+        return redirect('finance:invoice_list')    
 
       
 @login_required

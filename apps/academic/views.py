@@ -13,9 +13,10 @@ from django.contrib import messages
 from django.utils import timezone
 from apps.core.models import Notification, Role, SchoolConfiguration, User
 from apps.core.decorators import student_required
+from apps.core.servicos.notifications import AlertService
 from apps.students.models import Enrollment, Student
 from apps.teachers.models import Teacher, TeacherSubject
-from apps.finance.models import Invoice
+from apps.finance.models import FeeType, Invoice
 import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from django.http import HttpResponse
@@ -428,91 +429,6 @@ def student_dashboard(request):
         }
     }
     return render(request, 'academic/academic_page.html', context)
-
-
-"""
-@login_required
-def student_dashboard(request):
-    user = request.user
-    role = user.current_role
-    tenant = user.tenant  # RIGOR MULTI-TENANT: Sempre isole por tenant
-    
-    # 1. Ano Letivo Ativo (Isolado por Tenant)
-    active_year = AcademicYear.objects.filter(tenant=tenant, is_active=True).first()
-
-    # 2. Dispatch Aluno/Encarregado
-    if role in [Role.Type.STUDENT, Role.Type.GUARDIAN]:
-        return _handle_student_portal_view(request)
-
-    # 3. Permissões de Staff
-    is_director = role in [Role.Type.ADMIN, Role.Type.DIRECTOR]
-    has_access = user.pode_acessar_academic_page or is_director
-
-    if not has_access:
-        messages.error(request, "Acesso Negado: Não tens permissão para a Gestão Académica.")
-        return redirect('core:dashboard')
-    
-    # --- ALOCAÇÕES DO PROFESSOR (Otimizado) ---
-    teacher_allocations = []
-    if role == Role.Type.TEACHER and active_year:
-        teacher_allocations = TeacherSubject.objects.filter(
-            teacher__user=user,
-            class_room__academic_year=active_year,
-            tenant=tenant # RIGOR: Filtro de tenant explícito
-        ).select_related('class_room', 'subject')
-
-    # --- BLOQUEIO PEDAGÓGICO (Isolado por Tenant) ---
-    # Nunca use pk=1 em sistemas multi-tenant! Use o tenant como chave.
-    academic_global, _ = AcademicGlobal.objects.get_or_create(tenant=tenant)
-    
-    if request.method == 'POST' and 'update_lock' in request.POST and is_director:
-        form_lock = PedagogicalLockForm(request.POST, instance=academic_global)
-        if form_lock.is_valid():
-            form_lock.save()
-            messages.success(request, "Configurações atualizadas!")
-            return redirect('academic:student_dashboard')
-    else:
-        form_lock = PedagogicalLockForm(instance=academic_global)
-
-    # --- VAGAS PENDENTES (Otimizado com count manual para evitar 2 queries) ---
-    pending_vacancies = []
-    pending_count = 0
-    if is_director:
-        qs_vagas = VacancyRequest.objects.filter(
-            is_resolved=False,
-            tenant=tenant # Simplificado: use o tenant do request
-        ).select_related('student', 'target_grade')
-        
-        pending_count = qs_vagas.count()
-        pending_vacancies = qs_vagas[:5]
-
-    # --- TURMAS ---
-    classes = Class.objects.filter(
-        academic_year=active_year, 
-        tenant=tenant
-    ).select_related('grade_level', 'grade_level__course')
-
-    context = {
-        'classes': classes,
-        'teacher_allocations': teacher_allocations,
-        'view_type': role,
-        'active_year': active_year,
-        'is_director': is_director,
-        'form_lock': form_lock,
-        'pending_vacancies': pending_vacancies,
-        'pending_vacancies_count': pending_count,
-        'stats': {
-            'total_classes': classes.count(),
-            'total_students': Student.objects.filter(tenant=tenant, is_active=True).count(),
-        },
-        'perms': {
-            'ver_pautas': is_director or user.pode_ver_pautas_boletins,
-            'baixar_pautas': is_director or user.pode_baixar_pautas,
-            'ver_docs': is_director or user.pode_ver_documentos_academics,
-        }
-    }
-    return render(request, 'academic/academic_page.html', context)
-"""
 
 
 
@@ -993,55 +909,109 @@ class CourseCreateView(LoginRequiredMixin, StaffRequiredMixin, CreateView):
         # Não injetamos nada. O objeto cai automaticamente no esquema ativo.
         return super().form_valid(form)
 
-
-# apps/academic/views.py
-from django.shortcuts import render, get_object_or_404, redirect
-from django.db import transaction
-from .forms import CourseForm
-
-from django.db import transaction
-from django.contrib import messages
-
+"""
 @login_required
 @user_passes_test(is_manager_check, login_url='/')
 def course_edit(request, pk):
-    # Garante que o curso pertence ao tenant (escola) do usuário
-    #course = get_object_or_404(Course, pk=pk, tenant=request.user.tenant)
+    # Mantendo sua busca original que você confirmou que funciona
     course = get_object_or_404(Course, pk=pk)
     
-    # Importamos o Formset de Classes/Níveis que criamos
     from .forms import CourseForm, GradeLevelFormSet
 
     if request.method == 'POST':
-        # Passamos os dados do POST para o Form do Curso E para o Formset
         form = CourseForm(request.POST, instance=course)
         formset = GradeLevelFormSet(request.POST, instance=course)
 
         if form.is_valid() and formset.is_valid():
             try:
                 with transaction.atomic():
-                    # 1. Salva os dados do Curso (incluindo o PREÇO PADRÃO/monthly_fee)
                     course_obj = form.save()
-                    
-                    # 2. Salva as classes vinculadas (as percentagens)
                     formset.save()
                     
                     messages.success(request, f"Rigor SOTARQ: Curso '{course_obj.name}' e tabela de preços atualizados!")
                     return redirect('academic:course_list')
             except Exception as e:
                 messages.error(request, f"Erro ao processar alteração: {str(e)}")
+        # Mude o 'else' da sua view para isso para debugar:
         else:
+            print("ERROS NO FORM:", form.errors)
+            print("ERROS NO FORMSET:", formset.errors)
             messages.error(request, "Erro na validação. Verifique os valores inseridos.")
     else:
-        # Carregamento inicial (GET)
         form = CourseForm(instance=course)
         formset = GradeLevelFormSet(instance=course)
+
+    # --- INJEÇÃO DE DADOS PARA O TEMPLATE ---
+    # Para o select de "Vínculo de Taxa" e o JavaScript funcionarem, 
+    # precisamos passar as taxas (FeeType) para o contexto.
+    # Filtramos por school se o campo existir no FeeType
+    fees = FeeType.objects.filter() 
 
     return render(request, 'academic/course_edit.html', {
         'form': form,
         'formset': formset,
-        'course': course
+        'course': course,
+        'fees': fees, # Necessário para o {% for fee in fees %} no HTML
     })
+
+
+"""
+
+
+
+
+@login_required
+@user_passes_test(is_manager_check, login_url='/')
+def course_edit(request, pk):
+    course = get_object_or_404(Course, pk=pk)
+    
+    # Importação local para evitar import circular
+    from .forms import CourseForm, GradeLevelFormSet
+    from apps.finance.models import FeeType
+
+    # No Rigor SOTARQ, pegamos a escola do usuário logado (assumindo request.user.school)
+    user_school = getattr(request.user, 'school', None)
+
+    if request.method == 'POST':
+        # Passamos 'school' para o Form filtrar coordenadores e taxas corretamente
+        form = CourseForm(request.POST, instance=course, school=user_school)
+        formset = GradeLevelFormSet(request.POST, instance=course)
+
+        if form.is_valid() and formset.is_valid():
+            try:
+                with transaction.atomic():
+                    # 1. Salva o Curso (IVA, Taxas Padrão, etc)
+                    course_obj = form.save()
+                    
+                    # 2. Salva as Classes (GradeLevels)
+                    # O formset.save() vai persistir o 'total_monthly_fee' 
+                    # porque definimos required=False no form.
+                    formset.save()
+                    
+                    messages.success(request, f"Rigor SOTARQ: Curso '{course_obj.name}' e tabela de preços atualizados!")
+                    return redirect('academic:course_list')
+            except Exception as e:
+                messages.error(request, f"Erro de Persistência: {str(e)}")
+        else:
+            # Debug de Rigor para o Estagiário
+            print("ERROS NO FORM:", form.errors)
+            print("ERROS NO FORMSET:", formset.errors)
+            messages.error(request, "Falha na validação. Verifique os campos em vermelho.")
+    else:
+        # GET: Carrega formulários com a instância e filtros de escola
+        form = CourseForm(instance=course, school=user_school)
+        formset = GradeLevelFormSet(instance=course)
+
+    # Filtro de taxas para o contexto (usado pelo JS ou combos extras)
+    fees = FeeType.objects.filter(school=user_school) if user_school else FeeType.objects.all()
+
+    return render(request, 'academic/course_edit.html', {
+        'form': form,
+        'formset': formset,
+        'course': course,
+        'fees': fees,
+    })
+
 
 
 
@@ -1314,7 +1284,7 @@ def daily_attendance_control(request, allocation_id):
             elif grade.unjustified_absences >= (limit - 1):
                 guardian_link = student.guardians.filter(is_financial_responsible=True).first()
                 if guardian_link:
-                    from apps.core.services.notifications import AlertService
+                    #from apps.core.servicos.notifications import AlertService
                     AlertService.send_attendance_alert(
                         guardian_link.guardian.phone, 
                         student.full_name, 

@@ -8,7 +8,8 @@ app_name = 'finance'
 
 urlpatterns = [
     # --- INTERFACE DO ALUNO/ENCARREGADO ---
-    path('checkout/<int:invoice_id>/', views.checkout_invoice, name='checkout'),
+    #path('checkout/<int:invoice_id>/', views.checkout_invoice, name='checkout'),
+    
     
     
     # --- BUSINESS INTELLIGENCE (DIRETORIA) ---
@@ -46,6 +47,8 @@ urlpatterns = [
     # Motor de Mora e Perdão
     path('staff/waive-penalty/<int:invoice_id>/', views_staff.waive_penalty_action, name='waive_penalty'),
     
+    path('save-pricing/', views.save_course_pricing_unified, name='save_course_pricing_unified'),
+    
     # Ciclo de Caixa (Abertura e Fecho)
     path('cash/open/', views_secretary.open_cash_daily, name='open_cash_daily'),
     path('cash/close/', views_secretary.close_cash_daily, name='close_cash_daily'),
@@ -72,6 +75,11 @@ urlpatterns = [
 
     path('processar-pagamento-manual/', views.process_manual_payment, name='process_manual_payment'),
 
+    path('pricing_manager/', views.pricing_manager, name='pricing_manager'),
+
     # Checkout e Upload de Comprovativo (Portal do Aluno)
     path('upload-proof/<int:invoice_id>/', views_portal.upload_proof, name='upload_proof'),
+
+    path('config/bank-accounts/', views.BankAccountListView.as_view(), name='bank_accounts'),
+    path('config/bank-accounts/add/', views.BankAccountCreateView.as_view(), name='bank_account_add'),
 ]

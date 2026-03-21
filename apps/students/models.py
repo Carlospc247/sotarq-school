@@ -9,7 +9,7 @@ from django.utils import timezone
 from django.db.models import Max
 from django.db.models.signals import pre_save
 from django.dispatch import receiver
-
+from cloudinary.models import CloudinaryField
 
 
 
@@ -25,7 +25,7 @@ class Student(BaseModel):
     birth_date = models.DateField()
     gender = models.CharField(max_length=1, choices=Gender.choices)
     is_suspended = models.BooleanField(default=False, help_text="Bloqueia acesso por falta de pagamento")
-    
+    address = models.TextField(blank=True, null=True, verbose_name="Endereço")
     # Denormalization or Current Status:
     current_class = models.ForeignKey('academic.Class', on_delete=models.SET_NULL, null=True, blank=True, related_name='current_students')
     is_active = models.BooleanField(default=True)
@@ -207,7 +207,7 @@ class EnrollmentRequest(BaseModel):
     )
     
     doc_certificate = models.FileField(upload_to='candidates/certificates/%Y/', null=True, blank=True)
-    photo_passport = models.ImageField(upload_to='candidates/photos/%Y/', null=True, blank=True)
+    photo_passport_file = CloudinaryField('photo_passport_file', blank=True, null=True)
 
     has_special_needs = models.BooleanField(default=False)
     observations = models.TextField(blank=True, null=True)

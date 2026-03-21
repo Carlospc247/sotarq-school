@@ -1,21 +1,26 @@
 # apps/finance/views.py
+from decimal import Decimal
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db import transaction
 from django.db.models import Sum, Count
+from django.urls import reverse_lazy
 from django.utils import timezone
-from django.http import HttpResponse, HttpResponseForbidden # CORREÇÃO AQUI
+from django.http import FileResponse, HttpResponse, HttpResponseForbidden # CORREÇÃO AQUI
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
+from .forms import FeeTypeForm, PriceUpdateForm
 
+from apps.core.models import Role
 from apps.finance.utils.pdf_generator import SOTARQExporter
 from apps.fiscal.models import DocumentoFiscal
 
 # Imports dos teus modelos
-from .models import Invoice, Payment, PaymentGatewayConfig, DebtAgreement
+from .models import BankAccount, CashSession, FeePriceHistory, FeeType, Invoice, Payment, PaymentGatewayConfig, DebtAgreement
 from apps.students.models import Student
-from apps.academic.models import AcademicYear
+from apps.academic.models import AcademicYear, Course
 # Assumindo que este serviço existe em finance/services.py
 from .services import DebtRefinancingService, PenaltyEngine 
 
@@ -27,13 +32,14 @@ from django.utils import timezone
 from datetime import timedelta
 from .models import Payment, Invoice # Assumindo que você registrará despesas também
 
-from django.shortcuts import render
-from django.utils import timezone
-from django.db.models import Sum
-from django.db.models.functions import TruncDay
-from datetime import timedelta
-from django.contrib.auth.decorators import login_required
-from .models import Payment, Invoice, FeeType, CashSession, Student
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views.generic import ListView, CreateView, UpdateView, DeleteView
+
+
+
+
+
+
 
 
 @login_required
@@ -90,6 +96,83 @@ def finance_dashboard(request):
 
 
 @login_required
+def pricing_manager(request):
+    """
+    CENTRAL DE COMANDO FINANCEIRO (SOTARQ RIGOR)
+    Gerencia: Criação, Histórico de Preços e Vínculo com Cursos.
+    """
+    fees = FeeType.objects.all()
+    history_logs = FeePriceHistory.objects.all().select_related('fee_type')[:15]
+    courses = Course.objects.all()
+    
+    # RIGOR SOTARQ: Separar taxas por tipo para facilitar a escolha no template
+    # Se você não tiver um campo 'category', use o que tiver para filtrar
+    enrollment_fees = FeeType.objects.all() # Ou filtre por matrículas
+    monthly_fees = FeeType.objects.all()    # Ou filtre por mensalidades
+
+    update_form = PriceUpdateForm()
+    create_form = FeeTypeForm()
+
+    if request.method == 'POST':
+        # --- CASO 1: CRIAR NOVO TIPO DE TAXA ---
+        if 'btn_create_fee' in request.POST:
+            create_form = FeeTypeForm(request.POST)
+            if create_form.is_valid():
+                create_form.save()
+                messages.success(request, "Novo serviço/taxa registrado no catálogo.")
+                return redirect('finance:pricing_manager')
+
+        # --- CASO 2: ATUALIZAR PREÇO EXISTENTE (COM AUDITORIA) ---
+        elif 'fee_id' in request.POST and 'amount' in request.POST:
+            update_form = PriceUpdateForm(request.POST)
+            if update_form.is_valid():
+                fee_id = update_form.cleaned_data['fee_id']
+                new_val = update_form.cleaned_data['amount']
+                fee = get_object_or_404(FeeType, id=fee_id)
+                
+                if fee.amount != new_val:
+                    FeePriceHistory.objects.create(
+                        fee_type=fee,
+                        old_amount=fee.amount,
+                        new_amount=new_val
+                    )
+                    fee.amount = new_val
+                    fee.save()
+                    messages.success(request, f"Tarifário de {fee.name} atualizado: {new_val} Kz.")
+                return redirect('finance:pricing_manager')
+
+    context = {
+        'fees': fees,
+        'enrollment_fees': enrollment_fees, # ESSENCIAL PARA O SELECT
+        'monthly_fees': monthly_fees,       # ESSENCIAL PARA O SELECT
+        'history_logs': history_logs,
+        'courses': courses,
+        'update_form': update_form,
+        'create_form': create_form,
+    }
+    return render(request, 'finance/pricing_manager.html', context)
+
+
+@login_required
+def save_course_pricing_unified(request):
+    if request.method == 'POST':
+        course_id = request.POST.get('course_id')
+        enrollment_fee_id = request.POST.get('enrollment_fee_type')
+        monthly_fee_id = request.POST.get('monthly_fee_type')
+        
+        course = get_object_or_404(Course, id=course_id)
+        
+        # Rigor SOTARQ: Se o ID vier vazio (string vazia), setamos None
+        course.default_enrollment_fee_type_id = enrollment_fee_id if enrollment_fee_id else None
+        course.default_monthly_fee_type_id = monthly_fee_id if monthly_fee_id else None
+            
+        course.save()
+        messages.success(request, f"Configuração de preços para {course.name} salva com sucesso!")
+        
+    return redirect('finance:pricing_manager')
+
+
+@login_required
 @transaction.atomic
 def process_manual_payment(request):
     """
@@ -141,6 +224,41 @@ def process_manual_payment(request):
         # O transaction.atomic fará o rollback de tudo se algo falhar aqui
 
     return redirect('finance:secretary_dashboard')
+
+
+# Exemplo de lógica na View de Confirmação
+def confirm_enrollment_view(request, student_id):
+    student = Student.objects.get(id=student_id)
+    course = student.course 
+    
+    # 1. Recuperar o preço configurado para este curso
+    # Supondo que você salvou a relação no modelo Course ou numa tabela de preços
+    fee_type = course.default_enrollment_fee  
+    
+    # 2. Criar a Invoice (Fatura) no banco de dados primeiro
+    # O rigor multi-tenant garante que cai no schema certo
+    invoice = Invoice.objects.create(
+        student=student,
+        description=f"Matrícula/Confirmação - {course.name}",
+        subtotal=fee_type.amount,
+        tax_amount=fee_type.amount * 0.14, # Exemplo 14% IVA
+        total=fee_type.amount * 1.14,
+        status='paid' # Ou 'pending' se NÃO houver comprovativo
+    )
+
+    # 3. Gerar o PDF usando o seu SOTARQExporter
+    #from apps.finance.utils.pdf_generators import SOTARQExporter
+    pdf_content = SOTARQExporter.generate_fiscal_document(
+        instance=invoice, 
+        doc_type_code='FR', # Fatura Recibo
+        page_format='A4'
+    )
+
+    # 4. Retornar o PDF para exibição/impressão imediata
+    response = HttpResponse(pdf_content, content_type='application/pdf')
+    response['Content-Disposition'] = f'inline; filename="Fatura_{invoice.number}.pdf"'
+    return response
+
 
 
 def checkout_invoice(request, invoice_id):
@@ -336,4 +454,28 @@ def invoice_detail(request, invoice_id):
     }
     
     return render(request, 'finance/invoice_detail.html', context)
+
+
+
+class BankAccountListView(LoginRequiredMixin, ListView):
+    model = BankAccount
+    template_name = 'finance/bank_account_list.html'
+    context_object_name = 'accounts'
+
+    def get_queryset(self):
+        # Rigor Multi-tenant: Garante que só vê as contas do tenant atual
+        return BankAccount.objects.filter(is_active=True).order_by('bank_name')
+
+
+class BankAccountCreateView(LoginRequiredMixin, CreateView):
+    model = BankAccount
+    # Removido 'account_holder' e adicionado 'account_number'
+    fields = ['bank_name', 'account_number', 'iban', 'is_active']
+    template_name = 'finance/bank_account_form.html'
+    success_url = reverse_lazy('finance:bank_accounts')
+
+    def form_valid(self, form):
+        # O rigor SOTARQ exige que as mensagens sejam claras
+        messages.success(self.request, "Conta bancária registada com sucesso no sistema.")
+        return super().form_valid(form)
 
