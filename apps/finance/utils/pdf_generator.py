@@ -913,7 +913,6 @@ class SOTARQExporter:
         qr_drawn = False
         try:
             # Tentativa de gerar QR code AGT
-            from apps.fiscal.utils import generate_agt_qrcode_image
             qr_img = generate_agt_qrcode_image(data['instance'])
             if qr_img:
                 qr_buffer = BytesIO()
@@ -1235,23 +1234,7 @@ class SOTARQExporter:
         current_y = totals_y - 1.5 * cm
 
 
-        p.setFillColor(C['white'])
-        p.setFont("Helvetica-Bold", 10)
-        p.drawString(info_x, info_y, "Dados para Pagamento")
-
-        # Dados bancários dinâmicos
-        p.setFont("Helvetica", 9)
-        info_y -= 0.6 * cm
-        bank_info = SOTARQExporter._get_bank_info(data['tenant'])
-        # Quebra em duas linhas se necessário
-        if len(bank_info) > 60:
-            p.drawString(info_x, info_y, bank_info[:60])
-            info_y -= 0.5 * cm
-            p.drawString(info_x, info_y, bank_info[60:])
-        else:
-            p.drawString(info_x, info_y, bank_info)
-
-
+        
         # =========================================================================
         # 5. RODAPÉ - Dados dinâmicos do .env e banco
         # =========================================================================
