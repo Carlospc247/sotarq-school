@@ -44,9 +44,9 @@
                     
                     <div class="space-y-1">
                         <label class="text-[9px] font-black text-slate-500 uppercase ml-2">Enquadramento de IVA</label>
-                        <select name="tax_type_id" class="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-xs font-bold focus:ring-2 focus:ring-indigo-500 appearance-none">
+                        <select name="nif_type_id" class="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-xs font-bold focus:ring-2 focus:ring-indigo-500 appearance-none">
                             {% for tax in active_taxes %}
-                                <option value="{{ tax.id }}" {% if fp.tax_type_id == tax.id %}selected{% endif %}>
+                                <option value="{{ tax.id }}" {% if fp.nif_type_id == tax.id %}selected{% endif %}>
                                     {{ tax.nome }} ({{ tax.tax_percentage }}%)
                                 </option>
                             {% empty %}

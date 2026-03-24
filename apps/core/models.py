@@ -203,7 +203,7 @@ class SchoolConfiguration(BaseModel):
     """
     # --- Identidade ---
     school_name = models.CharField(max_length=255)
-    tax_id = models.CharField(max_length=20, verbose_name="NIF/Contribuinte")
+    nif = models.CharField(max_length=20, verbose_name="NIF/Contribuinte")
     logo = CloudinaryField('logo', blank=True, null=True)
     favicon = CloudinaryField('favicon', blank=True, null=True)
 

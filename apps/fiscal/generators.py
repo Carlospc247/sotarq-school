@@ -76,7 +76,7 @@ class SAFTGenerator:
             self._add(cust, "AccountID", "31.1.2.1")
             
             # --- HIGIENE DE NIF RIGOROSA (PADRÃO 10 DÍGITOS) ---
-            nif = str(getattr(aluno, 'tax_id', '')).strip()
+            nif = str(getattr(aluno, 'nif', '')).strip()
             
             # Rigor SOTARQ: Se não tiver 10 dígitos exatos, força Consumidor Final
             if len(nif) != 10 or not nif.isdigit():

@@ -83,7 +83,7 @@ class SchoolSettingsForm(forms.ModelForm):
         model = SchoolConfiguration
         fields = [
             # 1. Identidade e Cores do Sistema
-            'school_name', 'tax_id', 'logo', 'favicon', 'primary_color',
+            'school_name', 'nif', 'logo', 'favicon', 'primary_color',
             'secondary_color', 'weight_mac', 'weight_npp', 'weight_npt',
             
             # 2. Personalização do Site Institucional
@@ -126,7 +126,7 @@ class SchoolSettingsForm(forms.ModelForm):
             
             # --- INPUTS PADRÃO (Tailwind Styled) ---
             'school_name': forms.TextInput(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm'}),
-            'tax_id': forms.TextInput(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm'}),
+            'nif': forms.TextInput(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm'}),
             'hero_title': forms.TextInput(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm'}),
             'news_ticker': forms.TextInput(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm'}),
             'phone_contact': forms.TextInput(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm'}),

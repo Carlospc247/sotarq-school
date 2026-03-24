@@ -42,6 +42,15 @@ class ClientAdmin(admin.ModelAdmin):
                 'calculation_regime', # OK, desde que esteja em readonly_fields
             )
         }),
+        ('Contato e Fiscal', {
+            'fields': (
+                'address',
+                'phone',
+                'email',
+                'website',
+                'nif',
+            )
+        }),
         ('Controle do Sistema', {
             'fields': (
                 'is_active',

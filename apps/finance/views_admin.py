@@ -217,12 +217,12 @@ def apply_budget_discount(request, proforma_id):
     
     val = Decimal(request.POST.get('discount_value', '0'))
     mode = request.POST.get('discount_mode') # 'PCT' ou 'FIXED'
-    tax_id = request.POST.get('tax_type_id') # Seleção do IVA (ex: Normal 14%)
+    nif = request.POST.get('nif_type_id') # Seleção do IVA (ex: Normal 14%)
 
     # Aplicação do Rigor
     proforma.discount_value = val
     proforma.discount_is_pct = (mode == 'PCT')
-    proforma.tax_type_id = tax_id
+    proforma.nif_type_id = nif
     proforma.discount_authorized_by = request.user
     
     proforma.update_totals() # O método do modelo faz a mágica matemática

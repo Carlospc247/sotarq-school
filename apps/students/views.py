@@ -138,7 +138,7 @@ def student_hub_dispatcher(request):
         
         config = SchoolConfiguration.objects.create(
             school_name=tenant_name, # Pega o nome real do Tenant (ex: "Colégio Futuro")
-            tax_id="Consumidor Final", # Valor temporário obrigatório até o diretor atualizar
+            nif="Consumidor Final", # Valor temporário obrigatório até o diretor atualizar
             primary_color="#4f46e5",   # Padrão do Sistema
             secondary_color="#1e293b"
         )
@@ -174,7 +174,7 @@ def student_hub_dispatcher(request):
     # Carregar ou criar configuração padrão (evita erro se tabela vazia)
     config = SchoolConfiguration.objects.first()
     if not config:
-        config = SchoolConfiguration.objects.create(school_name="Minha Escola", tax_id="000")
+        config = SchoolConfiguration.objects.create(school_name="Minha Escola", nif="000")
     
     context = {
         'config': config,

@@ -35,10 +35,11 @@ class RoleAdmin(admin.ModelAdmin):
 @admin.register(SchoolConfiguration)
 class SchoolConfigurationAdmin(admin.ModelAdmin):
     # 1. LISTAGEM: Permite identificar rapidamente qual Tenant (Escola) você vai editar
-    list_display = ('school_name', 'tax_id', 'official_email', 'news_ticker')
+    #list_display = ('school_name', 'tax_id', 'official_email', 'news_ticker')
+    list_display = ('school_name', 'nif', 'official_email', 'news_ticker')
     
     # 2. BUSCA: A "opção de escolher o tenant" é feita através da busca pelo nome da escola
-    search_fields = ('school_name', 'tax_id', 'official_email')
+    search_fields = ('school_name', 'nif', 'official_email')
     
     # 3. FILTROS: Útil para ver quais escolas estão com matrículas abertas ou modos de exibição específicos
     list_filter = ('hero_mode', 'is_enrollment_open')
@@ -47,7 +48,7 @@ class SchoolConfigurationAdmin(admin.ModelAdmin):
     fieldsets = (
         # Identificação do Tenant
         ('Identificação da Escola (Tenant)', {
-            'fields': ('school_name', 'tax_id', 'official_email'),
+            'fields': ('school_name', 'nif', 'official_email'),
             'description': 'Dados principais para identificar o cliente.'
         }),
 
