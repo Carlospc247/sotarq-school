@@ -41,9 +41,9 @@ def upload_proof(request, invoice_id):
             return redirect('portal:blocked_page')
         
         messages.success(request, "Comprovativo enviado! A tesouraria foi notificada.")
-        return redirect('portal:dashboard')
+        return redirect('portal:student_dashboard')
 
-    return redirect('portal:dashboard')
+    return redirect('portal:student_dashboard')
 
 # apps/portal/views.py (ou views_portal.py)
 from django.shortcuts import render

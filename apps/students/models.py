@@ -32,7 +32,6 @@ class Student(BaseModel):
 
     merit_points = models.IntegerField(default=0, verbose_name="Pontos de Mérito Académico")
     
-    is_suspended = models.BooleanField(default=False, help_text="Bloqueia acesso por falta de pagamento")
     
     # ADIÇÃO DE RIGOR PARA FRAUDE:
     is_blocked_for_fraud = models.BooleanField(default=False, verbose_name="Bloqueio de Segurança (Fraude)")
@@ -141,6 +140,13 @@ class Enrollment(BaseModel):
     course = models.ForeignKey('academic.Course', on_delete=models.PROTECT)
     
     # ALTERAÇÃO TÉCNICA: null=True para permitir matrícula paga sem turma definida (aguardando Diretor)
+    grade_level = models.ForeignKey(
+        'academic.GradeLevel', 
+        on_delete=models.PROTECT, 
+        related_name='enrollments',
+        null=False # True apenas para migrar dados antigos, depois pode ser False
+    )
+
     class_room = models.ForeignKey(
         'academic.Class', 
         on_delete=models.PROTECT, 

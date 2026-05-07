@@ -1,11 +1,11 @@
 # apps/finance/signals.py
+from datetime import timezone
 
-from django.utils import timezone
 from apps.core.utils import generate_document_number
 from apps.documents.models import Document, DocumentType
-from django.db import transaction
+from django.db.models import transaction
 from django.dispatch import receiver
-from .models import Invoice, Payment
+from .models import Payment
 from apps.core.models import Notification
 from django.contrib.auth import get_user_model
 from .models import Payment, DebtAgreement
@@ -50,32 +50,21 @@ def notify_secretariat_on_payment(sender, instance, created, **kwargs):
 @receiver(post_save, sender=Payment)
 def trigger_agreement_activation(sender, instance, **kwargs):
     """
-    RIGOR SOTARQ: Ativa o acordo de dívida se a primeira prestação for paga.
-    Corrigido SyntaxError: Não repetimos o argumento no filter.
+    Sempre que um pagamento é validado, verifica se ativa um acordo de dívida.
     """
     if instance.validation_status == 'validated':
         invoice = instance.invoice
-        
-        # Para buscar DUAS strings no mesmo campo, usamos Q objects ou encadeamos filtros
-        from django.db.models import Q
-        
-        first_installment_item = invoice.items.filter(
-            Q(description__icontains="Prestação 1/") & 
-            Q(description__icontains="Acordo #")
-        ).first()
-
-        if first_installment_item:
+        # Verifica se esta fatura é a "Prestação 1" de algum acordo
+        if "Prestação 1/" in invoice.description and "Acordo #" in invoice.description:
+            # Extrair ID do acordo da descrição (ex: "Acordo #123")
             try:
-                desc = first_installment_item.description
-                # Extrair ID: "Acordo #123" -> ["Acordo ", "123"] -> "123"
-                agreement_id = desc.split('#')[1].strip()
-                
-                from .models import DebtAgreement
+                agreement_id = invoice.description.split('#')[1]
                 agreement = DebtAgreement.objects.get(id=agreement_id)
                 agreement.check_activation()
-                
-            except (IndexError, ValueError, DebtAgreement.DoesNotExist):
+            except (IndexError, DebtAgreement.DoesNotExist):
                 pass
+
+
 
 
 
@@ -279,31 +268,6 @@ def generate_receipt_document_file(sender, instance, created, **kwargs):
         filename = f"Recibo_{instance.number.replace('/', '_')}.pdf"
         new_doc.file.save(filename, ContentFile(pdf_content))
         new_doc.save()
-
-
-
-@receiver(pre_save, sender=Invoice)
-def protect_printed_invoice(sender, instance, **kwargs) :
-    """
-    RIGOR SOTARQ: Impede alteração de dados financeiros após a primeira impressão/emissão.
-    Permite apenas a alteração do próprio campo 'is_printed' ou status de liquidação.
-    """
-    if instance.pk:
-        old_instance = Invoice.objects.get(pk=instance.pk)
-        
-        # Se o documento já foi marcado como impresso
-        if old_instance.is_printed:
-            # Lista de campos permitidos para alteração mesmo após impressão (ex: status de pagamento)
-            allowed_updates = ['status', 'is_printed', 'updated_at']
-            
-            # Verificação de campos sensíveis (Total, Itens, Aluno, Data de Emissão)
-            for field in instance._meta.fields:
-                field_name = field.name
-                if field_name not in allowed_updates:
-                    if getattr(old_instance, field_name) != getattr(instance, field_name):
-                        raise PermissionDenied(
-                            f"VIOLAÇÃO FISCAL SOTARQ: A Fatura {instance.number} já foi impressa e não pode ser alterada."
-                        )
 
 
 

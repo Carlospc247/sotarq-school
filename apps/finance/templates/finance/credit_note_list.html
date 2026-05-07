@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="p-6 bg-slate-50 min-h-screen">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold italic">Notas de Crédito (Retificações)</h1>
+        <div class="bg-slate-800 text-white px-4 py-2 rounded-lg font-bold">
+            Total Anulado: {{ stats.total_nc|default:0 }} Kz ({{ stats.count_nc|default:0 }})
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
+        <table class="w-full text-left">
+            <thead class="bg-slate-800 text-slate-200 text-xs uppercase">
+                <tr>
+                    <th class="px-6 py-4">Nº Nota</th>
+                    <th class="px-6 py-4">Data</th>
+                    <th class="px-6 py-4">Motivo / Aluno</th>
+                    <th class="px-6 py-4">Valor Retificado</th>
+                    <th class="px-6 py-4 text-center">Ações</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for nc in notes %}
+                <tr class="hover:bg-rose-50 transition">
+                    <td class="px-6 py-4 font-bold text-rose-700">{{ nc.number }}</td>
+                    <td class="px-6 py-4 text-sm">{{ nc.issue_date|date:"d/m/Y" }}</td>
+                    <td class="px-6 py-4">
+                        <p class="font-medium text-slate-800">{{ nc.student.full_name }}</p>
+                        <p class="text-xs text-slate-400">{{ nc.waive_reason|default:"Retificação Fiscal" }}</p>
+                    </td>
+                    <td class="px-6 py-4 font-black text-rose-600">- {{ nc.total }} Kz</td>
+                    <td class="px-6 py-4 text-center">
+                        <a href="{% url 'fiscal:imprimir_documento_fiscal' nc.id %}" class="bg-rose-600 text-white px-4 py-2 rounded text-xs font-bold hover:bg-rose-700">
+                            IMPRIMIR NC
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

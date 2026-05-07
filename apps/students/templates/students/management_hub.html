@@ -236,7 +236,18 @@
                             {% endwith %}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <span class="text-brand-600 group-hover:text-brand-900 group-hover:underline">Ver Ficha</span>
+                            <div class="flex items-center justify-end space-x-3">
+                                <span class="text-brand-600 group-hover:text-brand-900 group-hover:underline">Ver Ficha</span>
+                                
+                                {% if request.user.current_role == 'ADMIN' or request.user.current_role == 'DIRECTOR' %}
+                                <a href="{% url 'students:student_delete' student.id %}" 
+                                class="text-red-600 hover:text-red-900 p-2 rounded-lg hover:bg-red-50 transition-colors"
+                                onclick="event.stopPropagation(); return confirm('ATENÇÃO: Esta ação é irreversível. Deseja realmente eliminar o aluno {{ student.full_name }} e todos os seus dados académicos e de acesso?');"
+                                title="Eliminar Aluno">
+                                    <i data-feather="trash-2" class="w-4 h-4"></i>
+                                </a>
+                                {% endif %}
+                            </div>
                         </td>
                     </tr>
                     {% empty %}
@@ -488,6 +499,16 @@
                                     <div class="md:col-span-2">
                                         <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Turma (Alocação Imediata)</label>
                                         {{ internal_enrollment_form.current_class }}
+                                    </div>
+
+                                    <div class="md:col-span-2">
+                                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Método de Pagamento <span class="text-red-500">*</span></label>
+                                        {{ internal_enrollment_form.payment_method }}
+                                    </div>
+
+                                    <div class="md:col-span-2">
+                                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Comprovativo <span class="text-[10px] text-slate-400 font-normal">(Opcional)</span></label>
+                                        {{ internal_enrollment_form.proof_file }}
                                     </div>
 
                                     <div class="md:col-span-2 flex items-center gap-2 border-b border-slate-100 pb-2 mt-2">

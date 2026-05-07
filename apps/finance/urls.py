@@ -44,6 +44,8 @@ urlpatterns = [
     path('staff/reject/<int:payment_id>/', views_staff.reject_payment, name='reject_payment'),
     path('staff/void-payment/<int:payment_id>/', views_staff.void_payment_action, name='void_payment'),
     
+    path('invoice/<int:invoice_id>/print/', views.student_print_invoice, name='invoice_pdf'),
+
     # Motor de Mora e Perdão
     path('staff/waive-penalty/<int:invoice_id>/', views_staff.waive_penalty_action, name='waive_penalty'),
     
@@ -68,10 +70,25 @@ urlpatterns = [
    
     path('api/bi/payment-methods/', views_admin.finance_bi_payment_methods, name='api_bi_payment_methods'),
 
+    path('invoices/<int:invoice_id>/convert-to-receipt/', views.convert_to_receipt, name='convert_to_receipt'),
+    
     path('checkout/<int:invoice_id>/', views.checkout_invoice, name='checkout'),
 
-    path('invoices/', views.invoice_list, name='invoice_list'),
+    ############################################################################
+
+    # Listagens
+    path('faturas/', views.invoice_list_view, name='invoice_list'),
+    path('recibos/', views.receipt_list_view, name='receipt_list'),
+    path('receipt/<int:pk>/print/', views.print_receipt, name='print_receipt'),
+    path('notas-credito/', views.credit_note_list_view, name='credit_note_list'),
+    
+    # Detalhes (Reutilizando a mesma lógica de impressão para ver detalhes)
+    #path('documento/<int:invoice_id>/', views.invoice_detail, name='invoice_detail'),
+
+    ############################################################################
+    #path('invoices/', views.invoice_list, name='invoice_list'),
     path('invoice/<int:invoice_id>/', views.invoice_detail, name='invoice_detail'),
+
 
     path('processar-pagamento-manual/', views.process_manual_payment, name='process_manual_payment'),
 

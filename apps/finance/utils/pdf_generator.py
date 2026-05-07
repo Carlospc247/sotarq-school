@@ -262,12 +262,38 @@ class SOTARQExporter:
         }
     
     
+   
+    """
     @staticmethod
     def _get_agt_footer_text():
-        """Retorna texto do rodapé AGT baseado no .env"""
+        
+        hash_fragment = documento.hash_documento[:4] if documento.hash_documento else "****"
         software_id = getattr(settings, 'AGT_ID_SISTEMA', 'SOTARQ-SCHOOL')
         cert_number = getattr(settings, 'AGT_CERTIFICATE_NUMBER', '000/AGT/2026')
-        return f"{software_id} - Processado por Programa validado número {cert_number}"
+        return f"{hash_fragment}-Processado por programa válido {cert_number}"
+    """
+
+    @staticmethod
+    def _get_agt_footer_text(data):
+        """
+        Retorna texto do rodapé AGT. 
+        Pega os 4 últimos caracteres do hash conforme solicitado.
+        """
+        # Recuperamos a instância original do dicionário 'data' montado no _extract_document_data
+        instance = data.get('instance')
+        
+        # Busca o hash em qualquer um dos campos possíveis (Invoice, Receipt ou DocumentoFiscal)
+        full_hash = getattr(instance, 'hash_control', getattr(instance, 'hash_documento', ''))
+        
+        # Pega os 4 últimos caracteres ou fallback
+        hash_fragment = full_hash[-4:] if full_hash and len(full_hash) >= 4 else "****"
+        
+        cert_number = getattr(settings, 'AGT_CERTIFICATE_NUMBER', '000/AGT/2026')
+        
+        return f"{hash_fragment}-Processado por programa válido {cert_number}"
+
+
+
 
     @staticmethod
     def _get_bank_info(tenant):
@@ -336,15 +362,21 @@ class SOTARQExporter:
 
     @staticmethod
     def _extract_document_data(instance):
-        """Extrai e normaliza dados do documento."""
+        """
+        Extração e Normalização Única SOTARQ (Rigor AGT).
+        Unifica Invoice, Receipt e DocumentoFiscal.
+        """
+        from apps.fiscal.models import DocType
+        
+        # 1. IDENTIFICAÇÃO DO TENANT (Multi-tenant isolation)
         tenant = getattr(instance, 'tenant', None)
-
-        # Se não tiver tenant direto, tenta pegar via student
         if not tenant and hasattr(instance, 'student') and instance.student:
-            if hasattr(instance.student, 'user') and instance.student.user:
-                tenant = getattr(instance.student.user, 'tenant', None)
+            # Tenta pegar o tenant via usuário vinculado ao estudante
+            student_user = getattr(instance.student, 'user', None)
+            if student_user:
+                tenant = getattr(student_user, 'tenant', None)
 
-        # Cliente/Aluno
+        # 2. INFORMAÇÕES DO CLIENTE/ALUNO
         client_info = {
             'name': "CONSUMIDOR FINAL",
             'nif': "999999999",
@@ -361,34 +393,58 @@ class SOTARQExporter:
                 'address': getattr(student, 'address', 'N/A')
             })
 
-        # Número do documento
-        doc_number = getattr(instance, 'number',
-                           getattr(instance, 'numero_documento',
-                                  getattr(instance, 'invoice', {}).get('number', 'S/N')))
+        # 3. IDENTIFICAÇÃO DINÂMICA DO TIPO E TÍTULO (O Coração do Rigor)
+        # Busca 'doc_type' (Invoice/Receipt) ou 'tipo_documento' (Fiscal)
+        raw_type_code = getattr(instance, 'doc_type', getattr(instance, 'tipo_documento', None))
+        
+        # Fallback para instâncias de Recibo que podem não ter o campo preenchido
+        if not raw_type_code and instance.__class__.__name__ == 'Receipt':
+            raw_type_code = DocType.RC
 
-        # Status exato do Invoice
-        #status_display = instance.get_status_display() if hasattr(instance, 'get_status_display') else instance.status
-        #agt_status = "NORMAL" if instance.status in ['paid', 'confirmed'] else "ANULADO"
+        # Mapeamento oficial baseado na classe DocType
+        titles = dict(DocType.choices)
+        display_doc_type = titles.get(raw_type_code, "DOCUMENTO").upper()
+
+        # 4. INTEGRIDADE FISCAL: HASH AGT (Os 4 caracteres de segurança)
+        full_hash = getattr(instance, 'hash_control', getattr(instance, 'hash_documento', ''))
+        agt_hash_summary = ""
+        if full_hash and len(full_hash) >= 31:
+            # Extração técnica: posições 1, 11, 21 e 31 (índices 0, 10, 20, 30)
+            agt_hash_summary = f"{full_hash[0]}{full_hash[10]}{full_hash[20]}{full_hash[30]}-"
+
+        # 5. EXTRAÇÃO DE VALORES E DATAS (Adaptativo)
+        doc_number = getattr(instance, 'number', 
+                    getattr(instance, 'numero_documento', 
+                    getattr(instance, 'invoice', {}).get('number', 'S/N')))
 
         issue_date = getattr(instance, 'issue_date', None)
         date_str = issue_date.strftime('%d/%m/%Y') if issue_date else 'N/A'
 
-        tax_pct = instance.tax_type.tax_percentage if getattr(instance, 'tax_type', None) else 0
+        # Lógica de totais: Receipt usa 'amount_paid', Invoice/Fiscal usa 'total'
+        total_val = getattr(instance, 'total', getattr(instance, 'amount_paid', 0))
+        subtotal_val = getattr(instance, 'subtotal', total_val)
+        
+        tax_pct = 0
+        if hasattr(instance, 'tax_type') and instance.tax_type:
+            tax_pct = instance.tax_type.tax_percentage
 
         return {
             'tenant': tenant,
             'client': client_info,
             'doc_number': doc_number,
-            'doc_type': getattr(instance, 'get_doc_type_display', lambda: 'DOCUMENTO')().upper(), # get_doc_type_display vai chamar o DocType (código) e transformar FT em Fatura em Maiúscula
+            'doc_type': display_doc_type,
+            'agt_hash_summary': agt_hash_summary,
             'date': date_str,
-            'items': list(getattr(instance, 'items', []).all()) if hasattr(instance, 'items') else [],
-            'subtotal': getattr(instance, 'subtotal', 0),
+            'items': list(instance.items.all()) if hasattr(instance, 'items') else [],
+            'subtotal': subtotal_val,
             'discount': getattr(instance, 'discount_amount', 0),
             'tax_amount': getattr(instance, 'tax_amount', 0),
-            'total': getattr(instance, 'total', 0),
+            'total': total_val,
             'tax_percentage': tax_pct,
             'instance': instance,
         }
+
+
 
     def _draw_80mm_production(p, data, width, height, margin, is_copy, C):
         """
@@ -562,7 +618,7 @@ class SOTARQExporter:
         y -= qr_size + 0.35 * cm
         p.setFont("Helvetica", 6)
         p.setFillColor(C['gray_600'])
-        p.drawCentredString(width / 2, y, SOTARQExporter._get_agt_footer_text())
+        p.drawCentredString(width / 2, y, SOTARQExporter._get_agt_footer_text(data))
 
         # Bank info e mensagem fiscal
         y -= 0.45 * cm
@@ -587,6 +643,7 @@ class SOTARQExporter:
         Mantém todos os campos: logo, tenant info, cliente, tabela de itens, totais, QR, banco, AGT.
         """
         content_w = width - 2 * margin
+        left_x = margin + 0.6 * cm
 
         def draw_line(y_pos, color=C['gray_200'], thickness=0.6):
             p.setStrokeColor(color)
@@ -642,10 +699,13 @@ class SOTARQExporter:
         p.setFont("Helvetica", 8) 
         p.drawString(left_x + 2.9 * cm, text_y, contact['address'])
 
-        # 4. Telefone e Web (Linha dedicada para não sobrecarregar o endereço)
+        # 4. Telefone e Web
         text_y -= 0.45 * cm
         p.drawString(left_x + 2.9 * cm, text_y, f"Tel: {contact['phone']} | {contact['website']}")
-        p.drawString(left_x + 2.9 * cm, text_y, f"NIF: {contact['nif']} | Email: {contact['email']}")
+
+        # 4.1 NIF e Email (PRECISA DE UM NOVO SALTO AQUI)
+        text_y -= 0.45 * cm  # <--- Este salto impede a sobreposição
+        p.drawString(left_x + 2.9 * cm, text_y, f"NIF: {getattr(data['tenant'], 'nif', '999999999')} | Email: {contact['email']}")
 
         # 5. Margem de segurança para o próximo bloco (Ex: Dados do Aluno)
         text_y -= 0.8 * cm
@@ -692,18 +752,51 @@ class SOTARQExporter:
         p.drawString(left_x, current_y - 2.8 * cm, f"Endereço: {data['client']['address']}")
 
         current_y = current_y - client_h - 0.8 * cm
-
+###########################
         # TABELA DE ITENS (estética enterprise)
-        table_data = [["Descrição", "Qtd", "Preço Unit.", "Desconto", "Total"]]
+        table_data = [["Descrição", "Qtd", "Preço Unit.", "Taxa (%)", "Desconto", "Total"]]
+        
         for item in data['items']:
-            table_data.append([        item.description,        "1",        f"{item.amount:,.2f}",        "0,00",        f"{item.amount:,.2f}"    ])
-        if not data['items']:
-            table_data.append([        f"Pagamento - {data['doc_type']} {data['doc_number']}",        "1",        f"{data['total']:,.2f}",        "0,00",        f"{data['total']:,.2f}"    ])
+            # Buscamos a taxa do item. Se o item tiver o campo tax_percentage, usamos, 
+            # caso contrário, usamos a taxa geral do documento gravada no 'data'
+            tax_val = getattr(item, 'tax_percentage', data.get('tax_percentage', 0))
+            
+            table_data.append([
+                item.description,
+                "1", # Qtd padrão ou extraída do item se existir item.quantity
+                f"{item.amount:,.2f}",
+                f"{tax_val:g}%",
+                "0,00", # Implementar item.discount se disponível no model de item
+                f"{item.amount:,.2f}"
+            ])
 
-        col_widths = [content_w * 0.48, content_w * 0.10, content_w * 0.13, content_w * 0.14, content_w * 0.15]
+        if not data['items']:
+            table_data.append([
+                f"Pagamento - {data['doc_type']} {data['doc_number']}",
+                "1",
+                f"{data['total']:,.2f}",
+                f"{data.get('tax_percentage', 0):g}%",
+                "0,00",
+                f"{data['total']:,.2f}"
+            ])
+
+        # AJUSTE DE LARGURAS (Total = 100% do content_w)
+        # Desc(40%) | Qtd(8%) | Preço(13%) | Taxa(10%) | Desc(14%) | Total(15%)
+        col_widths = [
+            content_w * 0.40, 
+            content_w * 0.08, 
+            content_w * 0.13, 
+            content_w * 0.10, 
+            content_w * 0.14, 
+            content_w * 0.15
+        ]
+        
         table = Table(table_data, colWidths=col_widths, repeatRows=1)
 
-        style = TableStyle([    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),    ('FONTSIZE', (0, 0), (-1, 0), 10),    ('TEXTCOLOR', (0, 0), (-1, 0), C['white']),
+        style = TableStyle([
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('TEXTCOLOR', (0, 0), (-1, 0), C['white']),
             ('BACKGROUND', (0, 0), (-1, 0), C['primary']),
             ('ALIGN', (0, 0), (0, 0), 'LEFT'),
             ('ALIGN', (1, 0), (-1, 0), 'RIGHT'),
@@ -714,7 +807,7 @@ class SOTARQExporter:
             ('FONTSIZE', (0, 1), (-1, -1), 9),
             ('TEXTCOLOR', (0, 1), (-1, -1), C['gray_800']),
             ('ALIGN', (0, 1), (0, -1), 'LEFT'),
-            ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
+            ('ALIGN', (1, 1), (-1, -1), 'RIGHT'), # Alinha Qtd, Preço, Taxa, Desc e Total à direita
             ('BOTTOMPADDING', (0, 1), (-1, -1), 8),
             ('TOPPADDING', (0, 1), (-1, -1), 8),
 
@@ -723,7 +816,7 @@ class SOTARQExporter:
             ('LINEBELOW', (0, -1), (-1, -1), 1.2, C['primary']),
         ])
 
-        # zebra leve
+        # Zebra
         for i in range(1, len(table_data)):
             if i % 2 == 0:
                 style.add('BACKGROUND', (0, i), (-1, i), C['gray_50'])
@@ -798,7 +891,7 @@ class SOTARQExporter:
 
         # AGT text
         p.setFont("Helvetica-Bold", 8)
-        p.drawString(info_x, footer_y + 0.7 * cm, SOTARQExporter._get_agt_footer_text())
+        p.drawString(info_x, footer_y + 0.7 * cm, SOTARQExporter._get_agt_footer_text(data))
         p.setFont("Helvetica", 8)
         p.drawString(info_x, footer_y + 0.35 * cm, "Os bens/Serviços foram colocados à disposição do cliente no local e data do documento.")
 

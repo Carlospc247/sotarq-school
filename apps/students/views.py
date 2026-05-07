@@ -1,5 +1,5 @@
 # apps/students/views.py
-
+"""
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -32,7 +32,72 @@ from apps.students.models import Enrollment
 import hashlib
 import hmac
 from django.conf import settings
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.utils import get_column_letter
+from datetime import datetime
+from django.http import HttpResponse
+from django.db import transaction
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.utils import timezone
 
+# Certifique-se de importar os Models de Encarregado
+from apps.core.models import Role, User, UserRole
+from apps.students.models import Student, Enrollment, Guardian, StudentGuardian
+from apps.students.forms import StudentImportForm
+from apps.academic.models import AcademicYear, Course
+"""
+####
+# 1. Standard Library Imports
+import hashlib
+import hmac
+from venv import logger
+import openpyxl
+from datetime import datetime, timedelta
+
+# 2. Third-Party Imports (Django & Utilities)
+from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.db import transaction
+from django.db.models import Sum, Count, Q
+from django.http import HttpResponse, HttpResponseForbidden
+from django.shortcuts import render, redirect, get_object_or_404
+from django.utils import timezone
+from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.utils import get_column_letter
+
+# 3. SOTARQ Core & Infrastructure
+from apps.core.models import Role, Notification, User, UserRole, SchoolConfiguration
+from apps.core.views_admin import is_manager_check
+
+# 4. SOTARQ Academic
+from apps.academic.models import (
+    Class, GradeLevel, LessonPlan, AcademicYear, Course
+)
+
+# 5. SOTARQ Teachers
+from apps.teachers.models import Teacher, TeacherSubject
+
+# 6. SOTARQ Students (Current App)
+from apps.students.models import (
+    EnrollmentRequest, Student, Enrollment, Guardian, StudentGuardian
+)
+from apps.students.forms import StudentImportForm, StudentInternalForm
+
+# Adicione estes imports no topo se não tiver
+from django.core.exceptions import PermissionDenied
+from apps.finance.models import Invoice, Payment
+
+
+
+def is_admin_or_director(user):
+    """Critério SOTARQ: Apenas ADMIN ou DIRECTOR podem apagar."""
+    if not user.is_authenticated:
+        return False
+    return user.current_role in [Role.Type.ADMIN, Role.Type.DIRECTOR]
 
 
 def is_manager_check(user):
@@ -66,7 +131,6 @@ def global_search_2(request):
         return HttpResponse("") # Economiza processamento se a query for vazia
 
     students = Student.objects.filter(
-        tenant=request.user.tenant,
         full_name__icontains=query
     ).prefetch_related(
         'enrollments__class_room__grade_level'
@@ -311,6 +375,7 @@ def _handle_teacher_view(request, context):
 # 4. MODAL DE DETALHES (TÁTIL)
 # ==============================================================================
 
+"""
 @login_required
 def student_detail_modal(request, student_id):
     # Rigor: select_related evita queries extras ao buscar dados do usuário e da turma
@@ -356,26 +421,71 @@ def student_detail_modal(request, student_id):
         'can_view_finance': can_view_finance
     })
 
+"""
+
+
+@login_required
+def student_detail_modal(request, student_id):
+    # 1. Busca Atómica com Prefetch de Faturamento e Matrícula
+    student = get_object_or_404(
+        Student.objects.select_related('user', 'current_class__grade_level__course')
+                       .prefetch_related(
+                           'enrollment_requests',
+                           'invoices__payments' # RIGOR: Puxa a árvore financeira completa
+                       ), 
+        id=student_id
+    )
+    
+    # ATENÇÃO: NÃO COMENTE ESTA LINHA!
+    user = request.user 
+
+    # 2. Processamento Financeiro (Fora do Template por Performance)
+    all_payments = []
+    for invoice in student.invoices.all():
+        all_payments.extend(invoice.payments.all())
+
+    # Ordenar: O mais recente no topo (Rigor SOTARQ)
+    all_payments.sort(key=lambda x: x.confirmed_at if x.confirmed_at else x.id, reverse=True)
+
+    # 3. Verificação de Escopo para Professores
+    if user.current_role == Role.Type.TEACHER:
+        is_authorized = TeacherSubject.objects.filter(
+            teacher__user=user,
+            class_room=student.current_class
+        ).exists()
+        
+        if not is_authorized:
+            return HttpResponse("Acesso Negado: Aluno não pertence às suas turmas.", status=403)
+
+    # 4. Permissões
+    can_edit = _check_permission(user, 'EDIT')
+    can_print = _check_permission(user, 'FILE')
+    can_view_finance = _check_permission(user, 'FINANCE')
+
+    # 5. Lógica de Extração do BI
+    bi_number = "N/D"
+    last_req = student.enrollment_requests.last()
+    if last_req and last_req.observations and "BI:" in last_req.observations:
+        try:
+            bi_number = last_req.observations.split("BI:")[1].strip()
+        except (IndexError, AttributeError):
+            pass
+
+    return render(request, 'students/partials/student_detail_modal.html', {
+        'student': student,
+        'payments': all_payments, # ESSENCIAL: Envia a lista unificada para o template
+        'bi_number': bi_number,
+        'can_edit': can_edit,
+        'can_print': can_print,
+        'can_view_finance': can_view_finance
+    })
+
+
+
 # ==============================================================================
 # IMPORTS NECESSÁRIOS (Certifique-se que estão no topo do ficheiro)
 # ==============================================================================
 
-import openpyxl
-from openpyxl.styles import Font, PatternFill, Alignment
-from openpyxl.utils import get_column_letter
-from datetime import datetime
-from django.http import HttpResponse
-from django.db import transaction
-from django.shortcuts import render, redirect
-from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from django.utils import timezone
-
-# Certifique-se de importar os Models de Encarregado
-from apps.core.models import Role, User, UserRole
-from apps.students.models import Student, Enrollment, Guardian, StudentGuardian
-from apps.students.forms import StudentImportForm
-from apps.academic.models import AcademicYear, Course
 
 
 # ==============================================================================
@@ -698,7 +808,7 @@ def teacher_start_lesson(request, allocation_id):
     )
 
     # Notificação Otimizada: Bulk Create
-    directors = User.objects.filter(tenant=request.user.tenant, current_role=Role.Type.DIRECTOR)
+    directors = User.objects.filter(current_role=Role.Type.DIRECTOR)
     msgs = [Notification(
         user=d,
         title="👨‍🏫 Aula Iniciada",
@@ -718,7 +828,7 @@ def teacher_end_lesson(request, lesson_id):
     lesson.topic = request.POST.get('topic', lesson.topic)
     lesson.save()
 
-    directors = User.objects.filter(tenant=request.user.tenant, current_role=Role.Type.DIRECTOR)
+    directors = User.objects.filter(current_role=Role.Type.DIRECTOR)
     msgs = [Notification(
         user=d,
         title="✅ Aula Terminada",
@@ -741,7 +851,7 @@ def director_validate_grades(request, class_id):
     klass = get_object_or_404(Class, id=class_id)
     # Lógica de validação aqui...
     
-    teachers = User.objects.filter(tenant=request.user.tenant, current_role=Role.Type.TEACHER)
+    teachers = User.objects.filter(current_role=Role.Type.TEACHER)
     msgs = [Notification(
         user=t, title="Boletins Validados", 
         message=f"Boletins da turma {klass.name} publicados."
@@ -782,9 +892,6 @@ def toggle_enrollment_status(request):
 
 
 
-# Adicione estes imports no topo se não tiver
-from django.core.exceptions import PermissionDenied
-from apps.finance.models import Invoice, Payment
 
 # ==============================================================================
 # 8. AÇÕES DE GESTÃO DO ALUNO (EDITAR, FICHA, EXTRATO)
@@ -823,14 +930,185 @@ def _check_permission(user, permission_type):
 
     return False
 
+"""
 
+@login_required
+@user_passes_test(is_manager_check, login_url='/')
+@transaction.atomic
+def student_add(request):
+    
+    config = SchoolConfiguration.objects.first()
+    if not config or not config.is_enrollment_open:
+        messages.error(request, "As matrículas estão fechadas no momento.")
+        return redirect('students:student_list')
+    
+    if request.method == 'POST':
+        form = StudentInternalForm(request.POST, request.FILES) 
+        if form.is_valid():
+            try:
+                # 1. DADOS BÁSICOS E VALIDAÇÃO
+                email = form.cleaned_data['email']
+                full_name = form.cleaned_data['full_name']
+                default_password = "Sotarq.Mudar123"
+                
+                if User.objects.filter(email=email).exists():
+                    messages.error(request, "Este email já está em uso.")
+                    return redirect('students:student_list')
+
+                # 2. CRIAR CONTA DE USUÁRIO (USER)
+                user = User.objects.create_user(
+                    username=email,
+                    email=email,
+                    password=default_password,
+                    first_name=full_name.split()[0],
+                    last_name=full_name.split()[-1] if len(full_name.split()) > 1 else "",
+                    current_role=Role.Type.STUDENT,
+                    is_active=True
+                )
+                role_student, _ = Role.objects.get_or_create(code=Role.Type.STUDENT)
+                UserRole.objects.create(user=user, role=role_student)
+
+                # 3. CRIAR PERFIL DO ESTUDANTE (STUDENT)
+                student = form.save(commit=False)
+                student.user = user
+                student.tenant = request.user.tenant
+                student.is_active = True
+                student.save()
+                
+                # 4. CRIAR MATRÍCULA ACADÉMICA (ENROLLMENT)
+                course = form.cleaned_data['course']
+                grade_level = form.cleaned_data['grade_level']
+                active_year = AcademicYear.objects.filter(is_active=True).first()
+
+                if active_year:
+                    Enrollment.objects.create(
+                        student=student,
+                        academic_year=active_year,
+                        course=course,
+                        grade_level=grade_level,
+                        status='pending_placement'
+                    )
+                
+                # 5. PROCESSAR ENCARREGADO (GUARDIAN)
+                g_email = form.cleaned_data.get('guardian_email')
+                if g_email:
+                    g_user, _ = User.objects.get_or_create(
+                        email=g_email,
+                        defaults={
+                            'username': g_email,
+                            'current_role': Role.Type.GUARDIAN,
+                            'tenant': request.user.tenant,
+                            'is_active': True
+                        }
+                    )
+                    guardian, _ = Guardian.objects.get_or_create(
+                        user=g_user,
+                        defaults={
+                            'full_name': form.cleaned_data.get('guardian_name', 'Não Informado'), 
+                            'phone': form.cleaned_data.get('guardian_phone', '')
+                        }
+                    )
+                    StudentGuardian.objects.get_or_create(
+                        student=student,
+                        guardian=guardian,
+                        defaults={
+                            'relationship': form.cleaned_data.get('relationship', 'other'),
+                            'is_financial_responsible': True
+                        }
+                    )
+
+                # 6. LÓGICA FINANCEIRA (RIGOR SOTARQ - FATURA FT)
+                from apps.finance.models import Invoice, InvoiceItem
+                from apps.finance.utils.pdf_generator import SOTARQExporter
+
+                # RIGOR: Buscamos os FeeTypes diretamente do Curso selecionado
+                taxa_matricula_obj = course.default_enrollment_fee_type
+                taxa_propina_obj = course.default_monthly_fee_type
+
+                # Validação de Integridade: Se o curso não tiver taxas configuradas, o sistema para aqui.
+                if not taxa_matricula_obj or not taxa_propina_obj:
+                    raise ValueError(
+                        f"Configuração Financeira Incompleta: O curso '{course.name}' "
+                        f"não possui Tipos de Taxa (Matrícula/Propina) associados no Admin."
+                    )
+
+                invoice = Invoice.objects.create(
+                    student=student,
+                    tax_type=course.taxa_iva,
+                    due_date=timezone.now().date() + timedelta(days=5),
+                    status='pending',
+                    tipo_documento='FT', 
+                )
+
+                # ITEM 1: Taxa de Matrícula (Usa o valor da propriedade do curso que já considera o FeeType)
+                InvoiceItem.objects.create(
+                    invoice=invoice, 
+                    fee_type=taxa_matricula_obj,
+                    description=f"Taxa de Matrícula Única - {course.name}", 
+                    amount=course.enrollment_fee 
+                )
+
+                # ITEM 2: Propina (Usa o valor calculado da classe, que já inclui acréscimos e IVA)
+                mes_atual = timezone.now().month
+                InvoiceItem.objects.create(
+                    invoice=invoice, 
+                    fee_type=taxa_propina_obj,
+                    description=f"Propina Mensal - {grade_level.name}", 
+                    amount=grade_level.total_monthly_fee, # RIGOR: Usa o valor final já salvo no GradeLevel
+                    competence_month=str(mes_atual)
+                )
+
+                invoice.update_totals()
+
+                # 7. ARQUIVO DIGITAL (ENROLLMENTREQUEST)
+                EnrollmentRequest.objects.create(
+                    student=student,
+                    request_type=EnrollmentRequest.RequestType.NEW,
+                    course=course,
+                    grade_level=grade_level,
+                    guardian_email=g_email if g_email else email,
+                    observations=f"Matrícula Presencial. BI: {form.cleaned_data['bi_number']}",
+                    photo_passport=request.FILES.get('photo_passport_file'),
+                    doc_bi=form.cleaned_data.get('doc_bi_file'),
+                    doc_health=form.cleaned_data.get('doc_health_file'),
+                    doc_certificate=form.cleaned_data.get('doc_certificate_file'),
+                    status='approved',
+                )
+
+                # 8. GERAÇÃO E ENTREGA DO PDF
+                messages.success(request, f"Matrícula de {student.full_name} concluída com sucesso!")
+                
+                exporter = SOTARQExporter()
+                pdf_content = exporter.generate_fiscal_document(
+                    instance=invoice, 
+                    doc_type_code='FT', 
+                    page_format='A4'
+                )
+
+                response = HttpResponse(pdf_content, content_type='application/pdf')
+                filename = f"FT_{invoice.number}_{student.registration_number}.pdf"
+                response['Content-Disposition'] = f'inline; filename="{filename}"'
+                
+                return response
+
+            except Exception as e:
+                messages.error(request, f"Erro Crítico no Sistema SOTARQ: {str(e)}")
+                return redirect('students:student_list')
+        else:
+            messages.error(request, "Erro na validação dos dados. Verifique o formulário.")
+            return render(request, 'students/student_form.html', {'form': form})
+
+    return redirect('students:student_list')
+
+"""
 
 @login_required
 @user_passes_test(is_manager_check, login_url='/')
 @transaction.atomic
 def student_add(request):
     """
-    View para Matrícula Presencial (Backoffice) - Unificada com Rigor Financeiro e Documental.
+    MOTOR SOTARQ: Matrícula Presencial Unificada.
+    Cria User, Student, Enrollment, Guardian, EnrollmentRequest e gera FT em PDF.
     """
     config = SchoolConfiguration.objects.first()
     if not config or not config.is_enrollment_open:
@@ -841,7 +1119,7 @@ def student_add(request):
         form = StudentInternalForm(request.POST, request.FILES) 
         if form.is_valid():
             try:
-                # 1. CRIAR USUÁRIO (USER)
+                # 1. DADOS BÁSICOS E VALIDAÇÃO
                 email = form.cleaned_data['email']
                 full_name = form.cleaned_data['full_name']
                 default_password = "Sotarq.Mudar123"
@@ -850,6 +1128,7 @@ def student_add(request):
                     messages.error(request, "Este email já está em uso.")
                     return redirect('students:student_list')
 
+                # 2. CRIAR CONTA DE USUÁRIO (USER) - Isolamento via Schema
                 user = User.objects.create_user(
                     username=email,
                     email=email,
@@ -857,45 +1136,42 @@ def student_add(request):
                     first_name=full_name.split()[0],
                     last_name=full_name.split()[-1] if len(full_name.split()) > 1 else "",
                     current_role=Role.Type.STUDENT,
-                    tenant=request.user.tenant,
                     is_active=True
                 )
-                
                 role_student, _ = Role.objects.get_or_create(code=Role.Type.STUDENT)
                 UserRole.objects.create(user=user, role=role_student)
 
-                # 2. CRIAR ESTUDANTE (STUDENT)
+                # 3. CRIAR PERFIL DO ESTUDANTE (STUDENT)
                 student = form.save(commit=False)
                 student.user = user
                 student.is_active = True
                 student.save()
                 
-                # 3. CRIAR MATRÍCULA (ENROLLMENT)
+                # 4. CRIAR MATRÍCULA ACADÉMICA (ENROLLMENT)
                 course = form.cleaned_data['course']
                 grade_level = form.cleaned_data['grade_level']
                 active_year = AcademicYear.objects.filter(is_active=True).first()
-                
+
                 if active_year:
                     Enrollment.objects.create(
                         student=student,
                         academic_year=active_year,
                         course=course,
-                        status='pending_placement' # Aguarda alocação de turma
+                        grade_level=grade_level,
+                        status='pending_placement'
                     )
                 
-                # 4. PROCESSAR ENCARREGADO (GUARDIAN)
+                # 5. PROCESSAR ENCARREGADO (GUARDIAN)
                 g_email = form.cleaned_data.get('guardian_email')
                 if g_email:
-                    g_user, created = User.objects.get_or_create(
+                    g_user, _ = User.objects.get_or_create(
                         email=g_email,
                         defaults={
                             'username': g_email,
                             'current_role': Role.Type.GUARDIAN,
-                            'tenant': request.user.tenant,
                             'is_active': True
                         }
                     )
-                    
                     guardian, _ = Guardian.objects.get_or_create(
                         user=g_user,
                         defaults={
@@ -903,7 +1179,6 @@ def student_add(request):
                             'phone': form.cleaned_data.get('guardian_phone', '')
                         }
                     )
-                    
                     StudentGuardian.objects.get_or_create(
                         student=student,
                         guardian=guardian,
@@ -913,74 +1188,89 @@ def student_add(request):
                         }
                     )
 
-                # 5. LÓGICA FINANCEIRA IMUTÁVEL (INVOICE)
-                # Cálculo baseado na percentagem sobre o padrão (Rigor SOTARQ)
-                base_fee = course.monthly_fee
-                percentage = grade_level.fee_percentage_increase
-                final_calculated_price = base_fee + (base_fee * percentage / 100)
-                
-                # 5. LÓGICA FINANCEIRA (RIGOR SOTARQ)
-                # 5. LÓGICA FINANCEIRA (RIGOR SOTARQ)
+                # 6. LÓGICA FINANCEIRA (RIGOR SOTARQ - FATURA FT)
                 from apps.finance.models import Invoice, InvoiceItem
-                from django.utils import timezone
-                import datetime
+                from apps.finance.utils.pdf_generator import SOTARQExporter
+                from apps.fiscal.models import DocType
 
-                # Criamos a fatura vinculada ao aluno e ao regime de IVA do curso
+                taxa_matricula_obj = course.default_enrollment_fee_type
+                taxa_propina_obj = course.default_monthly_fee_type
+
+                if not taxa_matricula_obj or not taxa_propina_obj:
+                    raise ValueError(
+                        f"Configuração Financeira Incompleta: O curso '{course.name}' "
+                        f"não possui Tipos de Taxa associados."
+                    )
+
+                # Cabeçalho da Fatura (Invoice não aceita fee_type)
                 invoice = Invoice.objects.create(
                     student=student,
                     tax_type=course.taxa_iva,
-                    due_date=timezone.now().date() + datetime.timedelta(days=5),
-                    status='pending'
-                    # O tenant será herdado via signals ou no save() do modelo Invoice
+                    due_date=timezone.now().date() + timedelta(days=5),
+                    status='pending',
+                    doc_type=DocType.FT, 
                 )
 
-                # ITEM 1: Matrícula (Preço Único definido no Curso)
+                # ITEM 1: Taxa de Matrícula
                 InvoiceItem.objects.create(
                     invoice=invoice, 
+                    fee_type=taxa_matricula_obj,
                     description=f"Taxa de Matrícula Única - {course.name}", 
                     amount=course.enrollment_fee 
                 )
 
-                # ITEM 2: Propina Mensal (Preço Escalonado via GradeLevel)
+                # ITEM 2: Propina
+                mes_atual = timezone.now().month
                 InvoiceItem.objects.create(
                     invoice=invoice, 
+                    fee_type=taxa_propina_obj,
                     description=f"Propina Mensal - {grade_level.name}", 
-                    amount=grade_level.calculated_monthly_fee
+                    amount=grade_level.total_monthly_fee,
+                    competence_month=mes_atual
                 )
 
-                # Atualiza Subtotal, IVA e Total Final baseado nos itens acima
+                # Atualiza totais baseados nos itens criados
                 invoice.update_totals()
 
-                # 6. SALVAR DOCUMENTAÇÃO E FOTO (ENROLLMENTREQUEST)
-                bi_val = form.cleaned_data['bi_number']
-                photo = request.FILES.get('photo_passport_file')
-                
+                # 7. ARQUIVO DIGITAL (ENROLLMENTREQUEST)
+                # Corrigido photo_passport para photo_passport_file conforme log de erro
                 EnrollmentRequest.objects.create(
                     student=student,
                     request_type=EnrollmentRequest.RequestType.NEW,
                     course=course,
                     grade_level=grade_level,
                     guardian_email=g_email if g_email else email,
-                    observations=f"Matrícula Presencial. BI: {bi_val}",
-                    photo_passport=photo,
+                    observations=f"Matrícula Presencial. BI: {form.cleaned_data['bi_number']}",
+                    photo_passport_file=request.FILES.get('photo_passport_file'),
                     doc_bi=form.cleaned_data.get('doc_bi_file'),
                     doc_health=form.cleaned_data.get('doc_health_file'),
                     doc_certificate=form.cleaned_data.get('doc_certificate_file'),
                     status='approved'
                 )
 
-                messages.success(request, f"Aluno {student.full_name} registado com sucesso. Foto e documentos arquivados.")
-
-                # Redirecionamento com trigger para impressão da Invoice
-                response = redirect('students:student_list')
-                response['Location'] += f'?print_invoice={invoice.id}'
-                return response
+                # 8. GERAÇÃO E ENTREGA DO PDF
+                messages.success(request, f"Matrícula de {student.full_name} concluída com sucesso!")
                 
+                exporter = SOTARQExporter()
+                pdf_content = exporter.generate_fiscal_document(
+                    instance=invoice, 
+                    doc_type_code='FT', 
+                    page_format='A4'
+                )
+
+                response = HttpResponse(pdf_content, content_type='application/pdf')
+                filename = f"FT_{invoice.number}_{student.registration_number}.pdf"
+                response['Content-Disposition'] = f'inline; filename="{filename}"'
+                
+                return response
+
             except Exception as e:
-                # O decorator @transaction.atomic fará o rollback de tudo em caso de erro
-                messages.error(request, f"Erro crítico ao registar: {str(e)}")
+                logger.error(f"Erro Crítico SOTARQ: {str(e)}")
+                messages.error(request, f"Erro Crítico no Sistema SOTARQ: {str(e)}")
+                return redirect('students:student_list')
         else:
-            messages.error(request, "Dados do formulário inválidos. Verifique os campos.")
+            messages.error(request, "Erro na validação dos dados. Verifique o formulário.")
+            return render(request, 'students/student_form.html', {'form': form})
 
     return redirect('students:student_list')
 
@@ -1038,6 +1328,39 @@ def student_edit(request, student_id):
         form = StudentInternalForm(instance=student, initial=initial_data)
 
     return render(request, 'students/student_edit.html', {'form': form, 'student': student})
+
+
+
+@login_required
+@user_passes_test(is_admin_or_director, login_url='students:student_list')
+@transaction.atomic
+def student_delete(request, pk):
+    """
+    Rigor SOTARQ: O isolamento por Schema (django-tenants) já garante 
+    que este pk pertence ao tenant atual. Não inventar campo 'tenant'.
+    """
+    # O django-tenants já aponta para o schema correto, o pk é suficiente e seguro.
+    student = get_object_or_404(Student, pk=pk)
+    user_to_delete = student.user
+    
+    try:
+        full_name = student.full_name
+        
+        # 1. Eliminar o Perfil do Estudante
+        # (Dependendo do seu CASCADE, isso pode limpar Enrollments automaticamente)
+        student.delete()
+        
+        # 2. Eliminar o Usuário de Acesso (User)
+        # Importante para não deixar lixo no schema do tenant.
+        if user_to_delete:
+            user_to_delete.delete()
+            
+        messages.success(request, f"O aluno {full_name} foi removido com sucesso do sistema.")
+    except Exception as e:
+        # O @transaction.atomic garante que se o User falhar, o Student volta.
+        messages.error(request, f"Erro Crítico ao eliminar: {str(e)}")
+        
+    return redirect('students:student_list')
 
 
 @login_required

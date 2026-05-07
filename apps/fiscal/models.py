@@ -1,8 +1,8 @@
 # apps/fiscal/models.py
-from datetime import timezone
 import logging
 from decimal import Decimal
 from django.db import models
+from django.utils import timezone  # <--- ESTE É O ÚNICO QUE DEVE TER .now(
 from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
 from apps.core.models import BaseModel
@@ -59,33 +59,39 @@ class AssinaturaDigital(BaseModel):
 # 4. Série Fiscal
 class SerieFiscal(BaseModel):
     """Controla as séries aprovadas pela AGT (Ex: FT 2026)"""
-    codigo = models.CharField(max_length=50) # Ex: FT20261
+    codigo = models.CharField(max_length=50)
     ano = models.IntegerField()
+    codigo_validacao_agt = models.CharField(max_length=50, blank=True)
     tipo_documento = models.CharField(max_length=10) # FT, FR, etc
     ultimo_numero = models.PositiveIntegerField(default=0)
     status = models.CharField(max_length=20, default='PENDING') # PENDING, ATIVA
 
     def __str__(self):
         return f"{self.codigo} ({self.ano})"
+    
+    class Meta:
+        # Garante que não existam dois registros com o mesmo TIPO, ANO e TENANT
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tipo_documento', 'ano', 'tenant'], 
+                name='unique_serie_tipo_ano_tenant'
+            )
+        ]
+        verbose_name = "Série Fiscal"
+        verbose_name_plural = "Séries Fiscais"
 
 
 class DocType(models.TextChoices):
         FT = 'FT', _('Fatura')
         FR = 'FR', _('Fatura-Recibo')
         FP = 'FP', _('Fatura Proforma')
-        ND = 'ND', _('Nota de Débito')
         NC = 'NC', _('Nota de Crédito')
         RC = 'RC', _('Recibo')
-        NL = 'NL', _('Nota de Liquidação')
-
 
 
 # 5. Documento Fiscal (A Fatura Real)
 class DocumentoFiscal(BaseModel):
-    """
-    Documento Fiscal Oficial SOTARQ.
-    Centraliza todos os tipos de documentos exigidos pela AGT.
-    """
+   
     
     class Status(models.TextChoices):
         DRAFT = 'draft', _('Rascunho')
@@ -104,7 +110,11 @@ class DocumentoFiscal(BaseModel):
         default=Status.DRAFT
     )
     
-    serie = models.CharField(max_length=20) # Ex: FT 2026/
+    # No Model DocumentoFiscal
+    serie = models.ForeignKey(SerieFiscal, on_delete=models.PROTECT, related_name='documentos')
+    serie_codigo = models.CharField(max_length=50, editable=False)
+
+
     numero = models.PositiveIntegerField()
     numero_documento = models.CharField(max_length=50, unique=True, editable=False) # Ex: FT NEWAY2026/001
     
@@ -138,31 +148,63 @@ class DocumentoFiscal(BaseModel):
     periodo_tributacao = models.CharField(max_length=7) # YYYY-MM
     usuario_criacao = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
 
+    # Campo para o OriginatingON do SAF-T
+    documento_origem = models.CharField(max_length=60, blank=True, null=True, help_text="Referência ao documento que originou este (Ex: FT SERIE/1)")
+
+
     def save(self, *args, **kwargs):
-        # Gera o Hash SHA1 obrigatório ao confirmar
-        if not self.hash_documento and self.status == self.Status.CONFIRMED:
+        # 1. RIGOR DE CACHE
+        if not self.serie_codigo:
+            self.serie_codigo = self.serie.codigo
+
+        # 2. RIGOR SOTARQ: FR confirmada no ato
+        if self.tipo_documento == DocType.FR:
+            self.status = self.Status.CONFIRMED
+
+        # 3. Lógica de Referência para Recibos
+        if self.tipo_documento == 'RC' and not self.documento_origem:
+            try:
+                from apps.finance.models import Receipt
+                receipt_comercial = Receipt.objects.filter(numero=self.numero_documento).first()
+                if receipt_comercial and receipt_comercial.payment.invoice.fiscal_doc:
+                    self.documento_origem = receipt_comercial.payment.invoice.fiscal_doc.numero_documento
+            except Exception as e:
+                print(f"Aviso SOTARQ: Erro no rastreio do RC: {e}")
+
+        # 4. GERAÇÃO DE NÚMERO E HASH
+        if not self.numero_documento and self.numero:
+            self.numero_documento = f"{self.tipo_documento} {self.serie_codigo}/{self.numero}"
+
+        if self.status == self.Status.CONFIRMED and not self.hash_documento:
             self._generate_sha1_hash()
+        
+        # 5. COMPLIANCE ATCUD
+        if not self.atcud and self.serie.codigo_validacao_agt:
+            self.atcud = f"{self.serie.codigo_validacao_agt}-{self.numero}"
             
         super().save(*args, **kwargs)
 
+    # RECUO DE EXATAMENTE 4 ESPAÇOS PARA O MÉTODO
     def _generate_sha1_hash(self):
-        """Implementação da Assinatura em Cadeia SOTARQ."""
+        """Implementação da Assinatura em Cadeia SOTARQ usando a FK."""
         last_doc = DocumentoFiscal.objects.filter(
             serie=self.serie,
-            tipo_documento=self.tipo_documento
+            tipo_documento=self.tipo_documento,
+            status=self.Status.CONFIRMED
         ).exclude(id=self.id).order_by('-numero').first()
 
         self.hash_anterior = last_doc.hash_documento if last_doc else ""
         
+        # O RIGOR ESTÁ AQUI: Alinhamento preciso
         signer = FiscalSigner()
         self.hash_documento = signer.sign(
             invoice_date=self.data_emissao,
             system_entry_date=self.created_at or timezone.now(),
             doc_number=self.numero_documento,
-            gross_total=self.valor_total,
+            gross_total=float(self.valor_total),
             previous_hash=self.hash_anterior
         )
-        self.saft_hash = self.hash_documento 
+        self.saft_hash = self.hash_documento
 
     class Meta:
         ordering = ['-data_emissao', '-numero']

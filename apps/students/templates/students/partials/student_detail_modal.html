@@ -170,12 +170,12 @@
                         Histórico de Recibos Oficiais
                     </h4>
                     <span class="text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-bold">
-                        {{ student.invoice_set.first.payments.count|default:"0" }} Documentos
+                        {{ payments|length }} Documentos
                     </span>
                 </div>
 
                 <div class="grid grid-cols-1 gap-3">
-                    {% for payment in student.invoice_set.first.payments.all %}
+                    {% for payment in payments %}
                         <div class="group flex items-center justify-between bg-white p-4 rounded-xl border-l-4 border-l-emerald-500 shadow-sm border border-slate-200 hover:shadow-md transition-all duration-200">
                             <div class="flex items-center gap-4">
                                 <div class="p-2 bg-emerald-50 rounded-lg text-emerald-700">

@@ -9,35 +9,6 @@ from xhtml2pdf import pisa
 logger = logging.getLogger(__name__)
 
 
-"""
-def generate_document_number(instance_or_model, prefix):
-    from django.db import connection
-    tenant = connection.tenant
-    tenant_slug = "".join(filter(str.isalnum, tenant.name)).upper()[:5]
-    year = datetime.datetime.now().year
-    
-    model_class = instance_or_model if isinstance(instance_or_model, type) else instance_or_model.__class__
-    search_pattern = f"{prefix} {tenant_slug}{year}/"
-
-    # RIGOR SOTARQ: Detecção dinâmica do campo de numeração
-    target_field = 'numero_documento' if hasattr(model_class, 'numero_documento') else 'number'
-    
-    filter_kwargs = {f"{target_field}__startswith": search_pattern}
-    last_doc = model_class.objects.filter(**filter_kwargs).order_by('id').last()
-
-    if not last_doc:
-        new_sequence = 1
-    else:
-        # Extração segura da sequência numérica final
-        try:
-            val = getattr(last_doc, target_field)
-            new_sequence = int(val.split('/')[-1]) + 1
-        except (ValueError, IndexError):
-            new_sequence = model_class.objects.count() + 1
-
-    return f"{search_pattern}{new_sequence:03d}"
-
-"""
 
 def generate_document_number(instance_or_model, prefix):
     import datetime
@@ -51,7 +22,7 @@ def generate_document_number(instance_or_model, prefix):
     # 2 primeiras + 3 últimas + 2 do centro (total 7 caracteres)
     if len(raw_name) >= 7:
         mid = len(raw_name) // 2
-        tenant_slug = raw_name[:2] + raw_name[-3:] + raw_name[mid-1:mid+1]
+        tenant_slug = raw_name[:1] + raw_name[-3:] + raw_name[mid-1:mid+1]
     else:
         # Fallback caso o nome seja muito curto
         tenant_slug = raw_name.ljust(7, 'X')

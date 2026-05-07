@@ -10,9 +10,10 @@
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700">
         <div>
             <h1 class="text-3xl font-black text-slate-900 dark:text-white leading-none tracking-tight">Dashboard Executivo</h1>
-            <p class="text-slate-500 dark:text-slate-400 mt-2 font-medium italic">
-                SotarShool Intelligence &bull; <span class="text-indigo-600 dark:text-indigo-400 font-bold">{{ active_unit.name }}</span>
-            </p>
+            <!--<p class="text-slate-500 dark:text-slate-400 mt-2 font-medium italic">
+                Sotarq-Shool Intelligence &bull; <span class="text-indigo-600 dark:text-indigo-400 font-bold">{{ active_unit.name }}</span>
+            </p>-->
+            
         </div>
         <div class="flex space-x-3">
             {% if user.current_role == 'ADMIN' or user.current_role == 'DIRECTOR' or user.current_role == 'DIRECT_ADMIN' %}

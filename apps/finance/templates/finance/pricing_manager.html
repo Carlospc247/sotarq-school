@@ -5,7 +5,7 @@
     
     <div class="header">
         <h1 class="text-3xl font-black text-slate-800 tracking-tighter uppercase">Gestão de Tarifário</h1>
-        <p class="text-slate-500 font-medium">Controle mestre de preços e serviços da instituição (Multi-tenant).</p>
+        <p class="text-slate-500 font-medium">Controle mestre de preços e serviços da instituição.</p>
     </div>
 
     <div class="flex justify-between items-center mb-6">
@@ -43,6 +43,60 @@
             </form>
         </div>
     </div>
+
+
+    <div class="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm mb-8">
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h3 class="text-lg font-black text-slate-800 uppercase tracking-tighter">Canais de Recebimento</h3>
+                <p class="text-slate-500 text-xs">Métodos aceitos pela tesouraria para este Tenant.</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {% for code, label in payment_types %}
+                {% if code|stringformat:"s" in activated_codes %}
+                    <div class="p-5 border-2 border-indigo-500 bg-indigo-50/30 rounded-2xl flex flex-col justify-between items-start gap-4 transition-all shadow-md shadow-indigo-100">
+                        <div class="flex justify-between w-full items-center">
+                            <span class="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{{ code }}</span>
+                            <span class="flex h-3 w-3 relative">
+                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                            </span>
+                        </div>
+                        <span class="font-black text-slate-800 text-sm">{{ label }}</span>
+                        
+                        <form method="POST" class="w-full">
+                            {% csrf_token %}
+                            <input type="hidden" name="method_code" value="{{ code }}">
+                            <input type="hidden" name="method_name" value="{{ label }}">
+                            <button type="submit" name="btn_toggle_method" class="w-full py-2 bg-red-50 text-red-600 text-[10px] font-black uppercase rounded-lg hover:bg-red-600 hover:text-white transition-all border border-red-100">
+                                Desativar Canal ×
+                            </button>
+                        </form>
+                    </div>
+                {% else %}
+                    <div class="p-5 border-2 border-slate-100 bg-slate-50 opacity-60 rounded-2xl flex flex-col justify-between items-start gap-4 transition-all hover:opacity-100">
+                        <div class="flex justify-between w-full items-center">
+                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">{{ code }}</span>
+                            <span class="h-3 w-3 rounded-full bg-slate-300"></span>
+                        </div>
+                        <span class="font-bold text-slate-400 text-sm">{{ label }}</span>
+                        
+                        <form method="POST" class="w-full">
+                            {% csrf_token %}
+                            <input type="hidden" name="method_code" value="{{ code }}">
+                            <input type="hidden" name="method_name" value="{{ label }}">
+                            <button type="submit" name="btn_toggle_method" class="w-full py-2 bg-white text-indigo-600 text-[10px] font-black uppercase rounded-lg hover:bg-indigo-600 hover:text-white transition-all border border-indigo-100 shadow-sm">
+                                Ativar Canal +
+                            </button>
+                        </form>
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {% for fee in fees %}

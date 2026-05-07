@@ -1,10 +1,12 @@
 # apps/finance/views.py
+from datetime import timedelta
 from decimal import Decimal
+from venv import logger
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db import transaction
-from django.db.models import Sum, Count
+from django.db.models import Sum, Count, Q
 from django.urls import reverse_lazy
 from django.utils import timezone
 from django.http import FileResponse, HttpResponse, HttpResponseForbidden # CORREÇÃO AQUI
@@ -18,25 +20,19 @@ from apps.finance.utils.pdf_generator import SOTARQExporter
 from apps.fiscal.models import DocumentoFiscal
 
 # Imports dos teus modelos
-from .models import BankAccount, CashSession, FeePriceHistory, FeeType, Invoice, Payment, PaymentGatewayConfig, DebtAgreement
+from .models import BankAccount, CashSession, FeePriceHistory, FeeType, Invoice, Payment, PaymentGatewayConfig, DebtAgreement, PaymentMethod, PaymentType
 from apps.students.models import Student
 from apps.academic.models import AcademicYear, Course
 # Assumindo que este serviço existe em finance/services.py
 from .services import DebtRefinancingService, PenaltyEngine 
 
-
-from django.shortcuts import render
-from django.db.models import Sum
 from django.db.models.functions import TruncDay
-from django.utils import timezone
-from datetime import timedelta
-from .models import Payment, Invoice # Assumindo que você registrará despesas também
-
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 
 
-
+from .models import Invoice, Receipt, Payment
+from apps.fiscal.models import DocType
 
 
 
@@ -65,7 +61,11 @@ def finance_dashboard(request):
 
     # --- 2. Lógica Operacional (Caixa e PDV) ---
     # Busca sessão ativa do usuário atual (Multi-tenant)
-    active_session = CashSession.objects.filter(operator=request.user, status='open').first()
+    # CORRETO (Rigor SOTARQ: Usando o campo 'user' definido no Model)
+    session = CashSession.objects.filter(user=request.user, status='open').last()
+
+    # CORRETO
+    active_session = CashSession.objects.filter(user=request.user, status='open').first()
     
     # Produtos rápidos para o balcão
     #quick_products = FeeType.objects.filter(
@@ -113,6 +113,13 @@ def pricing_manager(request):
     update_form = PriceUpdateForm()
     create_form = FeeTypeForm()
 
+    payment_methods = PaymentMethod.objects.all()
+
+    #activated_codes = [m.method_type for m in payment_methods if m.is_active]
+    
+    activated_codes = [str(m.method_type) for m in payment_methods if m.is_active]
+
+
     if request.method == 'POST':
         # --- CASO 1: CRIAR NOVO TIPO DE TAXA ---
         if 'btn_create_fee' in request.POST:
@@ -140,12 +147,36 @@ def pricing_manager(request):
                     fee.save()
                     messages.success(request, f"Tarifário de {fee.name} atualizado: {new_val} Kz.")
                 return redirect('finance:pricing_manager')
+        
+        # --- CASO 3: GESTÃO DE MÉTODOS DE PAGAMENTO (ATIVAÇÃO/DESATIVAÇÃO) ---
+        elif 'btn_toggle_method' in request.POST:
+            method_code = request.POST.get('method_code')
+            name = request.POST.get('method_name')
+            
+            # Busca o método ou cria se nunca tiver existido para este tenant
+            method, created = PaymentMethod.objects.get_or_create(
+                method_type=method_code,
+                defaults={'name': name, 'is_active': True}
+            )
+            
+            if not created:
+                # Se já existia, inverte o status atual
+                method.is_active = not method.is_active
+                method.save()
+            
+            status_msg = "ativado" if method.is_active else "desativado"
+            messages.success(request, f"Método {name} {status_msg} com sucesso.")
+            return redirect('finance:pricing_manager')
+
 
     context = {
         'fees': fees,
         'enrollment_fees': enrollment_fees, # ESSENCIAL PARA O SELECT
         'monthly_fees': monthly_fees,       # ESSENCIAL PARA O SELECT
         'history_logs': history_logs,
+        'payment_methods': payment_methods,
+        'activated_codes': activated_codes,
+        'payment_types': PaymentType.choices, # Passamos as opções do TextChoices
         'courses': courses,
         'update_form': update_form,
         'create_form': create_form,
@@ -259,7 +290,7 @@ def confirm_enrollment_view(request, student_id):
     response['Content-Disposition'] = f'inline; filename="Fatura_{invoice.number}.pdf"'
     return response
 
-
+"""
 
 def checkout_invoice(request, invoice_id):
     invoice = get_object_or_404(Invoice, id=invoice_id, student__user=request.user)
@@ -275,6 +306,185 @@ def checkout_invoice(request, invoice_id):
         'entidade': entidade,
     }
     return render(request, 'finance/checkout.html', context)
+
+
+"""
+
+from django.shortcuts import render, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.http import HttpResponse
+from .models import Invoice, PaymentGatewayConfig
+
+
+
+
+@login_required
+def checkout_invoice(request, invoice_id):
+    """
+    View unificada SOTARQ SCHOOL.
+    Resolve o erro 404 ao diferenciar busca para Staff e Alunos.
+    """
+    # 1. Busca da Fatura com Rigor de Permissão
+    if request.user.current_role in ['ADMIN', 'DIRECTOR', 'SECRETARY']:
+        # Se for staff, busca apenas pelo ID (visão total do tenant)
+        invoice = get_object_or_404(Invoice, id=invoice_id)
+    else:
+        # Se for aluno, OBRIGA que a fatura pertença ao perfil dele
+        try:
+            student = request.user.student_profile
+            invoice = get_object_or_404(Invoice, id=invoice_id, student=student)
+        except AttributeError:
+            return HttpResponseForbidden("Usuário não possui perfil de estudante.")
+
+    # 2. Configuração do Gateway
+    config = PaymentGatewayConfig.objects.first() 
+    entidade = config.mc_entity_code if config and config.mc_entity_code else "00000"
+    
+    # 3. Referência Multicaxa (9 dígitos)
+    referencia_pura = f"{invoice.id:09d}"
+    referencia_formatada = f"{referencia_pura[:3]} {referencia_pura[3:6]} {referencia_pura[6:]}"
+    
+    context = {
+        'invoice': invoice,
+        'config': config,
+        'referencia': referencia_formatada,
+        'entidade': entidade,
+    }
+    return render(request, 'finance/checkout.html', context)
+
+
+@login_required
+@transaction.atomic
+def convert_to_receipt(request, invoice_id):
+    """
+    MOTOR SOTARQ: Liquidação de Fatura (FT) gerando Recibo (RC).
+    Correção: Uso de ForeignKey 'method' em vez de string 'payment_method'.
+    """
+    # 1. Validação de Acesso
+    allowed_roles = [Role.Type.ADMIN, Role.Type.DIRECTOR, Role.Type.SECRETARY, Role.Type.ACCOUNTANT]
+    if request.user.current_role not in allowed_roles:
+        return HttpResponseForbidden("Acesso restrito à Tesouraria.")
+
+    invoice = get_object_or_404(Invoice, id=invoice_id)
+
+    # 2. Guard Clause
+    if invoice.status == 'paid':
+        messages.warning(request, f"O documento #{invoice.number} já se encontra liquidado.")
+        return redirect('finance:invoice_list')
+
+    # 3. Captura do Objeto PaymentMethod (Obrigatório conforme seu Model)
+    # Buscamos pelo ID vindo do formulário. 
+    # Se não vier no POST, buscamos o primeiro ativo como fallback de segurança.
+    method_id = request.POST.get('payment_method')
+    
+    if method_id:
+        payment_method_obj = get_object_or_404(PaymentMethod, id=method_id)
+    else:
+        payment_method_obj = PaymentMethod.objects.filter(is_active=True).first()
+        if not payment_method_obj:
+            messages.error(request, "ERRO: Nenhum Método de Pagamento configurado no sistema.")
+            return redirect('finance:invoice_list')
+
+    try:
+        # 4. Registro de Fluxo de Caixa
+        session = CashSession.objects.filter(user=request.user, status='open').last()
+        if not session:
+            messages.error(request, "ERRO: Não existe uma sessão de caixa aberta.")
+            return redirect('finance:invoice_list')
+
+        # CORREÇÃO DEFINITIVA: 
+        # Nome do campo: 'method' (conforme seu models.py)
+        # Valor: Instância do objeto 'payment_method_obj'
+        payment = Payment.objects.create(
+            invoice=invoice,
+            amount=invoice.total,
+            method=payment_method_obj, # <--- FK correta
+            validation_status='validated',
+            confirmed_by=request.user,
+            confirmed_at=timezone.now(),
+            cash_session=session,
+            reference=request.POST.get('reference', f"LIQ-{invoice.number}")
+        )
+
+        # 5. MOTOR DE ASSINATURA E GERAÇÃO DE RC
+        # Nota: O seu validate_payment já faz invoice.status = 'paid' e save()
+        receipt = payment.validate_payment(request.user)
+
+        # 6. Motor de Exportação Fiscal (PDF)
+        from apps.finance.utils.pdf_generator import SOTARQExporter
+        exporter = SOTARQExporter()
+        pdf_buffer = exporter.generate_fiscal_document(
+            instance=receipt, 
+            doc_type_code='RC', 
+            page_format='A4'
+        )
+
+        messages.success(request, f"Fatura #{invoice.number} liquidada com sucesso.")
+        
+        response = HttpResponse(pdf_buffer, content_type='application/pdf')
+        filename = f"RC_{receipt.number}_{invoice.student.registration_number}.pdf"
+        response['Content-Disposition'] = f'inline; filename="{filename}"'
+        return response
+
+    except Exception as e:
+        logger.error(f"CRÍTICO SOTARQ - Falha na liquidação (ID: {invoice_id}): {str(e)}")
+        messages.error(request, f"Falha na conversão fiscal: {str(e)}")
+        return redirect('finance:invoice_list')
+
+
+@login_required
+def student_print_invoice(request, invoice_id):
+    """
+    Gera o PDF da Fatura usando o design Enterprise do SOTARQExporter.
+    Implementa Rigor de Impressão e Segurança Multi-Tenant.
+    """
+    # 1. Busca a Fatura com rigor de Tenant (FUNDAMENTAL)
+    # Filtramos pelo tenant do usuário logado para evitar que um admin de outra escola veja esta fatura
+    invoice = get_object_or_404(Invoice, id=invoice_id)
+    
+    # 2. Verificar permissão (Secretaria, Direção ou o próprio Aluno)
+    # Adicionei o 'MANAGER' caso use esse termo no seu Role.Type
+    allowed_roles = ['ADMIN', 'DIRECTOR', 'SECRETARY', 'MANAGER']
+    is_staff = request.user.current_role in allowed_roles
+    is_owner = invoice.student.user == request.user
+
+    if not (is_staff or is_owner):
+        return HttpResponseForbidden("SOTARQ: Acesso Negado. Você não tem permissão para este documento.")
+
+    # 3. Marcar como Impressa ANTES de gerar o PDF (Garante o bloqueio de edição)
+    if not invoice.is_printed:
+        invoice.is_printed = True
+        invoice.printed_at = timezone.now()
+        invoice.printed_by = request.user
+        # Usamos save com update_fields para não disparar o erro de "bloqueio de alteração" no Signal
+        invoice.save(update_fields=['is_printed', 'printed_at', 'printed_by'])
+
+    # 4. Chamar o Exportador Unificado SOTARQ
+    from apps.finance.utils.pdf_generator import SOTARQExporter
+    
+    exporter = SOTARQExporter()
+    page_format = request.GET.get('format', 'A4')
+    
+    # Se já estava impressa antes deste acesso, marcamos como "Cópia" para AGT
+    # Se é a PRIMEIRA vez (is_printed era False), podemos considerar o original
+    is_copy = True if invoice.printed_at and (timezone.now() - invoice.printed_at).seconds > 5 else False
+
+    pdf_content = exporter.generate_fiscal_document(
+        instance=invoice, 
+        doc_type_code='FT', 
+        is_copy=is_copy,
+        page_format=page_format
+    )
+
+    # 5. Entrega do Documento
+    response = HttpResponse(pdf_content, content_type='application/pdf')
+    
+    # Nome do arquivo rigoroso
+    filename = f"FT_{invoice.number}.pdf".replace("/", "-") 
+    response['Content-Disposition'] = f'inline; filename="{filename}"'
+    
+    return response
+
 
 
 
@@ -395,39 +605,136 @@ def imprimir_documento_fiscal(request, doc_id):
     return response
 
 
-
+"""
 @login_required
 def invoice_list(request):
-    """
-    Listagem Inteligente de Faturas SOTARQ.
-    Rigor: Alunos vêm as SUAS faturas. Staff vê TUDO do Tenant.
-    """
     user = request.user
     
-    # 1. Filtro por Hierarquia de Acesso
+    # Base Queryset com isolamento Tenant
     if user.current_role in ['ADMIN', 'DIRECTOR', 'SECRETARY', 'ACCOUNTANT']:
-        # Staff vê todas as faturas da instituição atual
-        invoices = Invoice.objects.filter(student__user__tenant=user.tenant).select_related('student')
+        base_invoices = Invoice.objects.filter(student__user__tenant=user.tenant)
     else:
-        # Aluno/Encarregado vê apenas as suas
         try:
             student = user.student_profile
-            invoices = Invoice.objects.filter(student=student)
+            base_invoices = Invoice.objects.filter(student=student)
         except AttributeError:
-            invoices = Invoice.objects.none()
+            base_invoices = Invoice.objects.none()
 
-    # 2. Filtros de Interface (Opcional, mas recomendado para o rigor)
+    # Contadores para o Dashboard
+    total_unpaid = base_invoices.filter(status__in=['pending', 'overdue']).count()
+    
+    # Aplicar filtros da URL (Status, etc)
     status_filter = request.GET.get('status')
+    invoices = base_invoices
     if status_filter:
         invoices = invoices.filter(status=status_filter)
 
     context = {
         'invoices': invoices.order_by('-due_date'),
         'status_choices': Invoice.STATUS_CHOICES,
+        'total_unpaid': total_unpaid, # Injetado no contexto
     }
     
     return render(request, 'finance/invoice_list.html', context)
 
+
+"""
+###################################
+
+@login_required
+def invoice_list_view(request):
+    """
+    Gestão Unificada de FT e FR.
+    Inclui filtragem dinâmica e métricas globais de liquidez.
+    """
+    # 1. Base do Queryset (Rigor Tenant)
+    base_queryset = Invoice.objects.filter(
+        student__user__tenant=request.user.tenant,
+        doc_type__in=[DocType.FT, DocType.FR]
+    ).select_related('student', 'fiscal_doc').order_by('-issue_date')
+
+    # 2. Métricas Globais (Independente do filtro de pesquisa atual)
+    stats = base_queryset.aggregate(
+        total_ft_pending=Sum('total', filter=Q(doc_type=DocType.FT, status__in=['pending', 'overdue'])),
+        count_ft_pending=Count('id', filter=Q(doc_type=DocType.FT, status__in=['pending', 'overdue'])),
+        total_fr_paid=Sum('total', filter=Q(doc_type=DocType.FR, status='paid')),
+        count_fr_paid=Count('id', filter=Q(doc_type=DocType.FR, status='paid')),
+    )
+
+    # 3. Aplicação de Filtros de Pesquisa
+    status_filter = request.GET.get('status')
+    queryset = base_queryset
+    if status_filter:
+        queryset = queryset.filter(status=status_filter)
+
+    return render(request, 'finance/invoice_list.html', {
+        'invoices': queryset,
+        'stats': stats,
+        'status_choices': Invoice.STATUS_CHOICES,
+        'title': 'Conta Corrente Académica'
+    })
+
+
+@login_required
+def receipt_list_view(request):
+    """Histórico de Recibos (RC) e Fluxo de Caixa Realizado."""
+    queryset = Receipt.objects.filter(
+        payment__invoice__student__user__tenant=request.user.tenant
+    ).select_related('payment__invoice__student').order_by('-issue_date')
+
+    stats = queryset.aggregate(
+        total_rc=Sum('amount_paid'),
+        count_rc=Count('id')
+    )
+
+    return render(request, 'finance/receipt_list.html', {
+        'receipts': queryset,
+        'stats': stats,
+        'title': 'Recibos (RC)'
+    })
+
+@login_required
+def credit_note_list_view(request):
+    """Lista as Notas de Crédito (NC) com contagem rigorosa."""
+    queryset = Invoice.objects.filter(
+        student__user__tenant=request.user.tenant,
+        doc_type=DocType.NC
+    ).select_related('student', 'fiscal_doc').order_by('-issue_date')
+
+    stats = queryset.aggregate(
+        total_nc=Sum('total'),
+        count_nc=Count('id')
+    )
+
+    return render(request, 'finance/credit_note_list.html', {
+        'notes': queryset,
+        'stats': stats,
+        'title': 'Notas de Crédito'
+    })
+
+"""
+@login_required
+def credit_note_list_view(request):
+    
+    queryset = Invoice.objects.filter(
+        student__user__tenant=request.user.tenant,
+        doc_type=DocType.NC
+    ).select_related('student', 'fiscal_doc').order_by('-issue_date')
+
+    stats = queryset.aggregate(
+        total_nc=Sum('total'),
+        count_nc=Count('id')
+    )
+
+    return render(request, 'finance/credit_note_list.html', {
+        'notes': queryset,
+        'stats': stats,
+        'title': 'Notas de Crédito'
+    })
+
+"""
+
+###############################
 @login_required
 def invoice_detail(request, invoice_id):
     """
@@ -450,7 +757,7 @@ def invoice_detail(request, invoice_id):
         'multa': multa,
         'juros': juros,
         'total_atualizado': total_atualizado,
-        'is_staff': request.user.current_role in ['ADMIN', 'DIRECTOR', 'SECRETARY', 'ACCOUNTANT'],
+        'is_staff_tenant': request.user.current_role in ['ADMIN', 'DIRECTOR', 'SECRETARY', 'ACCOUNTANT'],
     }
     
     return render(request, 'finance/invoice_detail.html', context)

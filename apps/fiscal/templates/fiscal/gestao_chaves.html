@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="p-8 bg-slate-50 min-h-screen">
+    <div class="flex items-center gap-4 mb-8">
+        <a href="{% url 'fiscal:fiscal_audit_log' %}" class="text-slate-400 hover:text-slate-900 transition-colors">
+            <i class="fas fa-arrow-left"></i> Voltar ao Painel Fiscal
+        </a>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="bg-white p-6 rounded-[2rem] shadow-sm border-b-4 {% if assinatura %}border-green-500{% else %}border-red-500{% endif %}">
+            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Assinatura Digital</p>
+            <h3 class="text-xl font-black text-slate-800">
+                {% if assinatura %}ATIVA <i class="fas fa-check-circle text-green-500 text-xs"></i>{% else %}AUSENTE <i class="fas fa-times-circle text-red-500 text-xs"></i>{% endif %}
+            </h3>
+            <p class="text-[9px] text-slate-400 font-mono mt-1">ID: {{ assinatura.id|default:"---" }}</p>
+        </div>
+
+        <div class="md:col-span-2 bg-amber-50 border border-amber-100 p-6 rounded-[2rem] flex items-start gap-4">
+            <i class="fas fa-exclamation-triangle text-amber-500 mt-1"></i>
+            <div>
+                <p class="text-xs font-bold text-amber-900 uppercase tracking-tight">Protocolo de Segurança RSA</p>
+                <p class="text-[11px] text-amber-800 leading-relaxed mt-1">
+                    A geração de uma nova chave invalida a identidade digital anterior para novos documentos. 
+                    Certifique-se de que a escola possui autorização da AGT para esta alteração caso já esteja em produção.
+                </p>
+
+                
+            </div>
+            <p class="mt-4 text-[11px] text-black-700 italic border-l-2 border-black-200 pl-4 py-1">
+                <span class="text-red-500">***</span> Nota de Compliance: Apenas usuários com perfil <strong>ADMIN</strong> possuem autorização para executar as ações acima. Caso contrário, o acesso será negado pelo sistema de integridade SOTARQ.<span class="text-red-500">***</span>
+            </p>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-[2.5rem] shadow-xl overflow-hidden border border-slate-100 mb-8 p-8">
+        <div class="flex flex-col md:flex-row justify-between items-center gap-6">
+            <div class="text-center md:text-left">
+                <h2 class="font-black text-slate-800 uppercase italic tracking-tighter text-2xl">Gestão de Chaves</h2>
+                <p class="text-xs text-slate-400">Certificado Software: {{ certificate }}</p>
+            </div>
+            
+            <div class="flex flex-wrap gap-4 justify-center">
+                <form method="POST" action="{% url 'fiscal:gerar_nova_chave' %}" onsubmit="return confirm('ATENÇÃO: Isso mudará a assinatura digital da escola. Confirmar geração?');">
+                    {% csrf_token %}
+                    <button type="submit" class="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-200">
+                        Gerar Novo Par RSA
+                    </button>
+                </form>
+
+                {% if assinatura %}
+                <a href="{% url 'fiscal:baixar_chave_publica' assinatura.pk %}" class="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-black transition-all shadow-lg shadow-slate-200">
+                    <i class="fas fa-download mr-2"></i> Baixar Pública (.TXT)
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-[2.5rem] shadow-sm overflow-hidden border border-slate-100">
+        <div class="p-6 bg-slate-50/50 border-b border-slate-100">
+            <h2 class="font-black text-slate-800 uppercase italic text-sm tracking-widest">Histórico de Auditoria RSA</h2>
+        </div>
+        <table class="w-full text-left">
+            <thead>
+                <tr class="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white">
+                    <th class="px-6 py-4">Data de Geração</th>
+                    <th class="px-6 py-4">Status</th>
+                    <th class="px-6 py-4">Download</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-50">
+                {% for key in historico %}
+                <tr class="text-xs">
+                    <td class="px-6 py-4 font-mono">{{ key.created_at|date:"d/m/Y H:i:s" }}</td>
+                    <td class="px-6 py-4">
+                        {% if key.ativa %}
+                            <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full font-black text-[9px] uppercase">Em Uso</span>
+                        {% else %}
+                            <span class="bg-slate-100 text-slate-400 px-3 py-1 rounded-full font-black text-[9px] uppercase">Inativa</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4">
+                        <a href="{% url 'fiscal:baixar_chave_publica' key.pk %}" class="text-blue-500 hover:underline font-bold">Pública (.txt)</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="3" class="px-6 py-8 text-center text-slate-400 italic">Nenhuma chave gerada para este tenant.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

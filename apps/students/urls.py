@@ -32,6 +32,8 @@ urlpatterns = [
     path('validate/report-cards/<int:class_id>/', views.director_validate_grades, name='validate_grades'),
     path('enrollment/process/<int:student_id>/', views.process_enrollment, name='process_enrollment'),
     path('block/debtors/', views.block_debtors, name='block_debtors'),
+
+    path('delete/<int:pk>/', views.student_delete, name='student_delete'),
     
     # --- ROTA PÚBLICA (APENAS MATRÍCULA NOVA) ---
     path('enrollment/public/', views_public.public_enrollment_form, name='public_enrollment'),

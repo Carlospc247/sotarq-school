@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="p-6 bg-slate-50 min-h-screen">
+    <h1 class="text-2xl font-bold mb-6">Controle de Recibos (RC)</h1>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 max-w-2xl">
+        <div class="bg-white p-6 rounded-xl shadow-sm border-l-4 border-emerald-600">
+            <p class="text-xs text-slate-500 font-bold uppercase">Recibos Processados</p>
+            <p class="text-3xl font-black text-slate-800">{{ stats.count_rc|default:0 }}</p>
+        </div>
+        <div class="bg-white p-6 rounded-xl shadow-sm border-l-4 border-emerald-500">
+            <p class="text-xs text-slate-500 font-bold uppercase">Total em Caixa (Kz)</p>
+            <p class="text-3xl font-black text-emerald-600">{{ stats.total_rc|default:0 }} Kz</p>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
+        <table class="w-full text-left">
+            <thead class="bg-slate-50 text-slate-500 text-xs uppercase font-bold">
+                <tr>
+                    <th class="px-6 py-4">Nº Recibo</th>
+                    <th class="px-6 py-4">Data</th>
+                    <th class="px-6 py-4">Referente a</th>
+                    <th class="px-6 py-4">Valor</th>
+                    <th class="px-6 py-4">Hash AGT</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for rc in receipts %}
+                <tr class="hover:bg-slate-50">
+                    <td class="px-6 py-4 font-bold text-emerald-700">{{ rc.number }}</td>
+                    <td class="px-6 py-4 text-sm">{{ rc.issue_date|date:"d/m/Y H:i" }}</td>
+                    <td class="px-6 py-4 text-sm">{{ rc.payment.invoice.student.full_name }}</td>
+                    <td class="px-6 py-4 font-black">{{ rc.amount_paid }} Kz</td>
+                    <td class="px-6 py-4 font-mono text-[10px] text-slate-400">{{ rc.hash_control|truncatechars:12 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

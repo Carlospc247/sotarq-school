@@ -118,7 +118,7 @@ class SAFTGenerator:
         
         # Filtro rigoroso conforme sua app fiscal
         docs = DocumentoFiscal.objects.filter(
-            tipo_documento__in=['FT', 'FR', 'NC', 'VD', 'ND', 'RC'], 
+            tipo_documento__in=['FT', 'FR', 'NC', 'RC'], 
             **self.filters
         ).select_related('cliente', 'usuario_criacao')
         
@@ -171,13 +171,26 @@ class SAFTGenerator:
             for linha in doc.linhas.all().order_by('numero_linha'):
                 ln = etree.SubElement(inv, "Line")
                 self._add(ln, "LineNumber", str(linha.numero_linha))
+
+                # RIGOR AGT: OriginatingON (Referência ao Documento Pai)
+                # Se for RC (Recibo) ou NC/ND, precisamos indicar a fatura de origem
+                # Usamos o campo 'documento_origem' que adicionamos ao Model DocumentoFiscal
+                if doc.tipo_documento in ['RC', 'NC', 'ND'] and doc.documento_origem:
+                    self._add(ln, "OriginatingON", doc.documento_origem)
+
+
                 self._add(ln, "ProductCode", "SERV")
                 self._add(ln, "ProductDescription", linha.descricao)
                 self._add(ln, "Quantity", f"{linha.quantidade:.2f}")
                 self._add(ln, "UnitOfMeasure", "UN")
                 self._add(ln, "UnitPrice", f"{linha.preco_unitario:.2f}")
                 self._add(ln, "TaxPointDate", doc.data_emissao.strftime("%Y-%m-%d"))
-                self._add(ln, "Description", linha.descricao)
+
+                # RIGOR: Apenas uma tag Description com a referência injetada
+                desc_final = linha.descricao
+                if doc.documento_origem:
+                    desc_final += f" (REF: {doc.documento_origem})"
+                self._add(ln, "Description", desc_final)
                 
                 amount_str = f"{linha.valor_total_linha:.2f}"
                 if doc.tipo_documento in ['NC', 'ND']:
@@ -202,3 +215,12 @@ class SAFTGenerator:
             self._add(totals, "TaxPayable", f"{doc.valor_iva:.2f}")
             self._add(totals, "NetTotal", f"{doc.valor_base:.2f}")
             self._add(totals, "GrossTotal", f"{doc.valor_total:.2f}")
+
+        def _add(self, parent, tag, text):
+            """Helper para adicionar elementos de forma limpa"""
+            element = etree.SubElement(parent, tag)
+            element.text = str(text) if text is not None else ""
+            return element
+    
+
+

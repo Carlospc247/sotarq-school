@@ -1,5 +1,5 @@
 # apps/finance/views_management.py
-from datetime import timezone
+from django.utils import timezone  # <--- ESTE É O ÚNICO QUE DEVE TER .now(
 from django.http import HttpResponseForbidden
 from django.shortcuts import render
 from django.utils.decorators import login_required

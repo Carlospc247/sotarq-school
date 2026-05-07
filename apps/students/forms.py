@@ -2,6 +2,7 @@
 from django import forms
 
 from apps.core.models import User
+from apps.finance.models import PaymentMethod
 from .models import EnrollmentRequest, Student
 from apps.academic.models import Class, Course, GradeLevel
 from django.core.validators import FileExtensionValidator
@@ -58,22 +59,40 @@ class StudentInternalForm(forms.ModelForm):
 
     # --- CAMPOS DO ENCARREGADO (PARA A VIEW) ---
     guardian_name = forms.CharField(
-        max_length=255, required=True, label="Nome do Encarregado",
+        max_length=255, #required=True,
+        label="Nome do Encarregado",
         widget=forms.TextInput(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm', 'placeholder': 'Nome completo'})
     )
     guardian_phone = forms.CharField(
-        max_length=20, required=True, label="Telefone do Encarregado",
+        max_length=20, #required=True,
+        label="Telefone do Encarregado", # se quiser que seja obrigatorio use required=True,
         widget=forms.TextInput(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm'})
     )
     guardian_email = forms.EmailField(
-        required=True, label="Email do Encarregado",
+        #required=True,
+        label="Email do Encarregado",
         widget=forms.EmailInput(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm'})
     )
     relationship = forms.ChoiceField(
         choices=StudentGuardian.RELATIONSHIP_CHOICES,
         label="Parentesco",
-        required=True,
+        #required=True,
         widget=forms.Select(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm bg-white'})
+    )
+    payment_method = forms.ModelChoiceField(
+        queryset=PaymentMethod.objects.filter(is_active=True),
+        label="Método de Pagamento",
+        required=True,
+        empty_label="Selecione o Método",
+        widget=forms.Select(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm bg-white'})
+    )
+    
+    # Se o método exigir prova (conforme seu model PaymentMethod), 
+    # podemos adicionar o campo de arquivo opcional aqui
+    proof_file = forms.FileField(
+        required=False,
+        label="Comprovativo (Opcional)",
+        widget=forms.FileInput(attrs={'class': 'w-full p-3 border border-slate-300 rounded-lg text-sm'})
     )
 
     # --- DOCUMENTOS ---

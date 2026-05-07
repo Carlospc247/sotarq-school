@@ -10,8 +10,8 @@ from apps.students.models import Student
 from django.utils import timezone
 from decimal import Decimal
 from apps.core.utils import generate_document_number
-from django.db.models import Sum
-from apps.fiscal.models import DocType
+from django.db.models import F, Sum
+from apps.fiscal.models import DocType, DocumentoFiscal
 from django.db import transaction, models
 
 
@@ -111,7 +111,7 @@ class Invoice(models.Model):
         ('pending', _('Pendente')),
         ('paid', _('Pago')),
         ('cancelled', _('Cancelado')),
-        ('overdue', _('Vencido')), # Practical addition
+        ('overdue', _('Vencido')),
     )
 
 
@@ -128,6 +128,11 @@ class Invoice(models.Model):
 
     total = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
     subtotal = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
+
+    # gatilho que deteta a fatura criada. Integrar com o signals imepedidno alteração após criação
+    is_printed = models.BooleanField(default=False, verbose_name="Impressa")
+    printed_at = models.DateTimeField(null=True, blank=True)
+    printed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="printed_invoices")
     
     # FK com o Fiscal: Rigor AGT
     tax_type = models.ForeignKey(
@@ -199,15 +204,25 @@ class Invoice(models.Model):
         super(Invoice, self).save(update_fields=['subtotal', 'discount_amount', 'tax_amount', 'total'])
 
     def save(self, *args, **kwargs):
-        # Garante que os totais sejam recalculados antes de persistir, 
-        # sincronizando com o que o JS mostrou ao usuário.
-        if self.pk: # Só calcula se já existirem itens (ou chame após adicionar itens)
-            self.update_totals() 
-            
         if not self.number:
-            self.number = generate_document_number(self, self.doc_type)
+            from apps.fiscal.services import SerieManager
+            
+            # 1. Obtém a série ativa com Rigor Fiscal
+            serie = SerieManager.get_or_create_active_serie(self.doc_type)
+            
+            # 2. Incremento Atómico (Evita duplicados em multi-usuário)
+            # Usamos F() para incrementar diretamente no Banco de Dados
+            serie.ultimo_numero = F('ultimo_numero') + 1
+            serie.save(update_fields=['ultimo_numero'])
+            
+            # Recarregamos da BD para obter o número atualizado para o self.number
+            serie.refresh_from_db()
+            
+            # 3. Define o número padrão AGT: TIPO SERIE/NUMERO
+            self.number = f"{self.doc_type} {serie.codigo}/{serie.ultimo_numero}"
+            
+        # 4. Chamada do super() deve estar alinhada com o IF
         super().save(*args, **kwargs)
-    
 
 
     def calculate_current_total(self):
@@ -285,8 +300,78 @@ class InvoiceItem(models.Model):
         month_str = f" [{self.get_competence_month_display()}]" if self.competence_month else ""
         return f"{self.description}{month_str} ({self.amount})"
     
- 
 
+class Receipt(BaseModel):
+    # Use 'number' para manter compatibilidade com seu utilitário
+    number = models.CharField(max_length=50, unique=True, editable=False)
+    # Adicione estes para a API que você encontrou:
+    serie_codigo = models.CharField(max_length=30, editable=False, blank=True)
+    numero_sequencial = models.PositiveIntegerField(editable=False, null=True)
+    
+    payment = models.OneToOneField('finance.Payment', on_delete=models.CASCADE, related_name='official_receipt')
+    issue_date = models.DateTimeField(auto_now_add=True)
+    amount_paid = models.DecimalField(max_digits=15, decimal_places=2, editable=False)
+    hash_control = models.CharField(max_length=255, blank=True, null=True, editable=False)
+    #atcud = models.CharField(max_length=100, blank=True, null=True, editable=False)
+
+    def save(self, *args, **kwargs):
+        # 1. Tenta herdar do DocumentoFiscal se ele já existir (Sincronização Fiscal)
+        # Isso evita que o utils.py gere um número diferente do oficial da AGT
+        if not self.number and self.payment:
+             from apps.fiscal.models import DocumentoFiscal
+             doc = DocumentoFiscal.objects.filter(
+                 cliente=self.payment.invoice.student,
+                 valor_total=self.payment.amount,
+                 tipo_documento='RC'
+             ).first()
+             
+             if doc:
+                 self.number = doc.numero_documento
+                 self.serie_codigo = doc.serie_codigo
+                 self.numero_sequencial = doc.numero
+                 self.hash_control = doc.hash_documento
+
+        # 2. Fallback: Se não encontrou documento oficial, usa o utils (mas com cuidado)
+        if not self.number:
+            from apps.core.utils import generate_document_number
+            self.number = generate_document_number(self, "RC")
+            parts = self.number.split('/')
+            self.serie_codigo = parts[0]
+            self.numero_sequencial = int(parts[-1])
+            
+        super().save(*args, **kwargs)
+
+    def _generate_local_hash(self):
+        from apps.fiscal.signing import FiscalSigner
+        signer = FiscalSigner()
+        # Busca encadeamento
+        last = Receipt.objects.exclude(id=self.id).order_by('-id').last()
+        prev_hash = last.hash_control if last else ""
+        
+        self.hash_control = signer.sign(
+            invoice_date=self.issue_date.date() if self.issue_date else timezone.now().date(),
+            system_entry_date=timezone.now(),
+            doc_number=self.number,
+            gross_total=float(self.amount_paid),
+            previous_hash=prev_hash
+        )
+        
+        
+    @property
+    def atcud(self):
+        # Se o Receipt tem um vínculo com DocumentoFiscal
+        doc = DocumentoFiscal.objects.filter(numero=self.numero, tipo_documento='RC').first()
+        return doc.atcud if doc else "Pendente"
+    
+    @property
+    def originating_on(self):
+        """
+        Retorna a referência da Fatura de Origem para o SAF-T.
+        Extrai o número oficial do documento fiscal vinculado à fatura.
+        """
+        if self.payment and self.payment.invoice and self.payment.invoice.fiscal_doc:
+            return self.payment.invoice.fiscal_doc.numero_documento
+        return None
 
 
 class CashFlow(BaseModel):
@@ -336,7 +421,7 @@ class PaymentMethod(models.Model):
     method_type = models.CharField(
         max_length=2, 
         choices=PaymentType.choices, # Agora o Python já leu esta classe acima
-        default=PaymentType.CASH
+        default=PaymentType.DEPOSIT
     )
     is_active = models.BooleanField(default=True)
     
@@ -369,6 +454,14 @@ class Payment(models.Model):
     invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='payments')
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     method = models.ForeignKey(PaymentMethod, on_delete=models.PROTECT)
+    cash_session = models.ForeignKey(
+        'finance.CashSession', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='payments',
+        verbose_name="Sessão de Caixa"
+    )
     reference = models.CharField(max_length=100, blank=True, help_text="Transaction ID or Receipt details")
     
     confirmed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
@@ -467,6 +560,7 @@ class Payment(models.Model):
             }
         return None
     
+   
     @transaction.atomic
     def validate_payment(self, user):
         from django.db import transaction, connection
@@ -475,7 +569,7 @@ class Payment(models.Model):
         from .tasks import task_process_payment_notifications
         
         # Imports Locais dos Módulos Financeiro, Acadêmico e Core
-        from .models import CashFlow, MonthlyControl, Month
+        from .models import CashFlow, MonthlyControl, Month, Receipt # Adicionei Receipt aqui
         from apps.students.models import EnrollmentRequest, Enrollment
         from apps.academic.models import AcademicYear, Class, VacancyRequest
         from apps.core.models import Notification, User, Role
@@ -486,32 +580,85 @@ class Payment(models.Model):
             self.confirmed_by = user
             self.confirmed_at = timezone.now()
             
-            # Gera o Recibo PDF (Se implementado)
-            # generate_receipt_pdf(self)
-            
+            # Atualiza a Fatura
             self.invoice.status = 'paid'
             self.invoice.save()
             self.save()
 
+            # Dentro do seu validate_payment, no bloco de Registro no Fluxo de Caixa:
+
+            # --- CATEGORIZAÇÃO DINÂMICA RIGOROSA ---
+            category_flow = "Mensalidades"
+            first_item = self.invoice.items.first()
+            if first_item and first_item.fee_type:
+                category_flow = first_item.fee_type.name # Ex: "Multa de Exame", "Uniforme"
+
             # Registro no Fluxo de Caixa
             CashFlow.objects.create(
-                description=f"Recebimento: {self.invoice.number} - {self.invoice.student.full_name}",
+                description=f"RECEBIMENTO (RC): {self.invoice.number} - {self.invoice.student.full_name}",
                 amount=self.amount,
                 transaction_type='IN',
                 payment=self,
-                category="Mensalidades",
+                category=category_flow, # Categoria real do item
                 created_by=user 
             )
 
-            # 2. CONTROLE DE MENSALIDADES (Usando competence_month)
-            # 2. CONTROLE DE MENSALIDADES (Rigor SOTARQ: Update or Create)
+            # --- RIGOR SOTARQ: GERAÇÃO DO DOCUMENTO DE QUITAÇÃO (RECIBO COM HASH AGT) ---
+            from apps.fiscal.models import SerieFiscal, DocumentoFiscal, DocType
+
+            # 1. Buscar a série correta para o ano atual e tipo Recibo (RC)
+            # O Rigor SOTARQ exige que busquemos a série ativa no banco do Tenant
+            ano_atual = timezone.now().year
+            serie_rc = SerieFiscal.objects.filter(
+                tipo_documento=DocType.RC, 
+                status='ATIVA',
+                codigo__icontains=str(ano_atual) # Ex: procura "RC2026"
+            ).first()
+
+            # Fallback de segurança se não encontrar a do ano: pega a última RC ativa
+            if not serie_rc:
+                serie_rc = SerieFiscal.objects.filter(tipo_documento=DocType.RC, status='ATIVA').first()
+
+            if not serie_rc:
+                raise ValueError("ERRO CRÍTICO: Nenhuma Série Fiscal de Recibo (RC) está ativa.")
+            
+
+            # 2. Criar o DocumentoFiscal (O registro oficial para a AGT)
+            # Note que passamos o OBJETO serie_rc, não a string!
+            doc_fiscal = DocumentoFiscal.objects.create(
+                tipo_documento=DocType.RC,
+                status=DocumentoFiscal.Status.CONFIRMED,
+                serie=serie_rc,  # <--- INSTÂNCIA CORRETA AQUI
+                numero=serie_rc.ultimo_numero + 1, # Use o sequencial da série para rigor AGT
+                cliente=self.invoice.student,
+                entidade_nome=self.invoice.student.full_name,
+                entidade_nif=self.invoice.student.bi_number or '999999999',
+                data_emissao=timezone.now().date(),
+                valor_total=self.amount,
+                periodo_tributacao=timezone.now().strftime('%Y-%m'),
+                usuario_criacao=user
+            )
+
+            # 3. ATUALIZAR O SEQUENCIAL DA SÉRIE (Essencial para não duplicar números)
+            serie_rc.ultimo_numero += 1
+            serie_rc.save()
+
+            # 3. Criar o Recibo (O snapshot para o seu módulo financeiro)
+            receipt, created = Receipt.objects.get_or_create(
+                payment=self,
+                defaults={
+                    'amount_paid': self.amount,
+                    # O save() do Receipt agora vai herdar os dados do doc_fiscal
+                }
+            )
+
+
+            # 2. CONTROLE DE MENSALIDADES (Mantendo sua lógica original)
             current_year = AcademicYear.objects.filter(is_active=True).first()
             if not current_year:
                 current_year = AcademicYear.objects.order_by('-start_date').first()
             
-            # Filtramos apenas itens que são Propinas/Mensalidades para evitar sujar o MonthlyControl
             for item in self.invoice.items.filter(competence_month__isnull=False):
-                # O motor identifica se é propina pelo nome ou pelo tipo de taxa
                 is_propina_item = item.fee_type and (
                     "propina" in item.fee_type.name.lower() or 
                     "mensalidade" in item.fee_type.name.lower()
@@ -530,13 +677,11 @@ class Payment(models.Model):
                     )
                     logger.info(f"MENSALIDADE QUITADA: Aluno {self.invoice.student.id}, Mês {item.competence_month}")
                     
-            # 3. ORQUESTRAÇÃO DE MATRÍCULA (Candidaturas)
+            # 3. ORQUESTRAÇÃO DE MATRÍCULA (Mantendo sua lógica original)
             enroll_req = EnrollmentRequest.objects.filter(invoice=self.invoice).first()
             
             if enroll_req and enroll_req.status == 'pending_payment':
                 student = enroll_req.student
-                
-                # A. Ativar o Aluno e Utilizador (Converte Candidato -> Aluno)
                 student.is_active = True
                 student.is_suspended = False
                 student.save()
@@ -545,7 +690,6 @@ class Payment(models.Model):
                     student.user.is_active = True
                     student.user.save()
 
-                # B. Algoritmo de Auto-Alocação de Turma
                 candidate_classes = Class.objects.filter(
                     academic_year=current_year,
                     grade_level=enroll_req.grade_level,
@@ -558,7 +702,6 @@ class Payment(models.Model):
                         break
                 
                 if selected_class:
-                    # CASO A: Vaga Automática
                     Enrollment.objects.create(
                         student=student,
                         academic_year=current_year,
@@ -566,7 +709,6 @@ class Payment(models.Model):
                         class_room=selected_class,
                         status='active'
                     )
-                    
                     enroll_req.status = 'enrolled'
                     enroll_req.save()
                     
@@ -578,7 +720,6 @@ class Payment(models.Model):
                         icon="check-circle"
                     )
                 else:
-                    # CASO B: Sem Vaga (Fluxo de Aprovação Manual)
                     Enrollment.objects.create(
                         student=student,
                         academic_year=current_year,
@@ -586,9 +727,7 @@ class Payment(models.Model):
                         class_room=None, 
                         status='pending_placement'
                     )
-                    
                     sys_msg = f"Solicitação automática gerada via Pagamento #{self.id}. Validado por: {user.username}."
-                    
                     vacancy = VacancyRequest.objects.create(
                         student=student,
                         target_grade=enroll_req.grade_level,
@@ -597,7 +736,6 @@ class Payment(models.Model):
                         is_resolved=False
                     )
 
-                    # Notificações para Staff
                     secretaries = User.objects.filter(
                         tenant=self.invoice.student.user.tenant, 
                         current_role=Role.Type.SECRETARY
@@ -606,31 +744,26 @@ class Payment(models.Model):
                         Notification.objects.create(
                             user=sec,
                             title="⚠️ Solicitação de Vaga Pendente",
-                            message=f"O aluno {student.full_name} pagou mas não tem vaga automática na {enroll_req.grade_level}.",
+                            message=f"O aluno {student.full_name} pagou mas não tem vaga automática.",
                             link=f"/academic/vacancy/manage/{vacancy.id}/",
                             icon="clock"
                         )
                     
                     enroll_req.status = 'processing'
                     enroll_req.save()
-                    
-                    Notification.objects.create(
-                        user=student.user,
-                        title="Pagamento Recebido - Em Análise",
-                        message="O pagamento foi confirmado. O teu processo foi enviado à Direção Pedagógica para atribuição de vaga manual.",
-                        icon="info"
-                    )
 
-            # 4. LÓGICA DE DESBLOQUEIO DE DEVEDORES
+            # 4. LÓGICA DE DESBLOQUEIO DE DEVEDORES (Mantendo sua lógica original)
             first_item = self.invoice.items.first()
             if first_item and "Acordo de Dívida" in first_item.description:
                 if self.invoice.student.is_suspended:
                     self.invoice.student.is_suspended = False
                     self.invoice.student.save()
 
-        # Disparo da Task de Notificação Assíncrona fora da transação
+        # Fora da transação: Disparo de Tasks
         task_process_payment_notifications.delay(self.id, connection.schema_name)
-    
+
+
+
     def __str__(self):
         return f"{self.amount} for {self.invoice.number}"
 

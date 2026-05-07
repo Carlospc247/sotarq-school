@@ -1,0 +1,1 @@
+python manage.py tenant_command shell -c "from apps.fiscal.models import SerieFiscal; SerieFiscal.objects.all().delete(); print('Séries limpas em todos os tenants')" 

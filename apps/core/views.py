@@ -363,7 +363,7 @@ def user_add(request):
                     if password:
                         user.set_password(password)
                     else:
-                        user.set_password('Sotarq.123') # Senha padrão se vazia
+                        user.set_password('Sotarq.Mudar123') # Senha padrão se vazia
                     
                     user.save()
 

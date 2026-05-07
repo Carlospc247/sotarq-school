@@ -14,10 +14,16 @@ urlpatterns = [
     path('config/update/', views.update_config, name='update_config'),
     
     # [Sugestão] Visualização de Documentos Assinados RSA
-    path('documents/audit/', views.fiscal_audit_log, name='fiscal_audit_log'),
+    #path('documents/audit/', views.fiscal_audit_log, name='fiscal_audit_log'),
 
     
-    # Motor de Impressão Dual (Chama o SOTARQExporter v2.5)
+    path('gestao-chaves/', views.gestao_chaves_rsa, name='gestao_chaves_rsa'),
+    path('gestao-chaves/gerar/', views.gerar_nova_chave_action, name='gerar_nova_chave'),
+    path('gestao-chaves/baixar-publica/<int:pk>/', views.baixar_chave_publica, name='baixar_chave_publica'),
+
+    path('series/', views.gestao_series_fiscal, name='gestao_series'),
+    path('series/gerar/', views.gerar_series_fiscal, name='gerar_series'),
+
     # Ex: /fiscal/imprimir/45/?format=80mm
     path('imprimir/<int:doc_id>/', views.imprimir_documento_fiscal, name='imprimir_documento_fiscal'),
 

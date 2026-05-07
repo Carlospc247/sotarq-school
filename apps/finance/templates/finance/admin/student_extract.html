@@ -42,8 +42,9 @@
                             <th class="px-4 py-3">Descrição</th>
                             <th class="px-4 py-3">Valor</th>
                             <th class="px-4 py-3">Estado</th>
-                        </tr>
+                            <th class="px-4 py-3 text-right">Ação</th> </tr>
                     </thead>
+
                     <tbody class="divide-y divide-slate-100 text-sm">
                         {% for invoice in invoices %}
                         <tr class="hover:bg-slate-50 transition-colors">
@@ -58,9 +59,25 @@
                                     {{ invoice.get_status_display }}
                                 </span>
                             </td>
+                            <td class="px-4 py-3 text-right">
+                                {% if invoice.status != 'paid' and invoice.status != 'cancelled' %}
+                                    {% if user.current_role in 'ADMIN,DIRECTOR,SECRETARY,ACCOUNTANT' %}
+                                        <a href="{% url 'finance:convert_to_receipt' invoice.id %}" 
+                                        onclick="return confirm('Confirmar liquidação imediata da fatura #{{ invoice.number }}?')"
+                                        class="bg-emerald-600 text-white px-3 py-1 rounded text-[10px] font-bold hover:bg-emerald-700 transition">
+                                            LIQUIDAR (RC)
+                                        </a>
+                                    {% else %}
+                                        <a href="{% url 'finance:checkout' invoice.id %}" 
+                                        class="bg-brand-600 text-white px-3 py-1 rounded text-[10px] font-bold hover:bg-brand-700 transition">
+                                            PAGAR
+                                        </a>
+                                    {% endif %}
+                                {% elif invoice.status == 'paid' %}
+                                    <span class="text-emerald-500"><i data-feather="check" class="w-4 h-4 inline"></i></span>
+                                {% endif %}
+                            </td>
                         </tr>
-                        {% empty %}
-                        <tr><td colspan="4" class="px-4 py-8 text-center text-slate-400">Nenhuma fatura encontrada.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>

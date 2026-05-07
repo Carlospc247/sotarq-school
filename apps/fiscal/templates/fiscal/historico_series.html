@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="p-8 bg-slate-50 min-h-screen">
+    <div class="mb-8 flex justify-between items-end">
+        <div>
+            <h1 class="text-2xl font-black text-slate-800 uppercase italic tracking-tighter">
+                <i class="fas fa-history mr-2 text-indigo-600"></i> Histórico de Séries
+            </h1>
+            <p class="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Arquivo Digital de Conformidade AGT</p>
+        </div>
+        
+        <div class="flex gap-4">
+            <div class="bg-white border border-slate-200 px-4 py-2 rounded-2xl shadow-sm">
+                <p class="text-[9px] text-slate-400 font-black uppercase">Séries Ativas</p>
+                <p class="text-lg font-black text-green-600">{{ total_ativas }}</p>
+            </div>
+            <div class="bg-white border border-slate-200 px-4 py-2 rounded-2xl shadow-sm">
+                <p class="text-[9px] text-slate-400 font-black uppercase">Pendentes</p>
+                <p class="text-lg font-black text-amber-600">{{ pendentes }}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden">
+        <table class="w-full text-left">
+            <thead>
+                <tr class="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50/50 border-b border-slate-100">
+                    <th class="px-8 py-5">Série Fiscal</th>
+                    <th class="px-6 py-5">Ano Ref.</th>
+                    <th class="px-6 py-5">Tipo Doc.</th>
+                    <th class="px-6 py-5">Cód. Validação AGT</th>
+                    <th class="px-6 py-5">Último Nº</th>
+                    <th class="px-6 py-5">Status Legal</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-50">
+                {% for h in historico %}
+                <tr class="hover:bg-slate-50/80 transition-colors">
+                    <td class="px-8 py-5">
+                        <span class="font-black text-slate-700 text-sm tracking-tight">{{ h.codigo }}</span>
+                    </td>
+                    <td class="px-6 py-5 font-mono text-xs text-slate-500">{{ h.ano }}</td>
+                    <td class="px-6 py-5">
+                        <span class="bg-slate-100 text-slate-600 px-3 py-1 rounded-lg text-[10px] font-black uppercase">
+                            {{ h.tipo_documento }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-5">
+                        {% if h.codigo_validacao_agt %}
+                            <code class="bg-indigo-50 text-indigo-700 px-2 py-1 rounded border border-indigo-100 text-xs font-bold">
+                                {{ h.codigo_validacao_agt }}
+                            </code>
+                        {% else %}
+                            <span class="text-red-400 text-[10px] font-bold italic underline decoration-dotted">NÃO VINCULADA</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-5">
+                        <span class="font-mono text-slate-600 font-bold">#{{ h.ultimo_numero|stringformat:"03d" }}</span>
+                    </td>
+                    <td class="px-6 py-5 text-right">
+                        {% if h.status == 'ATIVA' %}
+                            <div class="flex items-center text-green-600 font-black text-[9px] uppercase">
+                                <div class="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+                                Em Operação
+                            </div>
+                        {% else %}
+                            <div class="flex items-center text-amber-500 font-black text-[9px] uppercase">
+                                <div class="w-2 h-2 bg-amber-400 rounded-full mr-2"></div>
+                                Aguardando AGT
+                            </div>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="px-8 py-20 text-center">
+                        <i class="fas fa-folder-open text-slate-200 text-4xl mb-4"></i>
+                        <p class="text-slate-400 font-bold uppercase text-xs">Nenhuma série registrada no histórico.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="mt-6 flex justify-between items-center px-4">
+        <p class="text-[9px] text-slate-400 font-bold uppercase italic">
+            Gerado em: {{ now|date:"d/m/Y H:i" }} | Relatório Protegido por Algoritmo SOTARQ
+        </p>
+        <button onclick="window.print()" class="text-slate-400 hover:text-indigo-600 text-[10px] font-black uppercase">
+            <i class="fas fa-print mr-1"></i> Imprimir Arquivo
+        </button>
+    </div>
+</div>
+{% endblock %}

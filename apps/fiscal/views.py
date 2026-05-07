@@ -1,27 +1,62 @@
 # apps/fiscal/views.py
+import random
+import string
+
 from django.http import HttpResponse, Http404
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required, user_passes_test
 
 from apps.academic.views import is_manager_check
-from .models import SAFTExport, FiscalConfig, TaxaIVAAGT
+from .models import AssinaturaDigital, DocType, SAFTExport, FiscalConfig, SerieFiscal, TaxaIVAAGT
 from .forms import FiscalConfigForm, TaxaIVAAGTForm
 from django.contrib.admin.views.decorators import staff_member_required
 from .models import DocumentoFiscal
 from django.db.models import F
 from django.conf import settings
+from django.db import IntegrityError
 from django.db.models import Q
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from .models import SAFTExport
 from .tasks import task_generate_xml
 from django.utils import timezone
-from apps.core.utils import render_to_pdf # Usando o utilitário que corrigimos antes
+from apps.core.utils import render_to_pdf
 from .models import DocumentoCanceladoAudit
 from django.db import transaction
+from django.core.exceptions import PermissionDenied
 
 
 
+def admin_role_required(view_func):
+    """
+    RIGOR SOTARQ: Garante acesso apenas ao ADMIN da Escola (Role.Type.ADMIN).
+    Também permite Superusers para evitar bloqueios em ambiente de desenvolvimento.
+    """
+    def _wrapped_view(request, *args, **kwargs):
+        # 1. Bypass para Superuser (O seu usuário master sempre entra)
+        if request.user.is_superuser:
+            return view_func(request, *args, **kwargs)
+        
+        # 2. Verificação de Role Dinâmica do Tenant
+        # Tentamos acessar request.user.role.code de forma segura
+        role = getattr(request.user, 'role', None)
+        
+        if role and hasattr(role, 'code'):
+            # Compara com o TextChoices da sua classe Role
+            from apps.core.models import Role # Certifique-se de importar corretamente
+            if role.code == Role.Type.ADMIN:
+                return view_func(request, *args, **kwargs)
+        
+        # 3. Log de Auditoria para Segurança
+        logger.warning(
+            f"[SECURITY_ALERT] Tentativa de acesso negada à área Fiscal. "
+            f"User: {request.user.email} | Role: {role.code if role else 'N/A'} | "
+            f"Tenant: {request.tenant.schema_name}"
+        )
+        
+        raise PermissionDenied("Apenas o Administrador da Escola pode gerir Séries e ATCUD.")
+    
+    return _wrapped_view
 
 
 @login_required
@@ -255,7 +290,7 @@ def anular_documento_fiscal(request, doc_id):
 # WEBSERVICE
 ##############################################
 from django.http import JsonResponse
-from .services import AGTWebService
+from .services import AGTWebService, gerar_chaves_rsa_tenant
 
 def api_agt_status(request):
     """Endpoint chamado pelo AJAX no Dashboard."""
@@ -292,3 +327,275 @@ def taxa_iva_create(request):
         })
     return redirect('fiscal:taxa_iva_list')
 
+
+@login_required
+@user_passes_test(is_manager_check)
+def gestao_chaves_rsa(request):
+    """
+    PAINEL SOTARQ: Gestão de Identidade Digital da Escola.
+    Permite gerar novas chaves e visualizar o status da assinatura.
+    """
+    # Busca a assinatura ativa para o Tenant atual
+    #assinatura = AssinaturaDigital.objects.filter(tenant=request.tenant, ativa=True).first()
+    assinatura = AssinaturaDigital.objects.filter(ativa=True).first()
+    
+    # Histórico de chaves (Auditoria)
+    #historico = AssinaturaDigital.objects.filter(tenant=request.tenant).order_by('-created_at')
+    historico = AssinaturaDigital.objects.filter().order_by('-created_at')
+
+    return render(request, 'fiscal/gestao_chaves.html', {
+        'assinatura': assinatura,
+        'historico': historico,
+    })
+
+"""
+@login_required
+@user_passes_test(is_manager_check)
+def gerar_nova_chave_action(request):
+    
+    #Gatilho para gerar par RSA 1024-bit.
+   
+    if request.method == "POST":
+        try:
+            # Chama o serviço que criamos anteriormente
+            nova_chave = gerar_chaves_rsa_tenant(request.tenant)
+            messages.success(request, f"Nova Chave RSA gerada com sucesso em {nova_chave.created_at.strftime('%d/%m/%Y %H:%M')}.")
+        except Exception as e:
+            messages.error(request, f"Erro crítico ao gerar chaves: {str(e)}")
+    
+    return redirect('fiscal:gestao_chaves_rsa')
+
+"""
+
+
+
+
+
+"""
+@login_required
+@user_passes_test(is_manager_check)
+def baixar_chave_publica(request, pk):
+
+    #Exporta a chave pública em formato .pem para entrega à AGT/Auditoria.
+    
+    assinatura = get_object_or_404(AssinaturaDigital, pk=pk, tenant=request.tenant)
+    
+    conteudo = assinatura.chave_publica_pem
+    filename = f"PUBLIC_KEY_{request.tenant.nif}_{assinatura.created_at.strftime('%Y%m%d')}.pem"
+    
+    response = HttpResponse(conteudo, content_type='application/x-pem-file')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    
+    # Rigor: Registrar no log quem baixou a chave
+    logger.info(f"Chave pública baixada pelo usuário {request.user} para o tenant {request.tenant.schema_name}")
+    
+    return response
+
+"""
+
+
+
+@login_required
+@admin_role_required # Segurança Máxima SOTARQ
+def gerar_nova_chave_action(request):
+    """
+    Gatilho para gerar par RSA 1024-bit seguindo o rigor do schema atual.
+    """
+    if request.method == "POST":
+        try:
+            # Não passamos mais o objeto tenant, o schema já está setado no middleware
+            nova_chave = gerar_chaves_rsa_tenant()
+            messages.success(request, f"Nova Chave RSA gerada com sucesso em {nova_chave.created_at.strftime('%d/%m/%Y %H:%M')}.")
+        except Exception as e:
+            messages.error(request, f"Erro crítico ao gerar chaves: {str(e)}")
+    
+    return redirect('fiscal:gestao_chaves_rsa')
+
+
+@login_required
+@user_passes_test(admin_role_required) # Segurança Máxima SOTARQ
+def baixar_chave_publica(request, pk):
+    """
+    Exporta a chave pública em TXT (exigência AGT) ou PEM.
+    O isolamento por schema do django-tenants garante a segurança.
+    """
+    assinatura = get_object_or_404(AssinaturaDigital, pk=pk)
+    
+    # Determina o formato (padrão txt conforme solicitado)
+    formato = request.GET.get('format', 'txt').lower()
+    conteudo = assinatura.chave_publica_pem
+    
+    if formato == 'pem':
+        content_type = 'application/x-pem-file'
+        extension = 'pem'
+    else:
+        content_type = 'text/plain'
+        extension = 'txt'
+
+    # Nome do arquivo usando o schema_name do tenant atual
+    filename = f"CHAVE_PUBLICA_{request.tenant.schema_name.upper()}_{assinatura.created_at.strftime('%Y%m%d')}.{extension}"
+    
+    response = HttpResponse(conteudo, content_type=content_type)
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    
+    logger.info(f"Chave pública exportada em .{extension} por {request.user} no schema {request.tenant.schema_name}")
+    
+    return response
+
+
+@login_required
+@user_passes_test(admin_role_required)
+def gestao_series_fiscal(request):
+    """
+    Interface Unificada SOTARQ para Séries Fiscais.
+    """
+    # Filtro de Tenant obrigatório para evitar 404 e vazamento de dados
+    series = SerieFiscal.objects.order_by('-ano', 'tipo_documento')
+    
+    if request.method == "POST":
+        # Captura o ID da série vindo do Modal ou do Form
+        serie_id = request.POST.get("serie_id")
+        
+        # Blindagem contra NoneType (o erro do strip que resolvemos)
+        novo_codigo = request.POST.get("codigo_agt", "").strip().upper()
+        
+        if not serie_id:
+            messages.error(request, "ERRO: ID da série não identificado.")
+            return redirect('fiscal:gestao_series')
+
+        # O Rigor exige buscar a série DENTRO do tenant atual
+        serie = get_object_or_404(SerieFiscal, id=serie_id)
+        
+        serie.codigo_validacao_agt = novo_codigo
+        serie.status = 'ATIVA' if novo_codigo else 'PENDING'
+        serie.save()
+        
+        # Sincronização de ATCUD
+        docs = DocumentoFiscal.objects.filter(serie=serie, atcud="")
+        count = 0
+        for doc in docs:
+            doc.save() # O save() do model gera o ATCUD
+            count += 1
+            
+        messages.success(request, f"Série {serie.codigo} atualizada! {count} documentos processados.")
+        return redirect('fiscal:gestao_series')
+
+    return render(request, 'fiscal/gestao_series.html', {'series': series})
+
+
+
+@login_required
+@user_passes_test(admin_role_required)
+def gerar_series_fiscal(request):
+    """
+    Controlador Central SOTARQ: Gere, Insira ou Vincule Séries Fiscais.
+    """
+    ano_atual = timezone.now().year
+    series = SerieFiscal.objects.order_by('-ano', 'tipo_documento')
+
+    if request.method == 'POST':
+        # --- CASO 1: Inserção Manual (Série fornecida pela AGT) ---
+        if 'inserir_manual' in request.POST:
+            tipo = request.POST.get('tipo_documento')
+            codigo = request.POST.get('codigo_manual', '').strip().upper()
+            validacao = request.POST.get('codigo_validacao', '').strip().upper()
+
+            # Validação de Rigor: Já existe este tipo para este ano?
+            if SerieFiscal.objects.filter(tipo_documento=tipo, ano=ano_atual).exists():
+                messages.error(request, f"VIOLAÇÃO DE REGRAS: Já existe uma série {tipo} para o ano {ano_atual}.")
+                return redirect('fiscal:gestao_series')
+
+            try:
+                SerieFiscal.objects.create(
+                    codigo=codigo,
+                    ano=ano_atual,
+                    tipo_documento=tipo,
+                    codigo_validacao_agt=validacao,
+                    status='ATIVA' if validacao else 'PENDING'
+                )
+                messages.success(request, f"Série manual {codigo} registrada com sucesso.")
+            except IntegrityError:
+                messages.error(request, "Erro de integridade: Código já existente.")
+
+        # --- CASO 2: Geração Automática (Algoritmo SOTARQ) ---
+        elif 'gerar_automatico' in request.POST:
+            tipos = [DocType.FT, DocType.FR, DocType.NC, DocType.RC]
+            nome_escola = request.tenant.name.replace(" ", "").upper()
+            prefixo = (nome_escola[:6] if len(nome_escola) >= 6 else nome_escola.ljust(6, 'X'))
+            criadas = 0
+
+            try:
+                with transaction.atomic():
+                    for tipo in tipos:
+                        # Pula se já existir para evitar erro de UniqueConstraint
+                        if SerieFiscal.objects.filter(tipo_documento=tipo, ano=ano_atual).exists():
+                            continue
+
+                        # Algoritmo de Código: TIPO + 3NUM + ESCOLA + 3CHAR + ANO
+                        while True:
+                            r_num = ''.join(random.choices(string.digits, k=3))
+                            r_char = ''.join(random.choices(string.ascii_uppercase, k=3))
+                            novo_codigo = f"{tipo}{r_num}{prefixo}{r_char}{ano_atual}"
+                            
+                            if not SerieFiscal.objects.filter(codigo=novo_codigo).exists():
+                                break
+
+                        SerieFiscal.objects.create(
+                            codigo=novo_codigo,
+                            ano=ano_atual,
+                            tipo_documento=tipo,
+                            status='PENDING'
+                        )
+                        criadas += 1
+                
+                if criadas > 0:
+                    messages.info(request, f"{criadas} séries geradas sob o padrão SOTARQ.")
+                else:
+                    messages.warning(request, "Nenhuma série nova foi gerada (Já existem séries para todos os tipos este ano).")
+            
+            except Exception as e:
+                messages.error(request, f"Falha na geração atómica: {str(e)}")
+
+        # --- CASO 3: Vincular Código (Via Modal) ---
+        elif 'vincular_codigo' in request.POST:
+            serie_id = request.POST.get('serie_id')
+            codigo_agt = request.POST.get('codigo_agt', '').strip().upper()
+            
+            serie = get_object_or_404(SerieFiscal, id=serie_id)
+            serie.codigo_validacao_agt = codigo_agt
+            serie.status = 'ATIVA'
+            serie.save()
+            messages.success(request, f"Série {serie.codigo} validada com sucesso.")
+
+        return redirect('fiscal:gestao_series')
+
+    return render(request, 'fiscal/gestao_series.html', {
+        'series': series,
+        'ano_atual': ano_atual,
+        'now': timezone.now()
+    })
+
+
+
+
+@login_required
+@user_passes_test(admin_role_required)
+def historico_series_fiscal(request):
+    """
+    Exibe o histórico completo de séries geradas e seu estado de conformidade.
+    """
+    # Ordenamos por ano decrescente e depois por tipo
+    historico = SerieFiscal.objects.all().order_by('-ano', 'tipo_documento')
+    
+    # Métricas rápidas para o cabeçalho do relatório
+    total_ativas = historico.filter(status='ATIVA').count()
+    pendentes = historico.filter(status='PENDING').count()
+
+    context = {
+        'historico': historico,
+        'total_ativas': total_ativas,
+        'pendentes': pendentes,
+        'ano_atual': timezone.now().year
+    }
+    
+    return render(request, 'fiscal/historico_series.html', context)

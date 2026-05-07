@@ -3,16 +3,17 @@
 import requests
 import xml.etree.ElementTree as ET
 from django.conf import settings
-from .models import DocumentoFiscal
-from .models import SerieFiscal, AssinaturaDigital, DocumentoFiscal
+from django.db import transaction
+from apps.core.models import SchoolConfiguration
+from .models import SerieFiscal, AssinaturaDigital, DocumentoFiscal, DocType
 from .signing import AGTSigner
-from datetime import timezone
-from .models import SerieFiscal, DocType
 from django.utils import timezone
 import json
-from django.conf import settings
-from .models import DocumentoFiscal, SerieFiscal
-from .signing import AGTSigner
+import datetime
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import serialization
+
+
 
 
 def request_series_agt(tenant, year, doc_type):
@@ -224,31 +225,137 @@ class AGTWebService:
         return is_online
 
 
+
 class SerieManager:
     @staticmethod
-    def get_or_create_active_serie(tenant, tipo_doc):
-        ano_atual = timezone.now().year
+    def get_or_create_active_serie(doc_type):
+        """
+        MOTOR DE SÉRIES SOTARQ (Unificado): 
+        Busca a série ativa para o Schema atual via django-tenant. 
+        Se não existir, executa o protocolo de solicitação automática à AGT.
+        """
+        year = datetime.date.today().year
         
-        # 1. Tenta buscar a série já existente e ativa
+        # 1. Busca local no Schema atual (Isolamento nativo django-tenant)
         serie = SerieFiscal.objects.filter(
-            tenant=tenant,
-            tipo_documento=tipo_doc,
-            ano=ano_atual,
+            ano=year,
+            tipo_documento=doc_type,
             status='ATIVA'
         ).first()
 
         if serie:
             return serie
 
-        # 2. RIGOR SOTARQ: Se não existe, solicita formalmente à AGT antes de criar
-        logger.info(f"Solicitando nova série {tipo_doc} para o Tenant {tenant.name} na AGT...")
-        
-        sucesso, resultado = request_series_agt(tenant, ano_atual, tipo_doc)
-        
-        if sucesso:
-            # O request_series_agt já cria o objeto SerieFiscal no banco se der certo
-            return SerieFiscal.objects.get(codigo=resultado, tenant=tenant)
-        else:
-            # Se a AGT falhar, lançamos erro para não emitir fatura ilegal
-            raise Exception(f"Bloqueio de Compliance: Não foi possível obter série legal da AGT. Erro: {resultado}")
+        # 2. Resgate de Configurações do Tenant para comunicação AGT
+        config = SchoolConfiguration.objects.first()
+        if not config:
+            raise ValueError("Erro Crítico SOTARQ: SchoolConfiguration não configurada para este Tenant.")
 
+        # 3. Solicitação Formal à AGT e Persistência
+        success, result = SerieManager.request_series_agt(config, year, doc_type)
+        
+        if success:
+            return result
+        else:
+            # Rigor Máximo: Bloqueio imediato se a AGT não autorizar
+            raise RuntimeError(f"BLOQUEIO DE FATURAÇÃO AGT: {result}")
+
+    @staticmethod
+    @transaction.atomic
+    def request_series_agt(config, year, doc_type):
+        """
+        Protocolo de Comunicação JWS/AGT:
+        Assina, envia e registra a nova série autorizada.
+        """
+        try:
+            # O SchoolConfiguration (config) providencia o NIF e a chave privada
+            # Assume-se que config.assinatura_digital.get_private_key() existe ou similar
+            signer = AGTSigner(config.assinatura_digital.get_private_key())
+            
+            payload = {
+                "schemaVersion": "1.2",
+                "submissionUUID": signer.get_submission_uuid(),
+                "taxRegistrationNumber": config.nif, # Rigor: Vem da config do Tenant
+                "submissionTimeStamp": signer.get_timestamp(),
+                "softwareInfo": signer.get_software_info(),
+                "seriesYear": str(year),
+                "documentType": doc_type,
+                "establishmentNumber": "1",
+                "seriesContingencyIndicator": "N"
+            }
+
+            sign_data = {
+                "taxRegistrationNumber": config.nif,
+                "establishmentNumber": "1",
+                "seriesYear": str(year),
+                "documentType": doc_type,
+                "seriesContingencyIndicator": "N" 
+            }
+            payload["jwsSignature"] = signer.sign_payload(sign_data)
+
+            url = f"{settings.AGT_BASE_URL}/solicitarSerie"
+            
+            response = requests.post(url, json=payload, timeout=30)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if "seriesFEResult" in data:
+                    res = data["seriesFEResult"]
+                    
+                    # Criação com os dados oficiais retornados
+                    nova_serie = SerieFiscal.objects.create(
+                        codigo=res["seriesCode"],
+                        ano=year,
+                        codigo_validacao_agt=res.get("seriesValidationCode", ""),
+                        tipo_documento=doc_type,
+                        ultimo_numero=0,
+                        status='ATIVA'
+                    )
+                    return True, nova_serie
+                
+                if "errorList" in data:
+                    return False, f"Rejeição AGT: {data['errorList']}"
+            
+            return False, f"Erro de Conexão AGT: HTTP {response.status_code}"
+
+        except Exception as e:
+            return False, f"Exceção no Protocolo SOTARQ-AGT: {str(e)}"
+        
+
+def gerar_chaves_rsa_tenant():
+    """
+    RIGOR SOTARQ: Gera par de chaves RSA 1024 bits para o SCHEMA ATUAL.
+    O isolamento é garantido pelo Search Path do PostgreSQL via django-tenants.
+    """
+    from .models import AssinaturaDigital
+    
+    # 1. Gerar a chave privada RSA 1024 (Padrão AGT)
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=1024,
+    )
+
+    # 2. Serializar Privada (PEM)
+    pem_privada = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption()
+    ).decode('utf-8')
+
+    # 3. Serializar Pública (PEM)
+    pem_publica = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    ).decode('utf-8')
+
+    # 4. Transação de Estado no Schema
+    # Como estamos dentro do Schema da Escola, objects.all() já é isolado.
+    AssinaturaDigital.objects.filter(ativa=True).update(ativa=False)
+    
+    nova_assinatura = AssinaturaDigital.objects.create(
+        chave_privada_pem=pem_privada,
+        chave_publica_pem=pem_publica,
+        ativa=True
+    )
+    
+    return nova_assinatura

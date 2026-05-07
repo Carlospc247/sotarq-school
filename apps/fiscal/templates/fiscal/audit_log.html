@@ -26,7 +26,13 @@
         <a href="{% url 'fiscal:saft_list' %}" class="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-black transition-all">
             Gerir Arquivos SAF-T
         </a>
-        <a href="{% url 'fiscal:taxa_iva_list' %}" target="_blank" class="text-[20px] font-bold text-indigo-600 hover:underline flex items-center">
+        <a href="{% url 'fiscal:gestao_chaves_rsa' %}" class="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100">
+            <i class="fas fa-key mr-2"></i> Gestão de Chaves RSA
+        </a>
+        <a href="{% url 'fiscal:gestao_series' %}" class="bg-amber-500 text-white px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-amber-600 transition-all shadow-lg shadow-amber-100">
+            <i class="fas fa-barcode mr-2"></i> Séries e ATCUD
+        </a>
+        <a href="{% url 'fiscal:taxa_iva_list' %}" class="bg-green-500 text-white px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-amber-600 transition-all shadow-lg shadow-amber-100">
             <i data-feather="settings" class="w-3 h-3 mr-1"></i> Configurar Taxas IVA
         </a>
     </div>
