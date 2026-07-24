@@ -227,16 +227,28 @@ class AGTWebService:
 
 
 class SerieManager:
+    """
+    MOTOR DE GERENCIAMENTO DE SÉRIES FISCAIS (Refatorado v2.0)
+    
+    IMPORTANTE: Esta classe foi refatorada para trabalhar com BillingFactory.
+    A lógica de numeração sequencial foi MOVIDA para BillingFactory.obter_proximo_numero().
+    
+    SerieManager mantém apenas:
+    1. Criação/Validação de séries junto à AGT
+    2. Backup de lógica de fallback (quando Factory não pode ser usado)
+    """
+    
     @staticmethod
     def get_or_create_active_serie(doc_type):
         """
-        MOTOR DE SÉRIES SOTARQ (Unificado): 
-        Busca a série ativa para o Schema atual via django-tenant. 
-        Se não existir, executa o protocolo de solicitação automática à AGT.
+        DEPRECATED: Use BillingFactory.obter_proximo_numero() em seu lugar.
+        
+        Mantido apenas para compatibilidade com código legado.
+        Esta função retorna apenas a SÉRIE, não o número sequencial.
         """
         year = datetime.date.today().year
         
-        # 1. Busca local no Schema atual (Isolamento nativo django-tenant)
+        # 1. Busca local no Schema atual
         serie = SerieFiscal.objects.filter(
             ano=year,
             tipo_documento=doc_type,
@@ -244,20 +256,30 @@ class SerieManager:
         ).first()
 
         if serie:
+            logger.warning(
+                f"DEPRECATED: SerieManager.get_or_create_active_serie() chamado. "
+                f"Use BillingFactory.obter_proximo_numero() em seu lugar."
+            )
             return serie
 
-        # 2. Resgate de Configurações do Tenant para comunicação AGT
+        # 2. Resgate de Configurações do Tenant
         config = SchoolConfiguration.objects.first()
         if not config:
-            raise ValueError("Erro Crítico SOTARQ: SchoolConfiguration não configurada para este Tenant.")
+            raise ValueError(
+                "Erro Crítico SOTARQ: SchoolConfiguration não configurada para este Tenant."
+            )
 
-        # 3. Solicitação Formal à AGT e Persistência
+        # 3. Solicitação à AGT
         success, result = SerieManager.request_series_agt(config, year, doc_type)
         
         if success:
-            return result
+            # Busca a série recém-criada
+            return SerieFiscal.objects.get(
+                codigo=result,
+                ano=year,
+                tipo_documento=doc_type
+            )
         else:
-            # Rigor Máximo: Bloqueio imediato se a AGT não autorizar
             raise RuntimeError(f"BLOQUEIO DE FATURAÇÃO AGT: {result}")
 
     @staticmethod
@@ -268,14 +290,12 @@ class SerieManager:
         Assina, envia e registra a nova série autorizada.
         """
         try:
-            # O SchoolConfiguration (config) providencia o NIF e a chave privada
-            # Assume-se que config.assinatura_digital.get_private_key() existe ou similar
             signer = AGTSigner(config.assinatura_digital.get_private_key())
             
             payload = {
                 "schemaVersion": "1.2",
                 "submissionUUID": signer.get_submission_uuid(),
-                "taxRegistrationNumber": config.nif, # Rigor: Vem da config do Tenant
+                "taxRegistrationNumber": config.nif,
                 "submissionTimeStamp": signer.get_timestamp(),
                 "softwareInfo": signer.get_software_info(),
                 "seriesYear": str(year),

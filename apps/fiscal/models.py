@@ -153,15 +153,24 @@ class DocumentoFiscal(BaseModel):
 
 
     def save(self, *args, **kwargs):
-        # 1. RIGOR DE CACHE
+        # CRÍTICO: DocumentoFiscal.numero DEVE SER PREENCHIDO PELO FACTORY OU MIGRAÇÕES
+        # Esta é a única proteção: se numero for vazio, rejeitamos
+        if not self.numero or self.numero == 0:
+            raise ValueError(
+                f"DocumentoFiscal.numero é obrigatório. "
+                f"Use BillingFactory.create_documento_fiscal() para criar documentos. "
+                f"(Recebido: numero={self.numero})"
+            )
+        
+        # 1. RIGOR DE CACHE: Sincroniza o código da série se não tiver
         if not self.serie_codigo:
             self.serie_codigo = self.serie.codigo
 
-        # 2. RIGOR SOTARQ: FR confirmada no ato
+        # 2. RIGOR SOTARQ: FR confirmada no ato (Reconfirmed: não muda mais)
         if self.tipo_documento == DocType.FR:
             self.status = self.Status.CONFIRMED
 
-        # 3. Lógica de Referência para Recibos
+        # 3. Lógica de Referência para Recibos (RC)
         if self.tipo_documento == 'RC' and not self.documento_origem:
             try:
                 from apps.finance.models import Receipt
@@ -169,16 +178,19 @@ class DocumentoFiscal(BaseModel):
                 if receipt_comercial and receipt_comercial.payment.invoice.fiscal_doc:
                     self.documento_origem = receipt_comercial.payment.invoice.fiscal_doc.numero_documento
             except Exception as e:
-                print(f"Aviso SOTARQ: Erro no rastreio do RC: {e}")
+                logger.warning(f"Aviso SOTARQ: Erro no rastreio do RC: {e}")
 
-        # 4. GERAÇÃO DE NÚMERO E HASH
+        # 4. GERAÇÃO DE NÚMERO_DOCUMENTO (Formato Oficial)
+        # Só faz se ainda não existir (proteção contra sobrescrita)
         if not self.numero_documento and self.numero:
             self.numero_documento = f"{self.tipo_documento} {self.serie_codigo}/{self.numero}"
 
+        # 5. GERAÇÃO DE HASH SHA1 (Assinatura em Cadeia - Decreto 292/18)
+        # Só gera se transição para 'confirmed' e não houver hash
         if self.status == self.Status.CONFIRMED and not self.hash_documento:
             self._generate_sha1_hash()
         
-        # 5. COMPLIANCE ATCUD
+        # 6. COMPLIANCE ATCUD (Código AGT)
         if not self.atcud and self.serie.codigo_validacao_agt:
             self.atcud = f"{self.serie.codigo_validacao_agt}-{self.numero}"
             

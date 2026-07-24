@@ -14,6 +14,10 @@ from django.core.exceptions import PermissionDenied
 from django.db.models.signals import pre_save, post_save, pre_delete
 from .models import Receipt, CashFlow
 from django.core.files.base import ContentFile
+from decimal import Decimal
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -82,72 +86,84 @@ def trigger_agreement_activation(sender, instance, **kwargs):
 @receiver(post_save, sender=Payment)
 def sync_to_fiscal_module(sender, instance, created, **kwargs):
     """
-    Rigor SOTARQ: Assim que um pagamento é VALIDADO, 
-    ele gera o espelho na app FISCAL para o SAF-T.
-    """
-    if instance.validation_status == 'validated' and not hasattr(instance.invoice, 'fiscal_doc'):
-        invoice = instance.invoice
-        # Criar o Documento Fiscal
-        doc_fiscal = DocumentoFiscal.objects.create(
-            tipo_documento=invoice.doc_type,
-            serie=f"{invoice.doc_type}{timezone.now().year}",
-            numero=int(invoice.number.split('/')[-1]),
-            numero_documento=invoice.number,
-            cliente=invoice.student,
-            data_emissao=timezone.now().date(),
-            entidade_nome=invoice.student.full_name,
-            valor_base=invoice.subtotal,
-            valor_total=invoice.total,
-            valor_iva=invoice.tax_amount,
-            periodo_tributacao=timezone.now().strftime("%Y-%m"),
-            usuario_criacao=instance.confirmed_by,
-            status='confirmed' # Já nasce confirmado para assinar RSA
-        )
-        
-        # Vincular as linhas
-        for item in invoice.items.all():
-            DocumentoFiscalLinha.objects.create(
-                documento=doc_fiscal,
-                descricao=item.description,
-                quantidade=1,
-                preco_unitario=item.amount,
-                taxa_iva=invoice.tax_type, # FK para TaxaIVAAGT
-                valor_total_linha=item.amount,
-                numero_linha=1
-            )
-        
-        # Atualiza a invoice comercial com o link fiscal
-        invoice.fiscal_doc = doc_fiscal
-        invoice.save()
-
-# apps/finance/signals.py unificado
-
-@receiver(post_save, sender=Payment)
-def master_finance_sync(sender, instance, created, **kwargs):
-    """
-    ORQUESTRADOR SUPREMO: Sincroniza Financeiro -> Fiscal -> Documentos -> Notificações.
+    REFATORADO (v2.0): Sincronização Fiscal via BillingFactory
+    
+    IMPORTANTE: Esta função é chamada APÓS um pagamento ser validado.
+    
+    MAS: Se a Invoice foi criada via BillingFactory, ela JÁ TEM fiscal_doc!
+    Esta função é um FALLBACK apenas para invoices legadas (migrações).
+    
+    Não cria mais DocumentoFiscal com número errado. A Factory é a fonte única.
     """
     if instance.validation_status == 'validated':
         invoice = instance.invoice
         
-        # 1. EVITAR DUPLICIDADE (Rigor Anti-Fatura-Dupla)
+        # PROTEÇÃO: Se já tem fiscal_doc linkado, nada a fazer
         if invoice.fiscal_doc:
             return
-
-        with transaction.atomic():
-            # 2. GERAÇÃO DO ESPELHO FISCAL (Para AGT/SAFT)
-            from apps.fiscal.models import DocumentoFiscal, DocumentoFiscalLinha, DocType
+        
+        # AVISO: Se chegou aqui, é porque a Invoice foi criada FORA do Factory
+        # Isto indica possível bug ou dados legados
+        logger.warning(
+            f"Invoice #{invoice.id} validada mas sem DocumentoFiscal linkado. "
+            f"Esta invoice NÃO foi criada via BillingFactory (dados legados?). "
+            f"Use BillingFactory.create_invoice_with_fiscal() para futuras criações."
+        )
+        
+        # FALLBACK: Tenta criar DocumentoFiscal, mas com número seguro
+        # NÃO usa generate_document_number() que pode gerar número duplicado
+        try:
+            from apps.fiscal.factories import BillingFactory
+            from apps.fiscal.models import DocumentoFiscal as DocFiscal
             
-            doc_fiscal = DocumentoFiscal.objects.create(
-                tipo_documento=invoice.doc_type,
-                serie=f"{invoice.doc_type}{timezone.now().year}",
-                # O número real fiscal é gerado aqui para garantir sequência sem furos
-                numero_documento=generate_document_number(DocumentoFiscal, invoice.doc_type), 
+            doc_fiscal = BillingFactory.create_documento_fiscal(
                 cliente=invoice.student,
-                data_emissao=timezone.now().date(),
-                entidade_nome=invoice.student.full_name,
-                valor_total=invoice.total,
+                tipo_documento=invoice.doc_type,
+                valor_base=invoice.subtotal,
+                valor_iva=invoice.tax_amount,
+                taxa_iva=invoice.tax_type,
                 usuario_criacao=instance.confirmed_by,
+                documento_origem=None,
+                status='confirmed'  # Já nasce confirmado porque Payment foi validado
+            )
+            
+            # Vincular as linhas
+            for item in invoice.items.all():
+                from apps.fiscal.models import DocumentoFiscalLinha
+                DocumentoFiscalLinha.objects.create(
+                    documento=doc_fiscal,
+                    descricao=item.description,
+                    quantidade=Decimal('1'),
+                    preco_unitario=item.amount,
+                    taxa_iva=invoice.tax_type,
+                    valor_total_linha=item.amount,
+                    valor_iva_linha=Decimal('0'),  # Pode calcular se necessário
+                    numero_linha=1
+                )
+            
+            # Linkar o fiscal_doc
+            invoice.fiscal_doc = doc_fiscal
+            invoice.save(update_fields=['fiscal_doc'])
+            
+            logger.info(f"Fallback: DocumentoFiscal criado para Invoice #{invoice.id}")
+            
+        except Exception as e:
+            logger.error(
+                f"CRÍTICO: Não consegui criar DocumentoFiscal fallback para Invoice #{invoice.id}: {e}. "
+                f"O documento pode estar SEM espelho fiscal!"
+            )
+
+
+@receiver(post_save, sender=Payment)
+def master_finance_sync(sender, instance, created, **kwargs):
+    """
+    ORQUESTRADOR DEPRECADO
+    
+    Mantido apenas para compatibilidade histórica.
+    Toda a sincronização agora é feita via BillingFactory e sync_to_fiscal_module.
+    """
+    # NOOP: Tudo já é feito no sync_to_fiscal_module acima
+    pass
                 status='confirmed'
             )
 

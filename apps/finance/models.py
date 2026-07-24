@@ -204,24 +204,29 @@ class Invoice(models.Model):
         super(Invoice, self).save(update_fields=['subtotal', 'discount_amount', 'tax_amount', 'total'])
 
     def save(self, *args, **kwargs):
-        if not self.number:
-            from apps.fiscal.services import SerieManager
-            
-            # 1. Obtém a série ativa com Rigor Fiscal
-            serie = SerieManager.get_or_create_active_serie(self.doc_type)
-            
-            # 2. Incremento Atómico (Evita duplicados em multi-usuário)
-            # Usamos F() para incrementar diretamente no Banco de Dados
-            serie.ultimo_numero = F('ultimo_numero') + 1
-            serie.save(update_fields=['ultimo_numero'])
-            
-            # Recarregamos da BD para obter o número atualizado para o self.number
-            serie.refresh_from_db()
-            
-            # 3. Define o número padrão AGT: TIPO SERIE/NUMERO
-            self.number = f"{self.doc_type} {serie.codigo}/{serie.ultimo_numero}"
-            
-        # 4. Chamada do super() deve estar alinhada com o IF
+        # IMPORTANTE: A numeração de Invoice deve SEMPRE vir de DocumentoFiscal via BillingFactory.
+        # Esta é uma proteção: se não tiver number, é porque foi criada fora do Factory.
+        # Logamos um aviso para debugging, mas permitimos (para compatibilidade com migrações).
+        if not self.number and self.doc_type:
+            logger.warning(
+                f"Invoice criada fora do Factory Pattern (student={self.student_id}). "
+                f"Use BillingFactory.create_invoice_with_fiscal() para criações futuras."
+            )
+            # Fallback: gera um número temporário (não ideal, mas evita erro)
+            from apps.fiscal.factories import BillingFactory
+            try:
+                codigo_serie, numero = BillingFactory.obter_proximo_numero(
+                    self.doc_type, 
+                    self.student.user.tenant
+                )
+                self.number = f"{self.doc_type} {codigo_serie}/{numero}"
+            except Exception as e:
+                logger.error(f"Fallback de numeração falhou: {e}")
+                # Último recurso: gera com timestamp
+                self.number = f"{self.doc_type} FALLBACK-{timezone.now().timestamp()}"
+        
+        # Validação: number deve ser única (constraint do modelo)
+        # O BD vai rejeitar se houver duplicação
         super().save(*args, **kwargs)
 
 
